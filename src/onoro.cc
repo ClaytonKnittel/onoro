@@ -55,6 +55,14 @@ Game::Game(uint32_t n_pawns)
     Game g2(*this, idx);
     printf("Move: (%u, %u)\n", idx.first, idx.second);
     printf("%s\n", g2.Print().c_str());
+
+    g2.forEachMove([&g2](idx_t idx2) {
+      Game g3(g2, idx2);
+      printf("2nd move: (%u, %u)\n", idx2.first, idx2.second);
+      printf("%s\n", g3.Print().c_str());
+    });
+
+    printf("\n\n");
   });
 }
 
