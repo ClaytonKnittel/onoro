@@ -50,15 +50,9 @@ file(GLOB_RECURSE ASM_SRC
 list(FILTER CXX_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
 list(FILTER ASM_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
 
-if(${BUILD_SHARED_LIBS})
-	add_library(onoro SHARED
-		${CXX_SRC} ${ASM_SRC}
-	)
-else()
-	add_library(onoro STATIC
-		${CXX_SRC} ${ASM_SRC}
-	)
-endif()
+add_executable(onoro
+  ${CXX_SRC} ${ASM_SRC}
+)
 
 if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
 	enable_language(ASM)
@@ -73,7 +67,7 @@ endif()
 
 target_compile_options(onoro PRIVATE
 	$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:-Wpedantic -Wall -Wextra
-	-Wno-unused-function -Wno-format -march=native -mtune=native>
+  -Wno-unused-function -Wno-format -march=native -mtune=native>
 )
 target_compile_options(onoro
 	PRIVATE
@@ -82,7 +76,7 @@ target_compile_options(onoro
 		$<$<COMPILE_LANGUAGE:CXX>:-Wno-nested-anon-types -Wno-ignored-qualifiers
 		-Wno-gnu-anonymous-struct -Wno-unused-parameter -Wno-newline-eof
 		-Wno-c++11-extensions -Wno-c++14-extensions -Wno-c++17-extensions
-		-Wno-gnu-zero-variadic-macro-arguments>
+		-Wno-gnu-zero-variadic-macro-arguments> -Wno-vla-extension
 )
 
 if("${CMAKE_ASM_COMPILER_ID}" MATCHES "GNU")
