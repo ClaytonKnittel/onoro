@@ -7,10 +7,14 @@
 
 namespace Onoro {
 
+struct pos_t {
+  int32_t x, y;
+};
+
 // (x, y) coordinates as an index.
 typedef std::pair<uint32_t, uint32_t> idx_t;
 // coordinates in vector space
-typedef std::pair<uint32_t, uint32_t> pos_t;
+// typedef std::pair<int32_t, int32_t> pos_t;
 
 template <uint32_t NPawns>
 class Game {
@@ -93,6 +97,10 @@ class Game {
    */
   uint32_t fromIdx(idx_t idx) const;
 
+  pos_t idxToPos(idx_t idx) const;
+
+  idx_t posToIdx(pos_t pos) const;
+
   uint32_t nPawnsInPlay() const;
 
   TileState getTile(idx_t idx) const;
@@ -112,13 +120,35 @@ class Game {
   void forEachMoveP2(CallbackFnT cb) const;
 };
 
-template <typename T>
-idx_t operator*(const T& a, const idx_t& b) {
-  return { a * b.first, a * b.second };
+bool operator==(const pos_t& a, const pos_t& b) {
+  return a.x == b.x && a.y == b.y;
 }
 
-idx_t operator+(const idx_t& a, const idx_t& b) {
-  return { a.first + b.first, a.second + b.second };
+bool operator!=(const pos_t& a, const pos_t& b) {
+  return a.x != b.x || a.y != b.y;
+}
+
+template <typename T>
+pos_t operator*(const T& a, const pos_t& b) {
+  return { static_cast<int32_t>(a * b.x), static_cast<int32_t>(a * b.y) };
+}
+
+pos_t operator+(const pos_t& a, const pos_t& b) {
+  return { a.x + b.x, a.y + b.y };
+}
+
+pos_t operator+=(pos_t& a, const pos_t& b) {
+  a = { a.x + b.x, a.y + b.y };
+  return a;
+}
+
+pos_t operator-(const pos_t& a, const pos_t& b) {
+  return { a.x - b.x, a.y - b.y };
+}
+
+pos_t operator-=(pos_t& a, const pos_t& b) {
+  a = { a.x - b.x, a.y - b.y };
+  return a;
 }
 
 template <uint32_t NPawns>
@@ -174,17 +204,19 @@ std::pair<int, pos_t> Game<NPawns>::calcMoveShiftAndOffset(const Game& g,
   pos_t offset = { 0, 0 };
   if (move.second == 0 && g.max_idx_.second < getBoardLen() - 1) {
     shift = getBoardLen() * 2;
-    offset.second = 2;
+    offset.x = 1;
+    offset.y = 2;
   } else if (move.second == getBoardLen() - 1 && g.max_idx_.second > 0) {
     shift = -static_cast<int>(getBoardLen() * 2);
-    offset.second = -2;
+    offset.x = -1;
+    offset.y = -2;
   }
   if (move.first == 0 && g.max_idx_.first < getBoardLen() - 1) {
     shift++;
-    offset.first = 1;
+    offset.x++;
   } else if (move.first == getBoardLen() - 1 && g.max_idx_.first > 0) {
     shift--;
-    offset.first = -1;
+    offset.x--;
   }
 
   return { shift, offset };
@@ -222,7 +254,7 @@ Game<NPawns>::Game() : state_({ 2, 0, 0 }) {
 
   min_idx_ = b_start;
   max_idx_ = { mid_idx + 1, mid_idx + 1 };
-  sum_of_mass_ = b_start + w_start + b_next;
+  sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next);
 
   printf("%s\n", this->Print().c_str());
 
@@ -240,9 +272,11 @@ Game<NPawns>::Game() : state_({ 2, 0, 0 }) {
     });
   }
 
-  g->forEachMoveP2([](idx_t to, idx_t from) {
+  g->forEachMoveP2([g](idx_t to, idx_t from) {
     printf("Move from (%u, %u) to (%u, %u)\n", from.first, from.second,
            to.first, to.second);
+    Game<NPawns> g2(*g, to, from);
+    printf("%s\n", g2.Print().c_str());
   });
 
   /*
@@ -277,11 +311,11 @@ Game<NPawns>::Game(const Game<NPawns>& g, idx_t move)
                std::min(move.second, g.min_idx_.second) };
   max_idx_ = { std::max(move.first, g.max_idx_.first),
                std::max(move.second, g.max_idx_.second) };
-  min_idx_ = min_idx_ + offset;
-  max_idx_ = max_idx_ + offset;
-  sum_of_mass_ = g.sum_of_mass_ + move + nPawnsInPlay() * offset;
+  min_idx_ = posToIdx(idxToPos(min_idx_) + offset);
+  max_idx_ = posToIdx(idxToPos(max_idx_) + offset);
+  sum_of_mass_ = g.sum_of_mass_ + idxToPos(move) + nPawnsInPlay() * offset;
 
-  setTile(move + offset,
+  setTile(posToIdx(idxToPos(move) + offset),
           g.state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
 }
 
@@ -297,13 +331,14 @@ Game<NPawns>::Game(const Game& g, idx_t move, idx_t from)
                std::min(move.second, g.min_idx_.second) };
   max_idx_ = { std::max(move.first, g.max_idx_.first),
                std::max(move.second, g.max_idx_.second) };
-  min_idx_ = min_idx_ + offset;
-  max_idx_ = max_idx_ + offset;
-  sum_of_mass_ = g.sum_of_mass_ + move + nPawnsInPlay() * offset;
+  min_idx_ = posToIdx(idxToPos(min_idx_) + offset);
+  max_idx_ = posToIdx(idxToPos(max_idx_) + offset);
+  sum_of_mass_ =
+      g.sum_of_mass_ + idxToPos(move) - idxToPos(from) + (NPawns * 2) * offset;
 
-  setTile(move + offset,
+  setTile(posToIdx(idxToPos(move) + offset),
           g.state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
-  clearTile(from + offset);
+  clearTile(posToIdx(idxToPos(from) + offset));
 }
 
 template <uint32_t NPawns>
@@ -321,7 +356,7 @@ std::string Game<NPawns>::Print() const {
     }
 
     for (uint32_t x = 0; x < getBoardLen(); x++) {
-      auto [mx, my] = sum_of_mass_;
+      auto [mx, my] = posToIdx(sum_of_mass_);
       mx = (mx + nPawnsInPlay() / 2) / nPawnsInPlay();
       my = (my + nPawnsInPlay() / 2) / nPawnsInPlay();
 
@@ -352,6 +387,18 @@ idx_t Game<NPawns>::toIdx(uint32_t i) const {
 template <uint32_t NPawns>
 uint32_t Game<NPawns>::fromIdx(idx_t idx) const {
   return idx.first + idx.second * getBoardLen();
+}
+
+template <uint32_t NPawns>
+pos_t Game<NPawns>::idxToPos(idx_t idx) const {
+  return { static_cast<int32_t>(idx.first + idx.second / 2),
+           static_cast<int32_t>(idx.second) };
+}
+
+template <uint32_t NPawns>
+idx_t Game<NPawns>::posToIdx(pos_t pos) const {
+  return { static_cast<uint32_t>(pos.x - static_cast<uint32_t>(pos.y) / 2),
+           static_cast<uint32_t>(pos.y) };
 }
 
 template <uint32_t NPawns>
