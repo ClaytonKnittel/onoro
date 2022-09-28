@@ -87,6 +87,7 @@ class Game {
   // Max x/y index values of any piece
   idx_t max_idx_;
 
+ public:
   /*
    * Converts an absolute index to an idx_t.
    */
@@ -255,47 +256,6 @@ Game<NPawns>::Game() : state_({ 2, 0, 0 }) {
   min_idx_ = b_start;
   max_idx_ = { mid_idx + 1, mid_idx + 1 };
   sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next);
-
-  printf("%s\n", this->Print().c_str());
-
-  Game<NPawns>* g = this;
-  for (uint32_t i = 0; i < NPawns * 2 - 3; i++) {
-    forEachMove([g](idx_t idx) {
-      Game<NPawns> g2(*g, idx);
-      printf("Move: (%u, %u)\n", idx.first, idx.second);
-      printf("min:  (%u, %u)\n", g2.min_idx_.first, g2.min_idx_.second);
-      printf("max:  (%u, %u)\n", g2.max_idx_.first, g2.max_idx_.second);
-      printf("%s\n", g2.Print().c_str());
-
-      *g = std::move(g2);
-      return false;
-    });
-  }
-
-  g->forEachMoveP2([g](idx_t to, idx_t from) {
-    printf("Move from (%u, %u) to (%u, %u)\n", from.first, from.second,
-           to.first, to.second);
-    Game<NPawns> g2(*g, to, from);
-    printf("%s\n", g2.Print().c_str());
-  });
-
-  /*
-  forEachMove([this](idx_t idx) {
-    Game g2(*this, idx);
-    printf("Move: (%u, %u)\n", idx.first, idx.second);
-    printf("%s\n", g2.Print().c_str());
-
-    g2.forEachMove([&g2](idx_t idx2) {
-      Game g3(g2, idx2);
-      printf("2nd move: (%u, %u)\n", idx2.first, idx2.second);
-      printf("%s\n", g3.Print().c_str());
-      return false;
-    });
-
-    printf("\n\n");
-    return false;
-  });
-  */
 }
 
 template <uint32_t NPawns>
