@@ -3,6 +3,8 @@
 
 static constexpr uint32_t n_pawns = 4;
 
+void TestUnionFind();
+
 int main(int argc, char* argv[]) {
   srand(0);
 
@@ -47,6 +49,8 @@ int main(int argc, char* argv[]) {
 
     printf("%s\n", g.Print().c_str());
   }
+
+  TestUnionFind();
 
   return 0;
 }

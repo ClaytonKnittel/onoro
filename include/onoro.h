@@ -5,6 +5,8 @@
 #include <string>
 #include <utility>
 
+#include "union_find.h"
+
 namespace Onoro {
 
 struct pos_t {
