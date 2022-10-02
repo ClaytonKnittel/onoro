@@ -599,9 +599,11 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
                             (idx % (bits_per_entry / tmp_board_tile_bits));
 
         tmp_board[tb_idx] -= uint64_t(1) << tb_shift;
-        if (((tmp_board[tb_idx] & tmp_board_tile_mask) >> tb_shift) == 1) {
+        if (((tmp_board[tb_idx] >> tb_shift) & tmp_board_tile_mask) == 1 &&
+            getTile(neighbor_idx) != TileState::TILE_EMPTY) {
           n_to_satisfy++;
         }
+
         return true;
       });
 
@@ -643,7 +645,9 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
           });
 
           if (n_satisfied == n_to_satisfy) {
-            cb(toIdx(tmp_next_idx), toIdx(next_idx));
+            if (!cb(toIdx(tmp_next_idx), toIdx(next_idx))) {
+              return;
+            }
           }
         }
       }
