@@ -12,6 +12,8 @@ class UnionFind {
   UnionFind(const UnionFind&) = delete;
   UnionFind(UnionFind&&) = default;
 
+  uint32_t GetNumGroups() const;
+
   // Returns the index of the parent of this element's set.
   uint32_t Find(uint32_t idx);
 
@@ -21,6 +23,7 @@ class UnionFind {
  private:
   T* buffer_;
   uint32_t buffer_size_;
+  uint32_t n_groups_;
 };
 
 template <typename T>
@@ -45,7 +48,8 @@ uint32_t UnionFind<T>::GetRoot(uint32_t idx) {
 }
 
 template <typename T>
-UnionFind<T>::UnionFind(uint32_t capacity) : buffer_size_(capacity) {
+UnionFind<T>::UnionFind(uint32_t capacity)
+    : buffer_size_(capacity), n_groups_(capacity) {
   buffer_ = new T[capacity];
   for (uint32_t i = 0; i < capacity; i++) {
     buffer_[i] = i;
@@ -55,6 +59,11 @@ UnionFind<T>::UnionFind(uint32_t capacity) : buffer_size_(capacity) {
 template <typename T>
 UnionFind<T>::~UnionFind() {
   delete[] buffer_;
+}
+
+template <typename T>
+uint32_t UnionFind<T>::GetNumGroups() const {
+  return n_groups_;
 }
 
 template <typename T>
@@ -69,6 +78,7 @@ uint32_t UnionFind<T>::Union(uint32_t a, uint32_t b) {
 
   if (ra != rb) {
     buffer_[rb] = ra;
+    n_groups_--;
   }
 
   return ra;

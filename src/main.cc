@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
     printf("%s\n", g.Print().c_str());
   }
 
-  TestUnionFind();
+  // TestUnionFind();
 
   return 0;
 }

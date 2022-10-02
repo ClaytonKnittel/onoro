@@ -119,6 +119,10 @@ void TestUnionFind() {
     assert(uf.Find(7) == 7);
     assert(uf.Find(8) == 8);
     assert(uf.Find(9) == 9);
+    assert(uf.GetNumGroups() == 7);
+
+    uf.Union(3, 4);
+    assert(uf.GetNumGroups() == 7);
   }
 
 #define NUM_TRIALS 10

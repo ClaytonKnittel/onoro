@@ -27,6 +27,11 @@ class Game {
   static constexpr uint32_t getBoardLen();
 
   /*
+   * Calculates the number of tiles in the board.
+   */
+  static constexpr uint32_t getBoardNumTiles();
+
+  /*
    * Calculates the size of the board in terms of uint64_t's.
    */
   static constexpr uint32_t getBoardSize();
@@ -121,6 +126,23 @@ class Game {
   // calls cb with arguments to : idx_t, from : idx_t
   template <class CallbackFnT>
   void forEachMoveP2(CallbackFnT cb) const;
+
+ private:
+  /*
+   * Iterates over all pawns on the board, calling cb with the idx_t of the pawn
+   * as the only argument. If cb returns false, iteration halts and this method
+   * returns false.
+   */
+  template <class CallbackFnT>
+  bool forEachPawn(CallbackFnT cb) const;
+
+  /*
+   * Iterates over all pawns on the board belonging to the player whose turn it
+   * currrently is, calling cb with the idx_t of the pawn as the only argument.
+   * If cb returns false, iteration halts and this method returns false.
+   */
+  template <class CallbackFnT>
+  bool forEachPlayablePawn(CallbackFnT cb) const;
 };
 
 bool operator==(const pos_t& a, const pos_t& b) {
@@ -160,8 +182,13 @@ constexpr uint32_t Game<NPawns>::getBoardLen() {
 }
 
 template <uint32_t NPawns>
+constexpr uint32_t Game<NPawns>::getBoardNumTiles() {
+  return getBoardLen() * getBoardLen();
+}
+
+template <uint32_t NPawns>
 constexpr uint32_t Game<NPawns>::getBoardSize() {
-  return (getBoardLen() * getBoardLen() * bits_per_tile + bits_per_entry - 1) /
+  return (getBoardNumTiles() * bits_per_tile + bits_per_entry - 1) /
          bits_per_entry;
 }
 
@@ -467,6 +494,36 @@ void Game<NPawns>::forEachMove(CallbackFnT cb) const {
   uint64_t tmp_board[tmp_board_len];
   memset(tmp_board, 0, tmp_board_len * 8);
 
+  forEachPawn([this, &tmp_board, &cb](idx_t next_idx) {
+    bool res =
+        forEachNeighbor(next_idx, [&tmp_board, this, &cb](idx_t neighbor_idx) {
+          if (getTile(neighbor_idx) == TileState::TILE_EMPTY) {
+            uint32_t idx = fromIdx(neighbor_idx);
+            uint32_t tb_shift = tmp_board_tile_bits *
+                                (idx % (bits_per_entry / tmp_board_tile_bits));
+            uint64_t tbb =
+                tmp_board[idx / (bits_per_entry / tmp_board_tile_bits)];
+            uint64_t mask = tmp_board_tile_mask << tb_shift;
+            uint64_t full_mask = uint64_t(min_neighbors_per_pawn) << tb_shift;
+
+            if ((tbb & mask) != full_mask) {
+              tbb += (uint64_t(1) << tb_shift);
+              tmp_board[idx / (bits_per_entry / tmp_board_tile_bits)] = tbb;
+
+              if ((tbb & mask) == full_mask) {
+                if (!cb(neighbor_idx)) {
+                  return false;
+                }
+              }
+            }
+          }
+
+          return true;
+        });
+
+    return res;
+  });
+  /*
   for (uint64_t i = 0; i < tmp_board_len; i++) {
     uint64_t board_bitmask = board_[i];
     uint64_t bitmask_idx_off = i * (bits_per_entry / bits_per_tile);
@@ -511,6 +568,7 @@ void Game<NPawns>::forEachMove(CallbackFnT cb) const {
       }
     }
   }
+  */
 }
 
 template <uint32_t NPawns>
@@ -519,9 +577,6 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
   static constexpr uint32_t tmp_board_tile_bits = 2;
   static constexpr uint64_t tmp_board_tile_mask =
       (uint64_t(1) << tmp_board_tile_bits) - 1;
-
-  uint64_t turn_tile = static_cast<uint64_t>(
-      state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
 
   constexpr uint64_t tmp_board_len =
       (getBoardLen() * getBoardLen() * tmp_board_tile_bits + bits_per_entry -
@@ -532,6 +587,27 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
   memset(tmp_board, 0, tmp_board_len * 8);
 
   // One pass to populate tmp_board with neighbor counts
+  forEachPawn([this, &tmp_board](idx_t next_idx) {
+    bool res = forEachNeighbor(next_idx, [&tmp_board,
+                                          this](idx_t neighbor_idx) {
+      uint32_t idx = fromIdx(neighbor_idx);
+      uint32_t tb_shift =
+          tmp_board_tile_bits * (idx % (bits_per_entry / tmp_board_tile_bits));
+      uint64_t tbb = tmp_board[idx / (bits_per_entry / tmp_board_tile_bits)];
+      uint64_t mask = tmp_board_tile_mask << tb_shift;
+      uint64_t full_mask = uint64_t(min_neighbors_per_pawn + 1) << tb_shift;
+
+      if ((tbb & mask) != full_mask) {
+        tbb += (uint64_t(1) << tb_shift);
+        tmp_board[idx / (bits_per_entry / tmp_board_tile_bits)] = tbb;
+      }
+
+      return true;
+    });
+
+    return res;
+  });
+  /*
   for (uint64_t i = 0; i < tmp_board_len; i++) {
     uint64_t board_bitmask = board_[i];
     uint64_t bitmask_idx_off = i * (bits_per_entry / bits_per_tile);
@@ -567,8 +643,90 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
       }
     }
   }
+  */
 
   // Another pass to enumerate all moves
+  forEachPlayablePawn([this, &tmp_board, &cb](idx_t next_idx) {
+    // TODO
+    // UnionFind<uint32_t> uf(getBoardNumTiles() + 1);
+
+    // number of neighbors with 1 neighbor after removing this piece
+    uint32_t n_to_satisfy = 0;
+    // decrease neighbor count of all neighbors
+    forEachNeighbor(
+        next_idx, [&tmp_board, &n_to_satisfy, this](idx_t neighbor_idx) {
+          uint32_t idx = fromIdx(neighbor_idx);
+          uint32_t tb_idx = idx / (bits_per_entry / tmp_board_tile_bits);
+          uint32_t tb_shift = tmp_board_tile_bits *
+                              (idx % (bits_per_entry / tmp_board_tile_bits));
+
+          tmp_board[tb_idx] -= uint64_t(1) << tb_shift;
+          if (((tmp_board[tb_idx] >> tb_shift) & tmp_board_tile_mask) == 1 &&
+              getTile(neighbor_idx) != TileState::TILE_EMPTY) {
+            n_to_satisfy++;
+          }
+
+          return true;
+        });
+
+    // try all possible new locations for piece
+    for (uint64_t j = 0; j < tmp_board_len; j++) {
+      uint64_t tmp_board_bitmask = tmp_board[j];
+      uint64_t tmp_bitmask_idx_off = j * (bits_per_entry / tmp_board_tile_bits);
+
+      while (tmp_board_bitmask != 0) {
+        uint32_t tmp_next_idx_off =
+            __builtin_ctzl(tmp_board_bitmask) / tmp_board_tile_bits;
+        uint32_t tb_shift = tmp_next_idx_off * tmp_board_tile_bits;
+        uint32_t tmp_next_idx = tmp_next_idx_off + tmp_bitmask_idx_off;
+        uint64_t clr_mask2 = tmp_board_tile_mask << tb_shift;
+
+        // skip this tile if it isn't empty (this will also skip the piece's
+        // old location since we haven't removed it, which we want)
+        if (getTile(toIdx(tmp_next_idx)) != TileState::TILE_EMPTY ||
+            ((tmp_board_bitmask >> tb_shift) & tmp_board_tile_mask) <= 1) {
+          tmp_board_bitmask = tmp_board_bitmask & ~clr_mask2;
+          continue;
+        }
+
+        tmp_board_bitmask = tmp_board_bitmask & ~clr_mask2;
+
+        uint32_t n_satisfied = 0;
+        forEachNeighbor(toIdx(tmp_next_idx), [&tmp_board, &n_satisfied,
+                                              this](idx_t neighbor_idx) {
+          uint32_t idx = fromIdx(neighbor_idx);
+          uint32_t tb_idx = idx / (bits_per_entry / tmp_board_tile_bits);
+          uint32_t tb_shift = tmp_board_tile_bits *
+                              (idx % (bits_per_entry / tmp_board_tile_bits));
+
+          if (((tmp_board[tb_idx] & tmp_board_tile_mask) >> tb_shift) == 1) {
+            n_satisfied++;
+          }
+          return true;
+        });
+
+        if (n_satisfied == n_to_satisfy) {
+          if (!cb(toIdx(tmp_next_idx), next_idx)) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // increase neighbor count of all neighbors
+    forEachNeighbor(next_idx, [&tmp_board, this](idx_t neighbor_idx) {
+      uint32_t idx = fromIdx(neighbor_idx);
+      uint32_t tb_idx = idx / (bits_per_entry / tmp_board_tile_bits);
+      uint32_t tb_shift =
+          tmp_board_tile_bits * (idx % (bits_per_entry / tmp_board_tile_bits));
+
+      tmp_board[tb_idx] += (uint64_t(1) << tb_shift);
+      return true;
+    });
+
+    return true;
+  });
+  /*
   for (uint64_t i = 0; i < tmp_board_len; i++) {
     uint64_t board_bitmask = board_[i];
     uint64_t bitmask_idx_off = i * (bits_per_entry / bits_per_tile);
@@ -589,6 +747,9 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
       }
 
       board_bitmask = board_bitmask & ~clr_mask;
+
+      // TODO
+      // UnionFind<uint32_t> uf(getBoardNumTiles() + 1);
 
       // number of neighbors with 1 neighbor after removing this piece
       uint32_t n_to_satisfy = 0;
@@ -666,5 +827,68 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
       });
     }
   }
+  */
+}
+
+template <uint32_t NPawns>
+template <class CallbackFnT>
+bool Game<NPawns>::forEachPawn(CallbackFnT cb) const {
+  for (uint64_t i = 0; i < getBoardSize(); i++) {
+    uint64_t board_bitmask = board_[i];
+    uint64_t bitmask_idx_off = i * (bits_per_entry / bits_per_tile);
+
+    while (board_bitmask != 0) {
+      // a tile will have one of its bits set, so find any bit in its bit
+      // set, then divide by size (relying on remainder truncation) to find
+      // its index relative to the bitmask
+      uint32_t next_idx_off = __builtin_ctzl(board_bitmask) / bits_per_tile;
+      uint32_t next_idx = next_idx_off + bitmask_idx_off;
+
+      board_bitmask =
+          board_bitmask & ~(tile_bitmask << (bits_per_tile * next_idx_off));
+
+      if (!cb(toIdx(next_idx))) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+template <uint32_t NPawns>
+template <class CallbackFnT>
+bool Game<NPawns>::forEachPlayablePawn(CallbackFnT cb) const {
+  uint64_t turn_tile = static_cast<uint64_t>(
+      state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
+
+  for (uint64_t i = 0; i < getBoardSize(); i++) {
+    uint64_t board_bitmask = board_[i];
+    uint64_t bitmask_idx_off = i * (bits_per_entry / bits_per_tile);
+
+    while (board_bitmask != 0) {
+      // a tile will have one of its bits set, so find any bit in its bit
+      // set, then divide by size (relying on remainder truncation) to find
+      // its index relative to the bitmask
+      uint32_t next_idx_off = __builtin_ctzl(board_bitmask) / bits_per_tile;
+      uint32_t next_idx = next_idx_off + bitmask_idx_off;
+
+      // skip this tile if it isn't our piece
+      uint64_t turn_tile_mask = turn_tile << (bits_per_tile * next_idx_off);
+      uint64_t clr_mask = tile_bitmask << (bits_per_tile * next_idx_off);
+      if ((board_bitmask & clr_mask) != turn_tile_mask) {
+        board_bitmask = board_bitmask & ~clr_mask;
+        continue;
+      }
+
+      board_bitmask = board_bitmask & ~clr_mask;
+
+      if (!cb(toIdx(next_idx))) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 }  // namespace Onoro
