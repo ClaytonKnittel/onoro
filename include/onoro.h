@@ -28,6 +28,55 @@ class GameHash {
   GameHash();
 
   std::size_t operator()(const Game<NPawns>& g) const noexcept;
+
+ private:
+  struct HashEl {
+    // hash to use for black pawn in this tile.
+    std::size_t black_hash;
+    // hash to use for white pawn in this tile.
+    std::size_t white_hash;
+  };
+
+  static constexpr uint32_t getSymmTableSize();
+
+  /*
+   * The infinite hexagonal plane centered at a fixed point forms a dihedral
+   * group D6, which has group operations R1 (Rn = rotate by n*60 degrees about
+   * the fixed point) and r0 (rn = reflect about a line at angle n*pi/6 through
+   * the fixed point).
+   *
+   * We are interested in seven subgroups of this group, for seven cases that
+   * the game board can be in, categorized by where the "center of mass" of the
+   * board lies:
+   *  - D6: the center of mass lies exactly in the center of a hexagonal cell
+   *  - D3: (R2 R4 r0 r2 r4) the center of mass lies on a vertex of a hexagonal
+   *      cell.
+   *  - C2 + C2: (R3 r1 r4) the center of mass lies on the midpoint of an edge
+   *      of a hexagonal cell.
+   *  - C2: (r0) the center of mass lies along a line extending from the middle
+   *      of a hexagonal cell to one of its vertices.
+   *  - C2: (r1) the center of mass lies along a line extending from the middle
+   *      of a hexagonal cell to the center of one of its edges.
+   *  - C2: (r4 + translation) the center of mass lies on an edge of a hexagonal
+   *      cell.
+   *  - trivial: all other cases
+   *
+   * By choosing a preferred orientation of the center of mass (i.e. let the
+   * tile containing the center of mass be (0, 0), and rotate/reflect the plane
+   * about the new origin until the center of mass lies in the triangle formed
+   * by the origin (center of the hexagon at (0, 0)), the vertex in the +x
+   * direction of the origin tile, and the midpoint of the edge extending in the
+   * +y direction from this vertex), we can ensure that all symmetries of the
+   * board will be reachable under the operations in the corresponding
+   * subgroup depending on where the center of mass lies.
+   */
+  std::size_t d6_table_[getSymmTableSize()];
+  std::size_t d3_table_[getSymmTableSize()];
+  std::size_t c2_c2_table_[getSymmTableSize()];
+  std::size_t c2_cv_table_[getSymmTableSize()];
+  std::size_t c2_ce_table_[getSymmTableSize()];
+  std::size_t c2_ev_table_[getSymmTableSize()];
+  std::size_t trivial_table_[getSymmTableSize()];
 };
 
 template <uint32_t NPawns>
@@ -225,6 +274,11 @@ pos_t operator-=(pos_t& a, const pos_t& b) {
 template <uint32_t NPawns>
 GameHash<NPawns>::GameHash() {
   printf("Constructed!\n");
+}
+
+template <uint32_t NPawns>
+constexpr uint32_t GameHash<NPawns>::getSymmTableSize() {
+  return Game<NPawns>::getBoardNumTiles();
 }
 
 template <uint32_t NPawns>
