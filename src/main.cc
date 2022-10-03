@@ -5,11 +5,12 @@
 #include "print_csi.h"
 
 static constexpr uint32_t n_pawns = 8;
+static constexpr bool print_overwrite = false;
 
 void TestUnionFind();
 
 int main(int argc, char* argv[]) {
-  srand(1);
+  srand(time(NULL));
 
   Onoro::Game<n_pawns> g;
 
@@ -51,6 +52,7 @@ int main(int argc, char* argv[]) {
     });
 
     if (move_cnt == 0) {
+      printf("Player won by no legal moves\n");
       return -1;
     }
 
@@ -60,7 +62,7 @@ int main(int argc, char* argv[]) {
           if (which == 0) {
             Onoro::Game<n_pawns> g2(g, to, from);
 
-            if (first) {
+            if (first || !print_overwrite) {
               first = false;
             } else {
               std::ostringstream ostr;
