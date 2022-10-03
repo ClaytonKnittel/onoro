@@ -733,8 +733,6 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
     uint32_t n_empty_tiles = getBoardNumTiles() - nPawnsInPlay();
     // the pawn we are moving is its own group
     uint32_t n_pawn_groups = uf.GetNumGroups() - n_empty_tiles - 1;
-    printf("N empty tiles: %u\nN pawn groups: %u\n", n_empty_tiles,
-           n_pawn_groups);
 
     // number of neighbors with 1 neighbor after removing this piece
     uint32_t n_to_satisfy = 0;
@@ -786,16 +784,19 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
                                               &groups_touching,
                                               this](idx_t neighbor_idx) {
           uint32_t idx = fromIdx(neighbor_idx);
+          if (getTile(idx) == TileState::TILE_EMPTY) {
+            return true;
+          }
+
           uint32_t tb_idx = idx / (bits_per_entry / tmp_board_tile_bits);
           uint32_t tb_shift = tmp_board_tile_bits *
                               (idx % (bits_per_entry / tmp_board_tile_bits));
 
-          if (((tmp_board[tb_idx] & tmp_board_tile_mask) >> tb_shift) == 1) {
+          if (((tmp_board[tb_idx] >> tb_shift) & tmp_board_tile_mask) == 1) {
             n_satisfied++;
           }
 
-          if (getTile(idx) != TileState::TILE_EMPTY &&
-              neighbor_idx != next_idx) {
+          if (neighbor_idx != next_idx) {
             uint32_t group_id = uf.GetRoot(idx);
             if (group_id != g1) {
               if (g1 == -1u) {
