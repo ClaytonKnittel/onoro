@@ -500,7 +500,12 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
     pos_t last_pos = last_move_pos + (pos_t){ n_in_row_to_win + 1, 0 };
     for (pos_t i = last_move_pos - (pos_t){ n_in_row_to_win, 0 }; i != last_pos;
          i += (pos_t){ 1, 0 }) {
-      if (getTile(posToIdx(i)) == move_color) {
+      idx_t idx = posToIdx(i);
+      if (!inBounds(idx)) {
+        continue;
+      }
+
+      if (getTile(idx) == move_color) {
         n_in_row++;
       } else {
         n_in_row = 0;
