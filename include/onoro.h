@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -73,13 +74,15 @@ class Game {
   static constexpr uint64_t tile_bitmask = (1 << bits_per_tile) - 1;
   static constexpr uint32_t max_pawns_per_player = 8;
   static constexpr uint32_t min_neighbors_per_pawn = 2;
+  static constexpr uint32_t n_in_row_to_win = 4;
 
   struct GameState {
     // You can play this game with a max of 8 pawns, and turn count stops
     // incrementing after the end of phase 1
     uint8_t turn       : 4;
     uint8_t blackTurn  : 1;
-    uint8_t __reserved : 3;
+    uint8_t finished   : 1;
+    uint8_t __reserved : 2;
   };
 
   uint64_t board_[getBoardSize()];
@@ -109,6 +112,8 @@ class Game {
 
   idx_t posToIdx(pos_t pos) const;
 
+  bool inBounds(idx_t idx) const;
+
   uint32_t nPawnsInPlay() const;
 
   TileState getTile(uint32_t i) const;
@@ -118,6 +123,13 @@ class Game {
   void setTile(idx_t idx, TileState);
 
   void clearTile(idx_t idx);
+
+  bool isFinished() const;
+
+  /*
+   * Returns true if the last move made (passed in as last_move) caused a win.
+   */
+  bool checkWin(idx_t last_move) const;
 
   template <class CallbackFnT>
   bool forEachNeighbor(idx_t idx, CallbackFnT cb) const;
@@ -278,7 +290,7 @@ std::pair<int, pos_t> Game<NPawns>::calcMoveShiftAndOffset(const Game& g,
 // Black goes first, but since black has 2 forced moves and white only has 1,
 // white is effectively first to make a choice.
 template <uint32_t NPawns>
-Game<NPawns>::Game() : state_({ 2, 0, 0 }) {
+Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
   static_assert(NPawns <= 2 * max_pawns_per_player);
 
   memset(this->board_, 0, getBoardSize() * sizeof(uint64_t));
@@ -299,8 +311,8 @@ Game<NPawns>::Game() : state_({ 2, 0, 0 }) {
 
 template <uint32_t NPawns>
 Game<NPawns>::Game(const Game<NPawns>& g, idx_t move)
-    : state_(
-          { static_cast<uint8_t>(g.state_.turn + 1), !g.state_.blackTurn, 0 }) {
+    : state_({ static_cast<uint8_t>(g.state_.turn + 1), !g.state_.blackTurn, 0,
+               0 }) {
   auto [shift, offset] = calcMoveShiftAndOffset(g, move);
   copyAndShift(reinterpret_cast<uint64_t*>(board_),
                reinterpret_cast<const uint64_t*>(g.board_), getBoardSize(),
@@ -316,11 +328,13 @@ Game<NPawns>::Game(const Game<NPawns>& g, idx_t move)
 
   setTile(posToIdx(idxToPos(move) + offset),
           g.state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
+
+  state_.finished = checkWin(move);
 }
 
 template <uint32_t NPawns>
 Game<NPawns>::Game(const Game& g, idx_t move, idx_t from)
-    : state_({ g.state_.turn, !g.state_.blackTurn, 0 }) {
+    : state_({ g.state_.turn, !g.state_.blackTurn, 0, 0 }) {
   auto [shift, offset] = calcMoveShiftAndOffset(g, move);
   copyAndShift(reinterpret_cast<uint64_t*>(board_),
                reinterpret_cast<const uint64_t*>(g.board_), getBoardSize(),
@@ -338,6 +352,8 @@ Game<NPawns>::Game(const Game& g, idx_t move, idx_t from)
   setTile(posToIdx(idxToPos(move) + offset),
           g.state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
   clearTile(posToIdx(idxToPos(from) + offset));
+
+  state_.finished = checkWin(move);
 }
 
 template <uint32_t NPawns>
@@ -401,6 +417,12 @@ idx_t Game<NPawns>::posToIdx(pos_t pos) const {
 }
 
 template <uint32_t NPawns>
+bool Game<NPawns>::inBounds(idx_t idx) const {
+  auto [x, y] = idx;
+  return x >= 0 && x < getBoardLen() && y >= 0 && y < getBoardLen();
+}
+
+template <uint32_t NPawns>
 uint32_t Game<NPawns>::nPawnsInPlay() const {
   return state_.turn + 1;
   ;
@@ -458,6 +480,84 @@ void Game<NPawns>::clearTile(idx_t idx) {
   uint64_t bitv_mask = ~(tile_bitmask << (bits_per_tile * bitv_idx));
 
   board_[i * bits_per_tile / bits_per_entry] = tile_bitv & bitv_mask;
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::isFinished() const {
+  return state_.finished;
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::checkWin(idx_t last_move) const {
+  // Check for a win in all 3 directions
+  pos_t last_move_pos = idxToPos(last_move);
+  uint32_t n_in_row;
+
+  TileState move_color = getTile(last_move);
+
+  {
+    n_in_row = 0;
+    pos_t last_pos = last_move_pos + (pos_t){ n_in_row_to_win + 1, 0 };
+    for (pos_t i = last_move_pos - (pos_t){ n_in_row_to_win, 0 }; i != last_pos;
+         i += (pos_t){ 1, 0 }) {
+      if (getTile(posToIdx(i)) == move_color) {
+        n_in_row++;
+      } else {
+        n_in_row = 0;
+      }
+
+      if (n_in_row == n_in_row_to_win) {
+        return true;
+      }
+    }
+  }
+
+  {
+    n_in_row = 0;
+    pos_t last_pos =
+        last_move_pos + (pos_t){ n_in_row_to_win + 1, n_in_row_to_win + 1 };
+    for (pos_t i = last_move_pos - (pos_t){ n_in_row_to_win, n_in_row_to_win };
+         i != last_pos; i += (pos_t){ 1, 1 }) {
+      idx_t idx = posToIdx(i);
+      if (!inBounds(idx)) {
+        continue;
+      }
+
+      if (getTile(idx) == move_color) {
+        n_in_row++;
+      } else {
+        n_in_row = 0;
+      }
+
+      if (n_in_row == n_in_row_to_win) {
+        return true;
+      }
+    }
+  }
+
+  {
+    n_in_row = 0;
+    pos_t last_pos = last_move_pos + (pos_t){ 0, n_in_row_to_win + 1 };
+    for (pos_t i = last_move_pos - (pos_t){ 0, n_in_row_to_win }; i != last_pos;
+         i += (pos_t){ 0, 1 }) {
+      idx_t idx = posToIdx(i);
+      if (!inBounds(idx)) {
+        continue;
+      }
+
+      if (getTile(idx) == move_color) {
+        n_in_row++;
+      } else {
+        n_in_row = 0;
+      }
+
+      if (n_in_row == n_in_row_to_win) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 template <uint32_t NPawns>

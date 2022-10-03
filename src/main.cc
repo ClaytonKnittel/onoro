@@ -9,18 +9,35 @@ static constexpr uint32_t n_pawns = 8;
 void TestUnionFind();
 
 int main(int argc, char* argv[]) {
-  srand(0);
+  srand(1);
 
   Onoro::Game<n_pawns> g;
 
   // printf("%s\n", g.Print().c_str());
 
   for (uint32_t i = 0; i < n_pawns * 2 - 3; i++) {
-    g.forEachMove([&g](Onoro::idx_t idx) {
-      Onoro::Game<n_pawns> g2(g, idx);
-      g = std::move(g2);
-      return false;
+    uint32_t move_cnt = 0;
+    g.forEachMove([&move_cnt](Onoro::idx_t idx) {
+      move_cnt++;
+      return true;
     });
+
+    int which = rand() % move_cnt;
+    g.forEachMove([&g, &which](Onoro::idx_t idx) {
+      if (which == 0) {
+        Onoro::Game<n_pawns> g2(g, idx);
+        g = std::move(g2);
+        return false;
+      } else {
+        which--;
+        return true;
+      }
+    });
+
+    if (g.isFinished()) {
+      printf("%s\n", g.Print().c_str());
+      return 0;
+    }
   }
 
   printf("%s\n", g.Print().c_str());
@@ -65,6 +82,10 @@ int main(int argc, char* argv[]) {
         });
 
     printf("%s\n", g.Print().c_str());
+    if (g.isFinished()) {
+      printf("Done!\n");
+      return 0;
+    }
     usleep(100);
   }
 
