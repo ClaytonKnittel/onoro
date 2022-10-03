@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
 
   printf("%s\n", g.Print().c_str());
 
-  for (uint32_t i = 0; i < 15; i++) {
+  for (uint32_t i = 0; i < 11; i++) {
     int move_cnt = 0;
     g.forEachMoveP2([&move_cnt](Onoro::idx_t to, Onoro::idx_t from) {
       move_cnt++;
@@ -34,10 +34,10 @@ int main(int argc, char* argv[]) {
     }
 
     int which = rand() % move_cnt;
-    g.forEachMoveP2([&g, &which](Onoro::idx_t to, Onoro::idx_t from) {
+    g.forEachMoveP2([&g, i, &which](Onoro::idx_t to, Onoro::idx_t from) {
       if (which == 0) {
-        printf("Move from (%u, %u) to (%u, %u)\n", from.first, from.second,
-               to.first, to.second);
+        printf("Move from (%u, %u) to (%u, %u) (%u)\n", from.first, from.second,
+               to.first, to.second, i);
         Onoro::Game<n_pawns> g2(g, to, from);
         g = std::move(g2);
         return false;

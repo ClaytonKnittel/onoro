@@ -111,14 +111,20 @@ class Game {
 
   uint32_t nPawnsInPlay() const;
 
+  TileState getTile(uint32_t i) const;
   TileState getTile(idx_t idx) const;
 
+  void setTile(uint32_t i, TileState);
   void setTile(idx_t idx, TileState);
 
   void clearTile(idx_t idx);
 
   template <class CallbackFnT>
   bool forEachNeighbor(idx_t idx, CallbackFnT cb) const;
+
+  // Iterates over only neighbors above/to the left of idx.
+  template <class CallbackFnT>
+  bool forEachTopLeftNeighbor(idx_t idx, CallbackFnT cb) const;
 
   template <class CallbackFnT>
   void forEachMove(CallbackFnT cb) const;
@@ -200,7 +206,7 @@ void Game<NPawns>::copyAndShift(uint64_t* __restrict__ dst,
   uint32_t shift = bit_offset & 0x3f;
   uint32_t rshift = shift == 0 ? 0 : 64 - shift;
 
-  uint64_t r = 0;
+  uint64_t r;
 
   if (shift == 0) {
     if (offset >= 0) {
@@ -212,18 +218,22 @@ void Game<NPawns>::copyAndShift(uint64_t* __restrict__ dst,
     }
   } else if (offset >= 0) {
     memset(dst, 0, offset * sizeof(uint64_t));
+
+    r = 0;
     for (size_t i = 0; i < n_8bytes - offset; i++) {
       uint64_t b = src[i];
       dst[i + offset] = r | (b << shift);
       r = b >> rshift;
     }
   } else {
+    r = src[-(offset + 1)] >> rshift;
     for (size_t i = 0; i < n_8bytes + offset; i++) {
       uint64_t b = src[i - offset];
       dst[i] = r | (b << shift);
       r = b >> rshift;
     }
-    memset(dst + (n_8bytes + offset), 0, -offset * sizeof(uint64_t));
+    dst[n_8bytes + offset] = r;
+    memset(dst + (n_8bytes + offset + 1), 0, -(offset + 1) * sizeof(uint64_t));
   }
 }
 
@@ -397,6 +407,14 @@ uint32_t Game<NPawns>::nPawnsInPlay() const {
 }
 
 template <uint32_t NPawns>
+typename Game<NPawns>::TileState Game<NPawns>::getTile(uint32_t i) const {
+  uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
+  uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
+
+  return TileState((tile_bitv >> (bits_per_tile * bitv_idx)) & tile_bitmask);
+}
+
+template <uint32_t NPawns>
 typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
   auto [x, y] = idx;
   uint32_t i = x + y * getBoardLen();
@@ -405,6 +423,16 @@ typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
   uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
 
   return TileState((tile_bitv >> (bits_per_tile * bitv_idx)) & tile_bitmask);
+}
+
+template <uint32_t NPawns>
+void Game<NPawns>::setTile(uint32_t i, TileState piece) {
+  uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
+  uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
+  uint64_t bitv_mask =
+      (static_cast<uint64_t>(piece) << (bits_per_tile * bitv_idx));
+
+  board_[i * bits_per_tile / bits_per_entry] = tile_bitv | bitv_mask;
 }
 
 template <uint32_t NPawns>
@@ -474,6 +502,37 @@ bool Game<NPawns>::forEachNeighbor(idx_t idx, CallbackFnT cb) const {
         CB_OR_RET({ x - 1, y + 1 });
       }
     }
+  }
+
+  return true;
+}
+
+template <uint32_t NPawns>
+template <class CallbackFnT>
+bool Game<NPawns>::forEachTopLeftNeighbor(idx_t idx, CallbackFnT cb) const {
+  auto [x, y] = idx;
+
+// clang-format off
+#define CB_OR_RET(...)    \
+    if (!cb(__VA_ARGS__)) \
+      return false;
+  // clang-format on
+
+  if (y > 0) {
+    CB_OR_RET({ x, y - 1 });
+
+    if (y % 2 == 0) {
+      if (x < getBoardLen() - 1) {
+        CB_OR_RET({ x + 1, y - 1 });
+      }
+    } else {
+      if (x > 0) {
+        CB_OR_RET({ x - 1, y - 1 });
+      }
+    }
+  }
+  if (x > 0) {
+    CB_OR_RET({ x - 1, y });
   }
 
   return true;
@@ -647,8 +706,35 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
 
   // Another pass to enumerate all moves
   forEachPlayablePawn([this, &tmp_board, &cb](idx_t next_idx) {
-    // TODO
-    // UnionFind<uint32_t> uf(getBoardNumTiles() + 1);
+    UnionFind<uint32_t> uf(getBoardNumTiles());
+
+    // Calculate the number of disjoint pawn groups after removing the pawn at
+    // next_idx
+    forEachPawn([&uf, &next_idx, this](idx_t idx) {
+      uint32_t idx_val = fromIdx(idx);
+
+      // Skip ourself
+      if (idx == next_idx) {
+        return true;
+      }
+
+      forEachTopLeftNeighbor(
+          idx, [&uf, &next_idx, &idx_val, this](idx_t neighbor_idx) {
+            if (getTile(neighbor_idx) != TileState::TILE_EMPTY &&
+                neighbor_idx != next_idx) {
+              uf.Union(idx_val, fromIdx(neighbor_idx));
+            }
+            return true;
+          });
+
+      return true;
+    });
+
+    uint32_t n_empty_tiles = getBoardNumTiles() - nPawnsInPlay();
+    // the pawn we are moving is its own group
+    uint32_t n_pawn_groups = uf.GetNumGroups() - n_empty_tiles - 1;
+    printf("N empty tiles: %u\nN pawn groups: %u\n", n_empty_tiles,
+           n_pawn_groups);
 
     // number of neighbors with 1 neighbor after removing this piece
     uint32_t n_to_satisfy = 0;
@@ -683,7 +769,7 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
 
         // skip this tile if it isn't empty (this will also skip the piece's
         // old location since we haven't removed it, which we want)
-        if (getTile(toIdx(tmp_next_idx)) != TileState::TILE_EMPTY ||
+        if (getTile(tmp_next_idx) != TileState::TILE_EMPTY ||
             ((tmp_board_bitmask >> tb_shift) & tmp_board_tile_mask) <= 1) {
           tmp_board_bitmask = tmp_board_bitmask & ~clr_mask2;
           continue;
@@ -692,7 +778,12 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
         tmp_board_bitmask = tmp_board_bitmask & ~clr_mask2;
 
         uint32_t n_satisfied = 0;
-        forEachNeighbor(toIdx(tmp_next_idx), [&tmp_board, &n_satisfied,
+        uint32_t g1 = -1u;
+        uint32_t g2 = -1u;
+        uint32_t groups_touching = 0;
+        forEachNeighbor(toIdx(tmp_next_idx), [&tmp_board, &next_idx,
+                                              &n_satisfied, &uf, &g1, &g2,
+                                              &groups_touching,
                                               this](idx_t neighbor_idx) {
           uint32_t idx = fromIdx(neighbor_idx);
           uint32_t tb_idx = idx / (bits_per_entry / tmp_board_tile_bits);
@@ -702,10 +793,24 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
           if (((tmp_board[tb_idx] & tmp_board_tile_mask) >> tb_shift) == 1) {
             n_satisfied++;
           }
+
+          if (getTile(idx) != TileState::TILE_EMPTY &&
+              neighbor_idx != next_idx) {
+            uint32_t group_id = uf.GetRoot(idx);
+            if (group_id != g1) {
+              if (g1 == -1u) {
+                g1 = group_id;
+                groups_touching++;
+              } else if (group_id != g2) {
+                g2 = group_id;
+                groups_touching++;
+              }
+            }
+          }
           return true;
         });
 
-        if (n_satisfied == n_to_satisfy) {
+        if (n_satisfied == n_to_satisfy && groups_touching == n_pawn_groups) {
           if (!cb(toIdx(tmp_next_idx), next_idx)) {
             return false;
           }
