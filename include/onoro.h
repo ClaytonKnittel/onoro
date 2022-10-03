@@ -184,7 +184,7 @@ pos_t operator-=(pos_t& a, const pos_t& b) {
 
 template <uint32_t NPawns>
 constexpr uint32_t Game<NPawns>::getBoardLen() {
-  return NPawns * 2;
+  return NPawns * 2 + 2;
 }
 
 template <uint32_t NPawns>
