@@ -76,7 +76,7 @@ target_compile_options(onoro
 		$<$<COMPILE_LANGUAGE:CXX>:-Wno-nested-anon-types -Wno-ignored-qualifiers
 		-Wno-gnu-anonymous-struct -Wno-unused-parameter -Wno-newline-eof
 		-Wno-c++11-extensions -Wno-c++14-extensions -Wno-c++17-extensions
-		-Wno-gnu-zero-variadic-macro-arguments> -Wno-vla-extension
+    -Wno-gnu-zero-variadic-macro-arguments -Wno-vla-extension>
 )
 
 if("${CMAKE_ASM_COMPILER_ID}" MATCHES "GNU")
@@ -108,17 +108,21 @@ if (NOT COMPILER_SUPPORTS_CXX17)
 endif()
 
 set_property(TARGET onoro PROPERTY CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
+
+add_subdirectory(modules/abseil-cpp EXCLUDE_FROM_ALL)
 
 target_include_directories(onoro
 	PRIVATE
 		"/usr/local/include"
 	PUBLIC
 		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/include>
+		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/abseil-cpp>
 )
 
 target_link_libraries(onoro
 	PUBLIC
-		"${LINK_LIBS}"
+		"${LINK_LIBS}" absl::flat_hash_map
 )
 
 if (${ENABLE_TESTING})

@@ -20,7 +20,30 @@ typedef std::pair<uint32_t, uint32_t> idx_t;
 // typedef std::pair<int32_t, int32_t> pos_t;
 
 template <uint32_t NPawns>
+class Game;
+
+template <uint32_t NPawns>
+class GameHash {
+ public:
+  GameHash();
+
+  std::size_t operator()(const Game<NPawns>& g) const noexcept;
+};
+
+template <uint32_t NPawns>
+class GameEq {
+ public:
+  GameEq() = default;
+
+  bool operator()(const Game<NPawns>& g1,
+                  const Game<NPawns>& g2) const noexcept;
+};
+
+template <uint32_t NPawns>
 class Game {
+  friend class GameHash<NPawns>;
+  friend class GameEq<NPawns>;
+
  private:
   /*
    * Calculates the required size of board for a game with n_pawns pawns.
@@ -49,7 +72,7 @@ class Game {
 
  public:
   Game();
-  Game(const Game&) = delete;
+  Game(const Game&) = default;
   Game(Game&&) = default;
 
   Game& operator=(Game&&) = default;
@@ -116,6 +139,8 @@ class Game {
 
   uint32_t nPawnsInPlay() const;
 
+  bool inPhase2() const;
+
   TileState getTile(uint32_t i) const;
   TileState getTile(idx_t idx) const;
 
@@ -125,6 +150,9 @@ class Game {
   void clearTile(idx_t idx);
 
   bool isFinished() const;
+
+  // returns true if black won, given isFinished() == true
+  bool blackWins() const;
 
   /*
    * Returns true if the last move made (passed in as last_move) caused a win.
@@ -192,6 +220,22 @@ pos_t operator-(const pos_t& a, const pos_t& b) {
 pos_t operator-=(pos_t& a, const pos_t& b) {
   a = { a.x - b.x, a.y - b.y };
   return a;
+}
+
+template <uint32_t NPawns>
+GameHash<NPawns>::GameHash() {
+  printf("Constructed!\n");
+}
+
+template <uint32_t NPawns>
+std::size_t GameHash<NPawns>::operator()(const Game<NPawns>& g) const noexcept {
+  return 0;
+}
+
+template <uint32_t NPawns>
+bool GameEq<NPawns>::operator()(const Game<NPawns>& g1,
+                                const Game<NPawns>& g2) const noexcept {
+  return true;
 }
 
 template <uint32_t NPawns>
@@ -297,7 +341,7 @@ Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
 
   uint32_t mid_idx = (getBoardLen() - 1) / 2;
   idx_t b_start = { mid_idx, mid_idx };
-  idx_t w_start = { mid_idx, mid_idx + 1 };
+  idx_t w_start = { mid_idx + !(mid_idx & 1), mid_idx + 1 };
   idx_t b_next = { mid_idx + 1, mid_idx };
 
   setTile(b_start, TileState::TILE_BLACK);
@@ -425,7 +469,11 @@ bool Game<NPawns>::inBounds(idx_t idx) const {
 template <uint32_t NPawns>
 uint32_t Game<NPawns>::nPawnsInPlay() const {
   return state_.turn + 1;
-  ;
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::inPhase2() const {
+  return state_.turn == NPawns * 2 - 1;
 }
 
 template <uint32_t NPawns>
@@ -485,6 +533,11 @@ void Game<NPawns>::clearTile(idx_t idx) {
 template <uint32_t NPawns>
 bool Game<NPawns>::isFinished() const {
   return state_.finished;
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::blackWins() const {
+  return !state_.blackTurn;
 }
 
 template <uint32_t NPawns>
