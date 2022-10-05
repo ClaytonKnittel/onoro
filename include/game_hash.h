@@ -86,12 +86,23 @@ class GameHash {
   static game_hash_t e_r3(game_hash_t h);
 
   /*
-   * Given a hash, compresses it to make it symmetric via rotation of 60, 120,
-   * or 180 degrees (R1, R2, or R3).
+   * Given a hash, compresses it to make it invariant under the corresponding
+   * group operation.
    */
   static game_hash_t make_c_R1(game_hash_t h);
   static game_hash_t make_v_R2(game_hash_t h);
   static game_hash_t make_e_R3(game_hash_t h);
+  static game_hash_t make_c_r0(game_hash_t h);
+  static game_hash_t make_c_r1(game_hash_t h);
+  static game_hash_t make_c_r2(game_hash_t h);
+  static game_hash_t make_c_r3(game_hash_t h);
+  static game_hash_t make_c_r4(game_hash_t h);
+  static game_hash_t make_c_r5(game_hash_t h);
+  static game_hash_t make_v_r1(game_hash_t h);
+  static game_hash_t make_v_r3(game_hash_t h);
+  static game_hash_t make_v_r5(game_hash_t h);
+  static game_hash_t make_e_r0(game_hash_t h);
+  static game_hash_t make_e_r3(game_hash_t h);
 
   /*
    * Given a hash, compress it to make it symmetric via reflection across the
@@ -307,8 +318,113 @@ game_hash_t GameHash<NPawns>::make_e_R3(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_refl(game_hash_t h) {
-  return 0;
+game_hash_t GameHash<NPawns>::make_c_r0(game_hash_t h) {
+  uint64_t b14 = h & 0x000000ffc00003ff;
+  uint64_t b26 = h & 0x00000000000ffc00;
+  uint64_t b35 = h & 0x000000003ff00000;
+
+  b26 = b26 | (b26 << 40);
+  b35 = b35 | (b35 << 20);
+  return b14 | b26 | b35;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_c_r1(game_hash_t h) {
+  uint64_t b12 = h & 0x00000000000003ff;
+  uint64_t b36 = h & 0x000000003ff00000;
+  uint64_t b45 = h & 0x000000ffc0000000;
+
+  b12 = b12 | (b12 << 10);
+  b36 = b36 | (b36 << 30);
+  b45 = b45 | (b45 << 10);
+  return b12 | b36 | b45;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_c_r2(game_hash_t h) {
+  uint64_t b13 = h & 0x00000000000003ff;
+  uint64_t b25 = h & 0x0003ff00000ffc00;
+  uint64_t b46 = h & 0x000000ffc0000000;
+
+  b13 = b13 | (b13 << 20);
+  b46 = b46 | (b46 << 20);
+  return b13 | b25 | b46;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_c_r3(game_hash_t h) {
+  uint64_t b14 = h & 0x00000000000003ff;
+  uint64_t b23 = h & 0x00000000000ffc00;
+  uint64_t b56 = h & 0x0003ff0000000000;
+
+  b14 = b14 | (b14 << 30);
+  b23 = b23 | (b23 << 10);
+  b56 = b56 | (b56 << 10);
+  return b14 | b23 | b56;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_c_r4(game_hash_t h) {
+  uint64_t b15 = h & 0x00000000000003ff;
+  uint64_t b24 = h & 0x00000000000ffc00;
+  uint64_t b36 = h & 0x0ffc00003ff00000;
+
+  b15 = b15 | (b15 << 40);
+  b24 = b24 | (b24 << 20);
+  return b15 | b24 | b36;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_c_r5(game_hash_t h) {
+  uint64_t b16 = h & 0x00000000000003ff;
+  uint64_t b25 = h & 0x00000000000ffc00;
+  uint64_t b34 = h & 0x000000003ff00000;
+
+  b16 = b16 | (b16 << 50);
+  b25 = b25 | (b25 << 30);
+  b34 = b34 | (b34 << 10);
+  return b16 | b25 | b34;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_v_r1(game_hash_t h) {
+  uint64_t b1 = h & 0x00000000001fffff;
+  uint64_t b23 = h & 0x000003ffffe00000;
+
+  b23 = b23 | (b23 << 21);
+  return b1 | b23;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_v_r3(game_hash_t h) {
+  uint64_t b12 = h & 0x00000000001fffff;
+  uint64_t b3 = h & 0x7ffffc0000000000;
+
+  b12 = b12 | (b12 << 21);
+  return b12 | b3;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_v_r5(game_hash_t h) {
+  uint64_t b13 = h & 0x00000000001fffff;
+  uint64_t b2 = h & 0x000003ffffe00000;
+
+  b13 = b13 | (b13 << 42);
+  return b13 | b2;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_e_r0(game_hash_t h) {
+  uint64_t b12 = h & 0x00000000ffffffff;
+
+  return b12 | (b12 << 32);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_e_r3(game_hash_t h) {
+  uint64_t b12 = h & 0x00000000ffffffff;
+
+  return b12 | (b12 << 32);
 }
 
 template <uint32_t NPawns>
