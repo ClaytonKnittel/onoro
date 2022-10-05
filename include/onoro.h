@@ -6,78 +6,17 @@
 #include <string>
 #include <utility>
 
+#include "game_hash.h"
+#include "hex_pos.h"
 #include "union_find.h"
 
 namespace Onoro {
 
-struct pos_t {
-  int32_t x, y;
-};
-
 // (x, y) coordinates as an index.
 typedef std::pair<uint32_t, uint32_t> idx_t;
-// coordinates in vector space
-// typedef std::pair<int32_t, int32_t> pos_t;
 
 template <uint32_t NPawns>
 class Game;
-
-template <uint32_t NPawns>
-class GameHash {
- public:
-  GameHash();
-
-  std::size_t operator()(const Game<NPawns>& g) const noexcept;
-
- private:
-  struct HashEl {
-    // hash to use for black pawn in this tile.
-    std::size_t black_hash;
-    // hash to use for white pawn in this tile.
-    std::size_t white_hash;
-  };
-
-  static constexpr uint32_t getSymmTableSize();
-
-  /*
-   * The infinite hexagonal plane centered at a fixed point forms a dihedral
-   * group D6, which has group operations R1 (Rn = rotate by n*60 degrees about
-   * the fixed point) and r0 (rn = reflect about a line at angle n*pi/6 through
-   * the fixed point).
-   *
-   * We are interested in seven subgroups of this group, for seven cases that
-   * the game board can be in, categorized by where the "center of mass" of the
-   * board lies:
-   *  - D6: the center of mass lies exactly in the center of a hexagonal cell
-   *  - D3: (R2 R4 r0 r2 r4) the center of mass lies on a vertex of a hexagonal
-   *      cell.
-   *  - C2 + C2: (R3 r1 r4) the center of mass lies on the midpoint of an edge
-   *      of a hexagonal cell.
-   *  - C2: (r0) the center of mass lies along a line extending from the middle
-   *      of a hexagonal cell to one of its vertices.
-   *  - C2: (r1) the center of mass lies along a line extending from the middle
-   *      of a hexagonal cell to the center of one of its edges.
-   *  - C2: (r4 + translation) the center of mass lies on an edge of a hexagonal
-   *      cell.
-   *  - trivial: all other cases
-   *
-   * By choosing a preferred orientation of the center of mass (i.e. let the
-   * tile containing the center of mass be (0, 0), and rotate/reflect the plane
-   * about the new origin until the center of mass lies in the triangle formed
-   * by the origin (center of the hexagon at (0, 0)), the vertex in the +x
-   * direction of the origin tile, and the midpoint of the edge extending in the
-   * +y direction from this vertex), we can ensure that all symmetries of the
-   * board will be reachable under the operations in the corresponding
-   * subgroup depending on where the center of mass lies.
-   */
-  std::size_t d6_table_[getSymmTableSize()];
-  std::size_t d3_table_[getSymmTableSize()];
-  std::size_t c2_c2_table_[getSymmTableSize()];
-  std::size_t c2_cv_table_[getSymmTableSize()];
-  std::size_t c2_ce_table_[getSymmTableSize()];
-  std::size_t c2_ev_table_[getSymmTableSize()];
-  std::size_t trivial_table_[getSymmTableSize()];
-};
 
 template <uint32_t NPawns>
 class GameEq {
@@ -117,7 +56,7 @@ class Game {
                            const uint64_t* __restrict__ src, size_t n_8bytes,
                            int32_t bit_offset);
 
-  static std::pair<int, pos_t> calcMoveShiftAndOffset(const Game&, idx_t move);
+  static std::pair<int, HexPos> calcMoveShiftAndOffset(const Game&, idx_t move);
 
  public:
   Game();
@@ -161,8 +100,8 @@ class Game {
 
   GameState state_;
 
-  // Sum of all pos_t's of pieces on the board
-  pos_t sum_of_mass_;
+  // Sum of all HexPos's of pieces on the board
+  HexPos sum_of_mass_;
 
   // Min x/y index values of any piece
   idx_t min_idx_;
@@ -180,9 +119,9 @@ class Game {
    */
   uint32_t fromIdx(idx_t idx) const;
 
-  pos_t idxToPos(idx_t idx) const;
+  HexPos idxToPos(idx_t idx) const;
 
-  idx_t posToIdx(pos_t pos) const;
+  idx_t posToIdx(HexPos pos) const;
 
   bool inBounds(idx_t idx) const;
 
@@ -239,52 +178,6 @@ class Game {
   template <class CallbackFnT>
   bool forEachPlayablePawn(CallbackFnT cb) const;
 };
-
-bool operator==(const pos_t& a, const pos_t& b) {
-  return a.x == b.x && a.y == b.y;
-}
-
-bool operator!=(const pos_t& a, const pos_t& b) {
-  return a.x != b.x || a.y != b.y;
-}
-
-template <typename T>
-pos_t operator*(const T& a, const pos_t& b) {
-  return { static_cast<int32_t>(a * b.x), static_cast<int32_t>(a * b.y) };
-}
-
-pos_t operator+(const pos_t& a, const pos_t& b) {
-  return { a.x + b.x, a.y + b.y };
-}
-
-pos_t operator+=(pos_t& a, const pos_t& b) {
-  a = { a.x + b.x, a.y + b.y };
-  return a;
-}
-
-pos_t operator-(const pos_t& a, const pos_t& b) {
-  return { a.x - b.x, a.y - b.y };
-}
-
-pos_t operator-=(pos_t& a, const pos_t& b) {
-  a = { a.x - b.x, a.y - b.y };
-  return a;
-}
-
-template <uint32_t NPawns>
-GameHash<NPawns>::GameHash() {
-  printf("Constructed!\n");
-}
-
-template <uint32_t NPawns>
-constexpr uint32_t GameHash<NPawns>::getSymmTableSize() {
-  return Game<NPawns>::getBoardNumTiles();
-}
-
-template <uint32_t NPawns>
-std::size_t GameHash<NPawns>::operator()(const Game<NPawns>& g) const noexcept {
-  return 0;
-}
 
 template <uint32_t NPawns>
 bool GameEq<NPawns>::operator()(const Game<NPawns>& g1,
@@ -348,10 +241,10 @@ void Game<NPawns>::copyAndShift(uint64_t* __restrict__ dst,
 }
 
 template <uint32_t NPawns>
-std::pair<int, pos_t> Game<NPawns>::calcMoveShiftAndOffset(const Game& g,
-                                                           idx_t move) {
+std::pair<int, HexPos> Game<NPawns>::calcMoveShiftAndOffset(const Game& g,
+                                                            idx_t move) {
   int shift = 0;
-  pos_t offset = { 0, 0 };
+  HexPos offset = { 0, 0 };
   if (move.second == 0 && g.max_idx_.second < getBoardLen() - 1) {
     shift = getBoardLen() * 2;
     offset.x = 1;
@@ -503,13 +396,13 @@ uint32_t Game<NPawns>::fromIdx(idx_t idx) const {
 }
 
 template <uint32_t NPawns>
-pos_t Game<NPawns>::idxToPos(idx_t idx) const {
+HexPos Game<NPawns>::idxToPos(idx_t idx) const {
   return { static_cast<int32_t>(idx.first + idx.second / 2),
            static_cast<int32_t>(idx.second) };
 }
 
 template <uint32_t NPawns>
-idx_t Game<NPawns>::posToIdx(pos_t pos) const {
+idx_t Game<NPawns>::posToIdx(HexPos pos) const {
   return { static_cast<uint32_t>(pos.x - static_cast<uint32_t>(pos.y) / 2),
            static_cast<uint32_t>(pos.y) };
 }
@@ -597,16 +490,16 @@ bool Game<NPawns>::blackWins() const {
 template <uint32_t NPawns>
 bool Game<NPawns>::checkWin(idx_t last_move) const {
   // Check for a win in all 3 directions
-  pos_t last_move_pos = idxToPos(last_move);
+  HexPos last_move_pos = idxToPos(last_move);
   uint32_t n_in_row;
 
   TileState move_color = getTile(last_move);
 
   {
     n_in_row = 0;
-    pos_t last_pos = last_move_pos + (pos_t){ n_in_row_to_win + 1, 0 };
-    for (pos_t i = last_move_pos - (pos_t){ n_in_row_to_win, 0 }; i != last_pos;
-         i += (pos_t){ 1, 0 }) {
+    HexPos last_pos = last_move_pos + (HexPos){ n_in_row_to_win + 1, 0 };
+    for (HexPos i = last_move_pos - (HexPos){ n_in_row_to_win, 0 };
+         i != last_pos; i += (HexPos){ 1, 0 }) {
       idx_t idx = posToIdx(i);
       if (!inBounds(idx)) {
         continue;
@@ -626,10 +519,11 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
 
   {
     n_in_row = 0;
-    pos_t last_pos =
-        last_move_pos + (pos_t){ n_in_row_to_win + 1, n_in_row_to_win + 1 };
-    for (pos_t i = last_move_pos - (pos_t){ n_in_row_to_win, n_in_row_to_win };
-         i != last_pos; i += (pos_t){ 1, 1 }) {
+    HexPos last_pos =
+        last_move_pos + (HexPos){ n_in_row_to_win + 1, n_in_row_to_win + 1 };
+    for (HexPos i =
+             last_move_pos - (HexPos){ n_in_row_to_win, n_in_row_to_win };
+         i != last_pos; i += (HexPos){ 1, 1 }) {
       idx_t idx = posToIdx(i);
       if (!inBounds(idx)) {
         continue;
@@ -649,9 +543,9 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
 
   {
     n_in_row = 0;
-    pos_t last_pos = last_move_pos + (pos_t){ 0, n_in_row_to_win + 1 };
-    for (pos_t i = last_move_pos - (pos_t){ 0, n_in_row_to_win }; i != last_pos;
-         i += (pos_t){ 0, 1 }) {
+    HexPos last_pos = last_move_pos + (HexPos){ 0, n_in_row_to_win + 1 };
+    for (HexPos i = last_move_pos - (HexPos){ 0, n_in_row_to_win };
+         i != last_pos; i += (HexPos){ 0, 1 }) {
       idx_t idx = posToIdx(i);
       if (!inBounds(idx)) {
         continue;

@@ -42,16 +42,20 @@ set(ENABLE_TESTING OFF CACHE BOOL "When enabled, build all unit tests. The
 file(GLOB_RECURSE CXX_SRC
 	"${PROJECT_SOURCE_DIR}/src/*.cc"
 )
+file(GLOB_RECURSE C_SRC
+	"${PROJECT_SOURCE_DIR}/src/*.c"
+)
 file(GLOB_RECURSE ASM_SRC
 	"${PROJECT_SOURCE_DIR}/src/*.s"
 )
 
 # remove arch_test dir
 list(FILTER CXX_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
+list(FILTER C_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
 list(FILTER ASM_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
 
 add_executable(onoro
-  ${CXX_SRC} ${ASM_SRC}
+  ${CXX_SRC} ${C_SRC} ${ASM_SRC}
 )
 
 if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
