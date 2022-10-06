@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dihedral_group.h"
 #include "hex_pos.h"
 #include "random.h"
 
