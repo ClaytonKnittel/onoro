@@ -6,7 +6,6 @@
 #include <string>
 #include <utility>
 
-#include "game_hash.h"
 #include "hex_pos.h"
 #include "union_find.h"
 
@@ -14,6 +13,10 @@ namespace Onoro {
 
 // (x, y) coordinates as an index.
 typedef std::pair<uint32_t, uint32_t> idx_t;
+
+// Forward declare GameHash
+template <uint32_t NPawns>
+class GameHash;
 
 template <uint32_t NPawns>
 class Game;
@@ -112,18 +115,18 @@ class Game {
   /*
    * Converts an absolute index to an idx_t.
    */
-  idx_t toIdx(uint32_t i) const;
+  static idx_t toIdx(uint32_t i);
 
   /*
    * Converts an idx_t to an absolute index.
    */
-  uint32_t fromIdx(idx_t idx) const;
+  static uint32_t fromIdx(idx_t idx);
 
-  HexPos idxToPos(idx_t idx) const;
+  static HexPos idxToPos(idx_t idx);
 
-  idx_t posToIdx(HexPos pos) const;
+  static idx_t posToIdx(HexPos pos);
 
-  bool inBounds(idx_t idx) const;
+  static bool inBounds(idx_t idx);
 
   uint32_t nPawnsInPlay() const;
 
@@ -386,29 +389,29 @@ std::string Game<NPawns>::Print() const {
 }
 
 template <uint32_t NPawns>
-idx_t Game<NPawns>::toIdx(uint32_t i) const {
+idx_t Game<NPawns>::toIdx(uint32_t i) {
   return { i % getBoardLen(), i / getBoardLen() };
 }
 
 template <uint32_t NPawns>
-uint32_t Game<NPawns>::fromIdx(idx_t idx) const {
+uint32_t Game<NPawns>::fromIdx(idx_t idx) {
   return idx.first + idx.second * getBoardLen();
 }
 
 template <uint32_t NPawns>
-HexPos Game<NPawns>::idxToPos(idx_t idx) const {
+HexPos Game<NPawns>::idxToPos(idx_t idx) {
   return { static_cast<int32_t>(idx.first + idx.second / 2),
            static_cast<int32_t>(idx.second) };
 }
 
 template <uint32_t NPawns>
-idx_t Game<NPawns>::posToIdx(HexPos pos) const {
+idx_t Game<NPawns>::posToIdx(HexPos pos) {
   return { static_cast<uint32_t>(pos.x - static_cast<uint32_t>(pos.y) / 2),
            static_cast<uint32_t>(pos.y) };
 }
 
 template <uint32_t NPawns>
-bool Game<NPawns>::inBounds(idx_t idx) const {
+bool Game<NPawns>::inBounds(idx_t idx) {
   auto [x, y] = idx;
   return x >= 0 && x < getBoardLen() && y >= 0 && y < getBoardLen();
 }
@@ -753,8 +756,7 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
 
   // One pass to populate tmp_board with neighbor counts
   forEachPawn([this, &tmp_board](idx_t next_idx) {
-    bool res = forEachNeighbor(next_idx, [&tmp_board,
-                                          this](idx_t neighbor_idx) {
+    bool res = forEachNeighbor(next_idx, [&tmp_board](idx_t neighbor_idx) {
       uint32_t idx = fromIdx(neighbor_idx);
       uint32_t tb_shift =
           tmp_board_tile_bits * (idx % (bits_per_entry / tmp_board_tile_bits));
@@ -926,7 +928,7 @@ void Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
     }
 
     // increase neighbor count of all neighbors
-    forEachNeighbor(next_idx, [&tmp_board, this](idx_t neighbor_idx) {
+    forEachNeighbor(next_idx, [&tmp_board](idx_t neighbor_idx) {
       uint32_t idx = fromIdx(neighbor_idx);
       uint32_t tb_idx = idx / (bits_per_entry / tmp_board_tile_bits);
       uint32_t tb_shift =

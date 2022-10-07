@@ -2,14 +2,15 @@
 
 #include "dihedral_group.h"
 #include "hex_pos.h"
+#include "onoro.h"
 #include "random.h"
 
 namespace Onoro {
 
 typedef std::size_t game_hash_t;
 
-template <uint32_t NPawns>
-class Game;
+typedef DihedralEl<6> D6;
+typedef DihedralEl<3> D3;
 
 /*
  * GameHash has one of five forms, depending on the board group structure:
@@ -54,17 +55,36 @@ class GameHash {
   // Returns the total number of tiles in each symm table.
   static constexpr uint32_t getSymmTableSize();
 
-  // Returns the origin tile for the D6 group.
-  static constexpr HexPos getCenterD6();
+  // Returns the tile designated as the origin tile for this board.
+  static constexpr HexPos getCenter();
+
+  // Translates from an absolute index to an index object.
+  static constexpr idx_t toIdx(uint32_t i);
+
+  static constexpr uint32_t fromIdx(idx_t idx);
+
+  static constexpr bool inBounds(idx_t idx);
+
+  static constexpr game_hash_t apply(D6 op, game_hash_t h);
 
   /*
    * Rotates the hash 60, 120, and 180 degrees (R1, R2, R3).
    *
+   * c_R1 rotates 60 degrees about the center of the origin tile.
+   * v_R2 rotates 120 degrees about the top right vertex of the origin tile.
+   * e_R3 rotates 180 degrees about the center of the right edge of the origin
+   * tile.
+   *
    * Note: these algorithms are incompatible with each other, i.e.
-   * c_R1(rot60(x)) != v_R2(x).
+   * c_R1(c_R1(x)) != v_R2(x).
    */
   static game_hash_t c_R1(game_hash_t h);
+  static game_hash_t c_R2(game_hash_t h);
+  static game_hash_t c_R3(game_hash_t h);
+  static game_hash_t c_R4(game_hash_t h);
+  static game_hash_t c_R5(game_hash_t h);
   static game_hash_t v_R2(game_hash_t h);
+  static game_hash_t v_R4(game_hash_t h);
   static game_hash_t e_R3(game_hash_t h);
 
   /*
@@ -170,13 +190,105 @@ constexpr uint32_t GameHash<NPawns>::getSymmTableSize() {
 }
 
 template <uint32_t NPawns>
+constexpr HexPos GameHash<NPawns>::getCenter() {
+  return { getSymmTableLen() / 2,
+           getSymmTableLen() / 2 + getSymmTableLen() / 4 };
+}
+
+template <uint32_t NPawns>
+constexpr idx_t GameHash<NPawns>::toIdx(uint32_t i) {
+  return { i % getSymmTableLen(), i / getSymmTableLen() };
+}
+
+template <uint32_t NPawns>
+constexpr uint32_t GameHash<NPawns>::fromIdx(idx_t idx) {
+  return idx.first + idx.second * getSymmTableLen();
+}
+
+template <uint32_t NPawns>
+constexpr bool GameHash<NPawns>::inBounds(idx_t idx) {
+  return idx.first >= 0 && idx.second >= 0 && idx.first < getSymmTableLen() &&
+         idx.second < getSymmTableLen();
+}
+
+template <uint32_t NPawns>
+constexpr game_hash_t GameHash<NPawns>::apply(D6 op, game_hash_t h) {
+  switch (op.ordinal()) {
+    case D6(D6::Action::ROT, 0).ordinal(): {
+      return h;
+    }
+    case D6(D6::Action::ROT, 1).ordinal(): {
+      return c_R1(h);
+    }
+    case D6(D6::Action::ROT, 2).ordinal(): {
+      return c_R2(h);
+    }
+    case D6(D6::Action::ROT, 3).ordinal(): {
+      return c_R3(h);
+    }
+    case D6(D6::Action::ROT, 4).ordinal(): {
+      return c_R4(h);
+    }
+    case D6(D6::Action::ROT, 5).ordinal(): {
+      return c_R5(h);
+    }
+    case D6(D6::Action::REFL, 0).ordinal(): {
+      return c_r0(h);
+    }
+    case D6(D6::Action::REFL, 1).ordinal(): {
+      return c_r1(h);
+    }
+    case D6(D6::Action::REFL, 2).ordinal(): {
+      return c_r2(h);
+    }
+    case D6(D6::Action::REFL, 3).ordinal(): {
+      return c_r3(h);
+    }
+    case D6(D6::Action::REFL, 4).ordinal(): {
+      return c_r4(h);
+    }
+    case D6(D6::Action::REFL, 5).ordinal(): {
+      return c_r5(h);
+    }
+    default: {
+      __builtin_unreachable();
+    }
+  }
+}
+
+template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::c_R1(game_hash_t h) {
   return ((h << 10) | (h >> 50)) & UINT64_C(0x0fffffffffffffff);
 }
 
 template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::c_R2(game_hash_t h) {
+  return c_R1(c_R1(h));
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::c_R3(game_hash_t h) {
+  return c_R1(c_R2(h));
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::c_R4(game_hash_t h) {
+  return c_R1(c_R3(h));
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::c_R5(game_hash_t h) {
+  return c_R1(c_R4(h));
+}
+
+template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::v_R2(game_hash_t h) {
   return ((h << 21) | (h >> 42)) & UINT64_C(0x7fffffffffffffff);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::v_R4(game_hash_t h) {
+  return v_R2(v_R2(h));
 }
 
 template <uint32_t NPawns>
@@ -432,17 +544,67 @@ template <uint32_t NPawns>
 void GameHash<NPawns>::initSymmTables() {
   seed_rand(0, 0);
 
-  // Initialize D6 table
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-    uint32_t x = i % getSymmTableLen();
-    uint32_t y = i / getSymmTableLen();
+    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
 
-    // coordinates of (0, 0) in this coordinate space
-    constexpr uint32_t x_origin = getSymmTableLen() / 2;
-    constexpr uint32_t y_origin = getSymmTableLen() / 2;
+    // Normalize coordinates to the center.
+    p -= getCenter();
 
-    if (x == x_origin && y == y_origin) {
+    // Initialize D6 table
+    game_hash_t d6b = gen_rand64();
+    game_hash_t d6w = gen_rand64();
+
+    // Returns true if the symmetry position symm of p_idx (given as an absolute
+    // index) has already been calculated (meaning we should derive our hashes
+    // from it).
+    std::function<bool(uint32_t, HexPos)> shouldReuse = [](uint32_t p_idx,
+                                                           HexPos symm) {
+      idx_t idx = Game<NPawns>::posToIdx(symm + getCenter());
+      uint32_t i = fromIdx(idx);
+      return i < p_idx && inBounds(idx);
+    };
+
+    if (p == HexPos::origin()) {
+      d6_table_[i] = { make_c_r0(make_c_R1(d6b)), make_c_r0(make_c_R1(d6w)) };
+    } else {
+      typedef DihedralEl<6> D6;
+      uint32_t sextant = p.c_sec();
+
+      // Try the other 5 rotational symmetries
+      HexPos s = p;
+      D6 op;
+      for (uint32_t _i = 0; _i < 5; _i++) {
+        s = s.c_R1();
+        // Accumulate the inverses of the operations we have been doing.
+        op = op * D6(D6::Action::ROT, 5);
+
+        if (shouldReuse(i, s)) {
+          const HashEl& el = d6_table_[fromIdx(Game<NPawns>::posToIdx(s))];
+          d6_table_[i] = { apply(op, el.black_hash), apply(op, el.white_hash) };
+        }
+      }
+
+      // TODO try the 6 reflected symmetries
+
+      // TODO otherwise, create a new hash value
+      if (p.x == 0) {
+      }
     }
+
+    /*
+    game_hash_t d3b = gen_rand64();
+    game_hash_t d3w = gen_rand64();
+    game_hash_t c2c2b = gen_rand64();
+    game_hash_t c2c2w = gen_rand64();
+    game_hash_t c2cvb = gen_rand64();
+    game_hash_t c2cvw = gen_rand64();
+    game_hash_t c2ceb = gen_rand64();
+    game_hash_t c2cew = gen_rand64();
+    game_hash_t c2evb = gen_rand64();
+    game_hash_t c2evw = gen_rand64();
+    game_hash_t trb = gen_rand64();
+    game_hash_t trw = gen_rand64();
+    */
   }
 }
 
