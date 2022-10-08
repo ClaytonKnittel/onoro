@@ -164,7 +164,13 @@ int main(int argc, char* argv[]) {
   srand(0);
 
   // return benchmark();
-  return playout();
+  // return playout();
+  Onoro::GameHash<0> h;
+  if (!h.validate()) {
+    printf("Invalid\n");
+  } else {
+    printf("Valid!\n");
+  }
 
   /*
   typedef DihedralEl<6> D6;

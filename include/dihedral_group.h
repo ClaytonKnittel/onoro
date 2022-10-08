@@ -20,7 +20,7 @@ class DihedralEl {
   };
 
   static constexpr Action action(element_t e) {
-    return static_cast<Action>(e % N);
+    return static_cast<Action>(e / N);
   }
 
   static constexpr uint32_t degree(element_t e) {
@@ -69,28 +69,40 @@ class DihedralEl {
         element_t& el = table[i * (2 * N) + j];
 
         switch (action(i)) {
-          case DihedralEl<N>::Action::ROT:
+          case DihedralEl<N>::Action::ROT: {
             switch (action(j)) {
-              case DihedralEl<N>::Action::ROT:
+              case DihedralEl<N>::Action::ROT: {
                 el = DihedralEl<N>(DihedralEl<N>::Action::ROT,
                                    (degree(i) + degree(j)) % N)
                          .e_;
-              case DihedralEl<N>::Action::REFL:
+                break;
+              }
+              case DihedralEl<N>::Action::REFL: {
                 el = DihedralEl<N>(DihedralEl<N>::Action::REFL,
                                    (degree(i) + degree(j)) % N)
                          .e_;
+                break;
+              }
             }
-          case DihedralEl<N>::Action::REFL:
+            break;
+          }
+          case DihedralEl<N>::Action::REFL: {
             switch (action(j)) {
-              case DihedralEl<N>::Action::ROT:
+              case DihedralEl<N>::Action::ROT: {
                 el = DihedralEl<N>(DihedralEl<N>::Action::REFL,
-                                   (N + degree(i) + degree(j)) % N)
+                                   (N + degree(i) - degree(j)) % N)
                          .e_;
-              case DihedralEl<N>::Action::REFL:
+                break;
+              }
+              case DihedralEl<N>::Action::REFL: {
                 el = DihedralEl<N>(DihedralEl<N>::Action::ROT,
-                                   (N + degree(i) + degree(j)) % N)
+                                   (N + degree(i) - degree(j)) % N)
                          .e_;
+                break;
+              }
             }
+            break;
+          }
         }
       }
     }
