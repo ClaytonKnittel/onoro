@@ -46,6 +46,7 @@ class GameHash {
   constexpr bool validate() const;
 
   static std::string printD6Hash(game_hash_t);
+  static std::string printD3Hash(game_hash_t);
 
  private:
   struct HashEl {
@@ -71,9 +72,11 @@ class GameHash {
 
   static constexpr bool inBounds(idx_t idx);
 
-  static constexpr game_hash_t apply(D6 op, game_hash_t h);
+  static constexpr game_hash_t apply_d6(D6 op, game_hash_t h);
+  static constexpr game_hash_t apply_d3(D3 op, game_hash_t h);
 
-  static constexpr game_hash_t make_invariant(D6 op, game_hash_t h);
+  static constexpr game_hash_t make_invariant_d6(D6 op, game_hash_t h);
+  static constexpr game_hash_t make_invariant_d3(D3 op, game_hash_t h);
 
   static constexpr game_hash_t C_MASK = UINT64_C(0x0fffffffffffffff);
   static constexpr game_hash_t V_MASK = UINT64_C(0x7fffffffffffffff);
@@ -209,10 +212,11 @@ constexpr bool GameHash<NPawns>::validate() const {
       if (inBounds(idx)) {
         const HashEl& hs =
             d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        if (apply(op, h.black_hash) != hs.black_hash ||
-            apply(op, h.white_hash) != hs.white_hash) {
+        if (apply_d6(op, h.black_hash) != hs.black_hash ||
+            apply_d6(op, h.white_hash) != hs.white_hash) {
           printf(
-              "Hashes not equal between position (%d, %d) and (%d, %d) under "
+              "D6 hashes not equal between position (%d, %d) and (%d, %d) "
+              "under "
               "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
               p.x, p.y, s.x, s.y, op.toString().c_str(),
               printD6Hash(h.black_hash).c_str(),
@@ -231,10 +235,11 @@ constexpr bool GameHash<NPawns>::validate() const {
       if (inBounds(idx)) {
         const HashEl& hs =
             d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        if (apply(op, h.black_hash) != hs.black_hash ||
-            apply(op, h.white_hash) != hs.white_hash) {
+        if (apply_d6(op, h.black_hash) != hs.black_hash ||
+            apply_d6(op, h.white_hash) != hs.white_hash) {
           printf(
-              "Hashes not equal between position (%d, %d) and (%d, %d) under "
+              "D6 hashes not equal between position (%d, %d) and (%d, %d) "
+              "under "
               "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
               p.x, p.y, s.x, s.y, op.toString().c_str(),
               printD6Hash(h.black_hash).c_str(),
@@ -247,6 +252,67 @@ constexpr bool GameHash<NPawns>::validate() const {
 
       s = s.c_r1();
       op = D6(D6::Action::ROT, 1) * op;
+    }
+  }
+
+  // Check D3 table
+  for (uint32_t i = 0; i < getSymmTableSize(); i++) {
+    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+
+    p -= getCenter();
+
+    const HashEl& h = d3_table_[i];
+
+    HexPos s = p;
+    D3 op;
+    for (uint32_t _i = 0; _i < 2; _i++) {
+      s = s.v_r2();
+      op = D3(D3::Action::ROT, 1) * op;
+
+      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      if (inBounds(idx)) {
+        const HashEl& hs =
+            d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        if (apply_d3(op, h.black_hash) != hs.black_hash ||
+            apply_d3(op, h.white_hash) != hs.white_hash) {
+          printf(
+              "D3 hashes not equal between position (%d, %d) and (%d, %d) "
+              "under "
+              "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
+              p.x, p.y, s.x, s.y, op.toString().c_str(),
+              printD3Hash(h.black_hash).c_str(),
+              printD3Hash(hs.black_hash).c_str(),
+              printD3Hash(h.white_hash).c_str(),
+              printD3Hash(hs.white_hash).c_str());
+          return false;
+        }
+      }
+    }
+
+    s = p.v_s1();
+    op = D3(D3::Action::REFL, 0);
+    for (uint32_t _i = 0; _i < 3; _i++) {
+      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      if (inBounds(idx)) {
+        const HashEl& hs =
+            d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        if (apply_d3(op, h.black_hash) != hs.black_hash ||
+            apply_d3(op, h.white_hash) != hs.white_hash) {
+          printf(
+              "D3 hashes not equal between position (%d, %d) and (%d, %d) "
+              "under "
+              "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
+              p.x, p.y, s.x, s.y, op.toString().c_str(),
+              printD3Hash(h.black_hash).c_str(),
+              printD3Hash(hs.black_hash).c_str(),
+              printD3Hash(h.white_hash).c_str(),
+              printD3Hash(hs.white_hash).c_str());
+          return false;
+        }
+      }
+
+      s = s.v_r2();
+      op = D3(D3::Action::ROT, 1) * op;
     }
   }
   return true;
@@ -262,6 +328,18 @@ std::string GameHash<NPawns>::printD6Hash(game_hash_t h) {
   ostr << " 0x" << std::setfill('0') << std::setw(3) << ((h >> 30) & 0x3ff);
   ostr << " 0x" << std::setfill('0') << std::setw(3) << ((h >> 40) & 0x3ff);
   ostr << " 0x" << std::setfill('0') << std::setw(3) << ((h >> 50) & 0x3ff);
+
+  return ostr.str();
+}
+
+template <uint32_t NPawns>
+std::string GameHash<NPawns>::printD3Hash(game_hash_t h) {
+  std::ostringstream ostr;
+
+  ostr << std::hex << "0x" << std::setfill('0') << std::setw(6)
+       << (h & 0x1fffff);
+  ostr << " 0x" << std::setfill('0') << std::setw(6) << ((h >> 21) & 0x1fffff);
+  ostr << " 0x" << std::setfill('0') << std::setw(6) << ((h >> 42) & 0x1fffff);
 
   return ostr.str();
 }
@@ -299,7 +377,7 @@ constexpr bool GameHash<NPawns>::inBounds(idx_t idx) {
 }
 
 template <uint32_t NPawns>
-constexpr game_hash_t GameHash<NPawns>::apply(D6 op, game_hash_t h) {
+constexpr game_hash_t GameHash<NPawns>::apply_d6(D6 op, game_hash_t h) {
   switch (op.ordinal()) {
     case D6(D6::Action::ROT, 0).ordinal(): {
       return h;
@@ -344,7 +422,35 @@ constexpr game_hash_t GameHash<NPawns>::apply(D6 op, game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-constexpr game_hash_t GameHash<NPawns>::make_invariant(D6 op, game_hash_t h) {
+constexpr game_hash_t GameHash<NPawns>::apply_d3(D3 op, game_hash_t h) {
+  switch (op.ordinal()) {
+    case D3(D3::Action::ROT, 0).ordinal(): {
+      return h;
+    }
+    case D3(D3::Action::ROT, 1).ordinal(): {
+      return v_r2(h);
+    }
+    case D3(D3::Action::ROT, 2).ordinal(): {
+      return v_r4(h);
+    }
+    case D3(D3::Action::REFL, 0).ordinal(): {
+      return v_s1(h);
+    }
+    case D3(D3::Action::REFL, 1).ordinal(): {
+      return v_s3(h);
+    }
+    case D3(D3::Action::REFL, 2).ordinal(): {
+      return v_s5(h);
+    }
+    default: {
+      __builtin_unreachable();
+    }
+  }
+}
+
+template <uint32_t NPawns>
+constexpr game_hash_t GameHash<NPawns>::make_invariant_d6(D6 op,
+                                                          game_hash_t h) {
   switch (op.ordinal()) {
     case D6(D6::Action::ROT, 0).ordinal(): {
       return h;
@@ -377,6 +483,35 @@ constexpr game_hash_t GameHash<NPawns>::make_invariant(D6 op, game_hash_t h) {
     case D6(D6::Action::ROT, 3).ordinal():
     case D6(D6::Action::ROT, 4).ordinal():
     case D6(D6::Action::ROT, 5).ordinal():
+    default: {
+      __builtin_unreachable();
+    }
+  }
+}
+
+template <uint32_t NPawns>
+constexpr game_hash_t GameHash<NPawns>::make_invariant_d3(D3 op,
+                                                          game_hash_t h) {
+  switch (op.ordinal()) {
+    case D3(D3::Action::ROT, 0).ordinal(): {
+      return h;
+    }
+    case D3(D3::Action::ROT, 1).ordinal(): {
+      return make_v_r2(h);
+    }
+    case D3(D3::Action::REFL, 0).ordinal(): {
+      return make_v_s1(h);
+    }
+    case D3(D3::Action::REFL, 1).ordinal(): {
+      return make_v_s3(h);
+    }
+    case D3(D3::Action::REFL, 2).ordinal(): {
+      return make_v_s5(h);
+    }
+
+    // Don't support making invariant under rotations other than the basic
+    // rotation.
+    case D3(D3::Action::ROT, 2).ordinal():
     default: {
       __builtin_unreachable();
     }
@@ -677,10 +812,6 @@ void GameHash<NPawns>::initSymmTables() {
     // Normalize coordinates to the center.
     p -= getCenter();
 
-    // Initialize D6 table
-    game_hash_t d6b = gen_rand64() & C_MASK;
-    game_hash_t d6w = gen_rand64() & C_MASK;
-
     // Returns true if the symmetry position symm of p_idx (given as an
     // absolute index) has already been calculated (meaning we should derive
     // our hashes from it).
@@ -690,6 +821,10 @@ void GameHash<NPawns>::initSymmTables() {
       uint32_t i = fromIdx(idx);
       return i < p_idx && inBounds(idx);
     };
+
+    // Initialize D6 table
+    game_hash_t d6b = gen_rand64() & C_MASK;
+    game_hash_t d6w = gen_rand64() & C_MASK;
 
     if (p == HexPos::origin()) {
       d6_table_[i] = { make_c_s0(make_c_r1(d6b)), make_c_s0(make_c_r1(d6w)) };
@@ -705,7 +840,8 @@ void GameHash<NPawns>::initSymmTables() {
         if (shouldReuse(i, s)) {
           const HashEl& el =
               d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-          d6_table_[i] = { apply(op, el.black_hash), apply(op, el.white_hash) };
+          d6_table_[i] = { apply_d6(op, el.black_hash),
+                           apply_d6(op, el.white_hash) };
           goto d6_hash_calc_done;
         }
       }
@@ -716,14 +852,16 @@ void GameHash<NPawns>::initSymmTables() {
       for (uint32_t _i = 0; _i < 6; _i++) {
         if (s == p) {
           // This tile is symmetric to itself under some reflection
-          d6_table_[i] = { make_invariant(op, d6b), make_invariant(op, d6w) };
+          d6_table_[i] = { make_invariant_d6(op, d6b),
+                           make_invariant_d6(op, d6w) };
           goto d6_hash_calc_done;
         }
 
         if (shouldReuse(i, s)) {
           const HashEl& el =
               d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-          d6_table_[i] = { apply(op, el.black_hash), apply(op, el.white_hash) };
+          d6_table_[i] = { apply_d6(op, el.black_hash),
+                           apply_d6(op, el.white_hash) };
           goto d6_hash_calc_done;
         }
 
@@ -736,6 +874,55 @@ void GameHash<NPawns>::initSymmTables() {
       d6_table_[i] = { d6b, d6w };
 
 d6_hash_calc_done:;
+    }
+
+    game_hash_t d3b = gen_rand64() & V_MASK;
+    game_hash_t d3w = gen_rand64() & V_MASK;
+
+    {
+      // Try the 2 rotational symmetries
+      HexPos s = p;
+      D3 op;
+      for (uint32_t _i = 0; _i < 2; _i++) {
+        s = s.v_r2();
+        op = op * D3(D3::Action::ROT, 2);
+
+        if (shouldReuse(i, s)) {
+          const HashEl& el =
+              d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+          d3_table_[i] = { apply_d3(op, el.black_hash),
+                           apply_d3(op, el.white_hash) };
+          goto d3_hash_calc_done;
+        }
+      }
+
+      // Try the 3 reflected symmetries
+      s = p.v_s1();
+      op = D3(D3::Action::REFL, 0);
+      for (uint32_t _i = 0; _i < 3; _i++) {
+        if (s == p) {
+          // This tile is symmetric to itself under some reflection
+          d3_table_[i] = { make_invariant_d3(op, d3b),
+                           make_invariant_d3(op, d3w) };
+          goto d3_hash_calc_done;
+        }
+
+        if (shouldReuse(i, s)) {
+          const HashEl& el =
+              d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+          d3_table_[i] = { apply_d3(op, el.black_hash),
+                           apply_d3(op, el.white_hash) };
+          goto d3_hash_calc_done;
+        }
+
+        s = s.v_r2();
+        op = op * D3(D3::Action::ROT, 2);
+      }
+
+      // Otherwise, create a new hash value
+      d3_table_[i] = { d3b, d3w };
+
+d3_hash_calc_done:;
     }
 
     /*

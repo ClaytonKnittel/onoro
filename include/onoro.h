@@ -290,17 +290,40 @@ Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
   memset(this->board_, 0, getBoardSize() * sizeof(uint64_t));
 
   uint32_t mid_idx = (getBoardLen() - 1) / 2;
-  idx_t b_start = { mid_idx, mid_idx };
-  idx_t w_start = { mid_idx + !(mid_idx & 1), mid_idx + 1 };
-  idx_t b_next = { mid_idx + 1, mid_idx };
 
-  setTile(b_start, TileState::TILE_BLACK);
-  setTile(w_start, TileState::TILE_WHITE);
-  setTile(b_next, TileState::TILE_BLACK);
+  if (true) {
+    idx_t b_start = { mid_idx, mid_idx };
+    idx_t w_start = { mid_idx + !(mid_idx & 1), mid_idx + 1 };
+    idx_t b_next = { mid_idx + 1, mid_idx };
 
-  min_idx_ = b_start;
-  max_idx_ = { mid_idx + 1, mid_idx + 1 };
-  sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next);
+    setTile(b_start, TileState::TILE_BLACK);
+    setTile(w_start, TileState::TILE_WHITE);
+    setTile(b_next, TileState::TILE_BLACK);
+
+    min_idx_ = b_start;
+    max_idx_ = { mid_idx + 1, mid_idx + 1 };
+    sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next);
+  } else {
+    idx_t b_start = { mid_idx + !(mid_idx & 1), mid_idx - 1 };
+    idx_t w_start = { mid_idx + !(mid_idx & 1), mid_idx + 1 };
+    idx_t b_next = { mid_idx + 1, mid_idx };
+    idx_t w_next = { mid_idx - (mid_idx & 1), mid_idx + 1 };
+    idx_t b_next2 = { mid_idx - 1, mid_idx };
+    idx_t w_next2 = { mid_idx - (mid_idx & 1), mid_idx - 1 };
+
+    setTile(b_start, TileState::TILE_BLACK);
+    setTile(w_start, TileState::TILE_BLACK);
+    setTile(b_next, TileState::TILE_WHITE);
+    setTile(w_next, TileState::TILE_WHITE);
+    setTile(b_next2, TileState::TILE_BLACK);
+    setTile(w_next2, TileState::TILE_WHITE);
+
+    min_idx_ = { mid_idx - (mid_idx & 1), mid_idx - 1 };
+    max_idx_ = { mid_idx + 1, mid_idx + 1 };
+    sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next) +
+                   idxToPos(w_next) + idxToPos(b_next2) + idxToPos(w_next2);
+    state_.turn = 5;
+  }
 }
 
 template <uint32_t NPawns>
