@@ -926,8 +926,6 @@ d3_hash_calc_done:;
     }
 
     /*
-    game_hash_t d3b = gen_rand64();
-    game_hash_t d3w = gen_rand64();
     game_hash_t c2c2b = gen_rand64();
     game_hash_t c2c2w = gen_rand64();
     game_hash_t c2cvb = gen_rand64();
