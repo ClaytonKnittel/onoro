@@ -1,18 +1,23 @@
 #pragma once
 
+#include <utils/math/group/cyclic.h>
+#include <utils/math/group/dihedral.h>
+#include <utils/math/group/direct_product.h>
+#include <utils/math/random.h>
+
 #include <iomanip>
 
-#include "dihedral_group.h"
 #include "hex_pos.h"
 #include "onoro.h"
-#include "random.h"
 
 namespace Onoro {
 
 typedef std::size_t game_hash_t;
 
-typedef DihedralEl<6> D6;
-typedef DihedralEl<3> D3;
+typedef util::math::group::Dihedral<6> D6;
+typedef util::math::group::Dihedral<3> D3;
+typedef util::math::group::Cyclic<2> C2;
+typedef util::math::group::DirectProduct<C2, C2> K4;
 
 /*
  * GameHash has one of five forms, depending on the board group structure:
@@ -47,6 +52,7 @@ class GameHash {
 
   static std::string printD6Hash(game_hash_t);
   static std::string printD3Hash(game_hash_t);
+  static std::string printK4Hash(game_hash_t);
 
  private:
   struct HashEl {
@@ -74,9 +80,13 @@ class GameHash {
 
   static constexpr game_hash_t apply_d6(D6 op, game_hash_t h);
   static constexpr game_hash_t apply_d3(D3 op, game_hash_t h);
+  static constexpr game_hash_t apply_k4(K4 op, game_hash_t h);
+  static constexpr game_hash_t apply_c2(C2 op, game_hash_t h);
 
   static constexpr game_hash_t make_invariant_d6(D6 op, game_hash_t h);
   static constexpr game_hash_t make_invariant_d3(D3 op, game_hash_t h);
+  static constexpr game_hash_t make_invariant_k4(K4 op, game_hash_t h);
+  static constexpr game_hash_t make_invariant_c2(C2 op, game_hash_t h);
 
   static constexpr game_hash_t C_MASK = UINT64_C(0x0fffffffffffffff);
   static constexpr game_hash_t V_MASK = UINT64_C(0x7fffffffffffffff);
@@ -85,60 +95,60 @@ class GameHash {
   /*
    * Rotates the hash 60, 120, and 180 degrees (R1, R2, R3).
    *
-   * c_r1 rotates 60 degrees about the center of the origin tile.
-   * v_r2 rotates 120 degrees about the top right vertex of the origin tile.
-   * e_r3 rotates 180 degrees about the center of the right edge of the origin
+   * d6_r1 rotates 60 degrees about the center of the origin tile.
+   * d3_r2 rotates 120 degrees about the top right vertex of the origin tile.
+   * k4_r3 rotates 180 degrees about the center of the right edge of the origin
    * tile.
    *
    * Note: these algorithms are incompatible with each other, i.e.
-   * c_r1(c_r1(x)) != v_r2(x).
+   * d6_r1(d6_r1(x)) != d3_r2(x).
    */
-  static game_hash_t c_r1(game_hash_t h);
-  static game_hash_t c_r2(game_hash_t h);
-  static game_hash_t c_r3(game_hash_t h);
-  static game_hash_t c_r4(game_hash_t h);
-  static game_hash_t c_r5(game_hash_t h);
-  static game_hash_t v_r2(game_hash_t h);
-  static game_hash_t v_r4(game_hash_t h);
-  static game_hash_t e_r3(game_hash_t h);
+  static game_hash_t d6_r1(game_hash_t h);
+  static game_hash_t d6_r2(game_hash_t h);
+  static game_hash_t d6_r3(game_hash_t h);
+  static game_hash_t d6_r4(game_hash_t h);
+  static game_hash_t d6_r5(game_hash_t h);
+  static game_hash_t d6_s0(game_hash_t h);
+  static game_hash_t d6_s1(game_hash_t h);
+  static game_hash_t d6_s2(game_hash_t h);
+  static game_hash_t d6_s3(game_hash_t h);
+  static game_hash_t d6_s4(game_hash_t h);
+  static game_hash_t d6_s5(game_hash_t h);
 
-  /*
-   * [cve]_r<n>: Reflects the hash across a line at angle n*30 degrees,
-   * passing through:
-   *  - c: the center of the origin hex
-   *  - v: the top right vertex of the origin hex
-   *  - e: the center of the right edge of the origin hex
-   */
-  static game_hash_t c_s0(game_hash_t h);
-  static game_hash_t c_s1(game_hash_t h);
-  static game_hash_t c_s2(game_hash_t h);
-  static game_hash_t c_s3(game_hash_t h);
-  static game_hash_t c_s4(game_hash_t h);
-  static game_hash_t c_s5(game_hash_t h);
-  static game_hash_t v_s1(game_hash_t h);
-  static game_hash_t v_s3(game_hash_t h);
-  static game_hash_t v_s5(game_hash_t h);
-  static game_hash_t e_s0(game_hash_t h);
-  static game_hash_t e_s3(game_hash_t h);
+  static game_hash_t d3_r2(game_hash_t h);
+  static game_hash_t d3_r4(game_hash_t h);
+  static game_hash_t d3_s1(game_hash_t h);
+  static game_hash_t d3_s3(game_hash_t h);
+  static game_hash_t d3_s5(game_hash_t h);
+
+  static game_hash_t k4_r3(game_hash_t h);
+  static game_hash_t k4_s0(game_hash_t h);
+  static game_hash_t k4_s3(game_hash_t h);
+
+  static game_hash_t c2_r(game_hash_t h);
 
   /*
    * Given a hash, compresses it to make it invariant under the corresponding
    * group operation.
    */
-  static game_hash_t make_c_r1(game_hash_t h);
-  static game_hash_t make_v_r2(game_hash_t h);
-  static game_hash_t make_e_r3(game_hash_t h);
-  static game_hash_t make_c_s0(game_hash_t h);
-  static game_hash_t make_c_s1(game_hash_t h);
-  static game_hash_t make_c_s2(game_hash_t h);
-  static game_hash_t make_c_s3(game_hash_t h);
-  static game_hash_t make_c_s4(game_hash_t h);
-  static game_hash_t make_c_s5(game_hash_t h);
-  static game_hash_t make_v_s1(game_hash_t h);
-  static game_hash_t make_v_s3(game_hash_t h);
-  static game_hash_t make_v_s5(game_hash_t h);
-  static game_hash_t make_e_s0(game_hash_t h);
-  static game_hash_t make_e_s3(game_hash_t h);
+  static game_hash_t make_d6_r1(game_hash_t h);
+  static game_hash_t make_d6_s0(game_hash_t h);
+  static game_hash_t make_d6_s1(game_hash_t h);
+  static game_hash_t make_d6_s2(game_hash_t h);
+  static game_hash_t make_d6_s3(game_hash_t h);
+  static game_hash_t make_d6_s4(game_hash_t h);
+  static game_hash_t make_d6_s5(game_hash_t h);
+
+  static game_hash_t make_d3_r2(game_hash_t h);
+  static game_hash_t make_d3_s1(game_hash_t h);
+  static game_hash_t make_d3_s3(game_hash_t h);
+  static game_hash_t make_d3_s5(game_hash_t h);
+
+  static game_hash_t make_k4_r3(game_hash_t h);
+  static game_hash_t make_k4_s0(game_hash_t h);
+  static game_hash_t make_k4_s3(game_hash_t h);
+
+  static game_hash_t make_c2_r(game_hash_t h);
 
   void initSymmTables();
 
@@ -176,7 +186,7 @@ class GameHash {
    */
   HashEl d6_table_[getSymmTableSize()];
   HashEl d3_table_[getSymmTableSize()];
-  HashEl c2_c2_table_[getSymmTableSize()];
+  HashEl k4_table_[getSymmTableSize()];
   HashEl c2_cv_table_[getSymmTableSize()];
   HashEl c2_ce_table_[getSymmTableSize()];
   HashEl c2_ev_table_[getSymmTableSize()];
@@ -314,6 +324,40 @@ constexpr bool GameHash<NPawns>::validate() const {
       s = s.v_r2();
       op = D3(D3::Action::ROT, 1) * op;
     }
+
+    // Check K4 table
+    for (uint32_t i = 0; i < getSymmTableSize(); i++) {
+      HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+
+      p -= getCenter();
+
+      const HashEl& h = k4_table_[i];
+
+      for (K4 op : { K4(C2(1), C2(0)), K4(C2(0), C2(1)), K4(C2(1), C2(1)) }) {
+        HexPos s = p.apply_k4_e(op);
+
+        idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+        if (inBounds(idx)) {
+          const HashEl& hs =
+              k4_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+          if (apply_k4(op, h.black_hash) != hs.black_hash ||
+              apply_k4(op, h.white_hash) != hs.white_hash) {
+            printf(
+                "K4 hashes not equal between position (%d, %d) and (%d, %d) "
+                "under "
+                "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
+                p.x, p.y, s.x, s.y, op.toString().c_str(),
+                printK4Hash(h.black_hash).c_str(),
+                printK4Hash(hs.black_hash).c_str(),
+                printK4Hash(h.white_hash).c_str(),
+                printK4Hash(hs.white_hash).c_str());
+            printf("%s\n", printK4Hash(h.black_hash).c_str());
+            printf("%s\n", printK4Hash(apply_k4(op, h.black_hash)).c_str());
+            return false;
+          }
+        }
+      }
+    }
   }
   return true;
 }
@@ -340,6 +384,18 @@ std::string GameHash<NPawns>::printD3Hash(game_hash_t h) {
        << (h & 0x1fffff);
   ostr << " 0x" << std::setfill('0') << std::setw(6) << ((h >> 21) & 0x1fffff);
   ostr << " 0x" << std::setfill('0') << std::setw(6) << ((h >> 42) & 0x1fffff);
+
+  return ostr.str();
+}
+
+template <uint32_t NPawns>
+std::string GameHash<NPawns>::printK4Hash(game_hash_t h) {
+  std::ostringstream ostr;
+
+  ostr << std::hex << "0x" << std::setfill('0') << std::setw(4) << (h & 0xffff);
+  ostr << " 0x" << std::setfill('0') << std::setw(4) << ((h >> 16) & 0xffff);
+  ostr << " 0x" << std::setfill('0') << std::setw(4) << ((h >> 32) & 0xffff);
+  ostr << " 0x" << std::setfill('0') << std::setw(4) << ((h >> 48) & 0xffff);
 
   return ostr.str();
 }
@@ -383,37 +439,37 @@ constexpr game_hash_t GameHash<NPawns>::apply_d6(D6 op, game_hash_t h) {
       return h;
     }
     case D6(D6::Action::ROT, 1).ordinal(): {
-      return c_r1(h);
+      return d6_r1(h);
     }
     case D6(D6::Action::ROT, 2).ordinal(): {
-      return c_r2(h);
+      return d6_r2(h);
     }
     case D6(D6::Action::ROT, 3).ordinal(): {
-      return c_r3(h);
+      return d6_r3(h);
     }
     case D6(D6::Action::ROT, 4).ordinal(): {
-      return c_r4(h);
+      return d6_r4(h);
     }
     case D6(D6::Action::ROT, 5).ordinal(): {
-      return c_r5(h);
+      return d6_r5(h);
     }
     case D6(D6::Action::REFL, 0).ordinal(): {
-      return c_s0(h);
+      return d6_s0(h);
     }
     case D6(D6::Action::REFL, 1).ordinal(): {
-      return c_s1(h);
+      return d6_s1(h);
     }
     case D6(D6::Action::REFL, 2).ordinal(): {
-      return c_s2(h);
+      return d6_s2(h);
     }
     case D6(D6::Action::REFL, 3).ordinal(): {
-      return c_s3(h);
+      return d6_s3(h);
     }
     case D6(D6::Action::REFL, 4).ordinal(): {
-      return c_s4(h);
+      return d6_s4(h);
     }
     case D6(D6::Action::REFL, 5).ordinal(): {
-      return c_s5(h);
+      return d6_s5(h);
     }
     default: {
       __builtin_unreachable();
@@ -428,19 +484,55 @@ constexpr game_hash_t GameHash<NPawns>::apply_d3(D3 op, game_hash_t h) {
       return h;
     }
     case D3(D3::Action::ROT, 1).ordinal(): {
-      return v_r2(h);
+      return d3_r2(h);
     }
     case D3(D3::Action::ROT, 2).ordinal(): {
-      return v_r4(h);
+      return d3_r4(h);
     }
     case D3(D3::Action::REFL, 0).ordinal(): {
-      return v_s1(h);
+      return d3_s1(h);
     }
     case D3(D3::Action::REFL, 1).ordinal(): {
-      return v_s3(h);
+      return d3_s3(h);
     }
     case D3(D3::Action::REFL, 2).ordinal(): {
-      return v_s5(h);
+      return d3_s5(h);
+    }
+    default: {
+      __builtin_unreachable();
+    }
+  }
+}
+
+template <uint32_t NPawns>
+constexpr game_hash_t GameHash<NPawns>::apply_k4(K4 op, game_hash_t h) {
+  switch (op.ordinal()) {
+    case K4(C2(0), C2(0)).ordinal(): {
+      return h;
+    }
+    case K4(C2(1), C2(0)).ordinal(): {
+      return k4_s0(h);
+    }
+    case K4(C2(0), C2(1)).ordinal(): {
+      return k4_s3(h);
+    }
+    case K4(C2(1), C2(1)).ordinal(): {
+      return k4_r3(h);
+    }
+    default: {
+      __builtin_unreachable();
+    }
+  }
+}
+
+template <uint32_t NPawns>
+constexpr game_hash_t GameHash<NPawns>::apply_c2(C2 op, game_hash_t h) {
+  switch (op.ordinal()) {
+    case C2(0).ordinal(): {
+      return h;
+    }
+    case C2(1).ordinal(): {
+      return c2_r(h);
     }
     default: {
       __builtin_unreachable();
@@ -452,33 +544,31 @@ template <uint32_t NPawns>
 constexpr game_hash_t GameHash<NPawns>::make_invariant_d6(D6 op,
                                                           game_hash_t h) {
   switch (op.ordinal()) {
-    case D6(D6::Action::ROT, 0).ordinal(): {
-      return h;
-    }
     case D6(D6::Action::ROT, 1).ordinal(): {
-      return make_c_r1(h);
+      return make_d6_r1(h);
     }
     case D6(D6::Action::REFL, 0).ordinal(): {
-      return make_c_s0(h);
+      return make_d6_s0(h);
     }
     case D6(D6::Action::REFL, 1).ordinal(): {
-      return make_c_s1(h);
+      return make_d6_s1(h);
     }
     case D6(D6::Action::REFL, 2).ordinal(): {
-      return make_c_s2(h);
+      return make_d6_s2(h);
     }
     case D6(D6::Action::REFL, 3).ordinal(): {
-      return make_c_s3(h);
+      return make_d6_s3(h);
     }
     case D6(D6::Action::REFL, 4).ordinal(): {
-      return make_c_s4(h);
+      return make_d6_s4(h);
     }
     case D6(D6::Action::REFL, 5).ordinal(): {
-      return make_c_s5(h);
+      return make_d6_s5(h);
     }
 
     // Don't support making invariant under rotations other than the basic
     // rotation.
+    case D6(D6::Action::ROT, 0).ordinal():
     case D6(D6::Action::ROT, 2).ordinal():
     case D6(D6::Action::ROT, 3).ordinal():
     case D6(D6::Action::ROT, 4).ordinal():
@@ -493,24 +583,22 @@ template <uint32_t NPawns>
 constexpr game_hash_t GameHash<NPawns>::make_invariant_d3(D3 op,
                                                           game_hash_t h) {
   switch (op.ordinal()) {
-    case D3(D3::Action::ROT, 0).ordinal(): {
-      return h;
-    }
     case D3(D3::Action::ROT, 1).ordinal(): {
-      return make_v_r2(h);
+      return make_d3_r2(h);
     }
     case D3(D3::Action::REFL, 0).ordinal(): {
-      return make_v_s1(h);
+      return make_d3_s1(h);
     }
     case D3(D3::Action::REFL, 1).ordinal(): {
-      return make_v_s3(h);
+      return make_d3_s3(h);
     }
     case D3(D3::Action::REFL, 2).ordinal(): {
-      return make_v_s5(h);
+      return make_d3_s5(h);
     }
 
     // Don't support making invariant under rotations other than the basic
     // rotation.
+    case D3(D3::Action::ROT, 0).ordinal():
     case D3(D3::Action::ROT, 2).ordinal():
     default: {
       __builtin_unreachable();
@@ -519,47 +607,61 @@ constexpr game_hash_t GameHash<NPawns>::make_invariant_d3(D3 op,
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_r1(game_hash_t h) {
+constexpr game_hash_t GameHash<NPawns>::make_invariant_k4(K4 op,
+                                                          game_hash_t h) {
+  switch (op.ordinal()) {
+    case K4(C2(1), C2(0)).ordinal(): {
+      return make_k4_s0(h);
+    }
+    case K4(C2(0), C2(1)).ordinal(): {
+      return make_k4_s3(h);
+    }
+    case K4(C2(1), C2(1)).ordinal(): {
+      return make_k4_r3(h);
+    }
+
+    // Don't support making invariant under identity.
+    case K4(C2(0), C2(0)).ordinal():
+    default: {
+      __builtin_unreachable();
+    }
+  }
+}
+
+template <uint32_t NPawns>
+constexpr game_hash_t GameHash<NPawns>::make_invariant_c2(C2 op,
+                                                          game_hash_t h) {
+  // Only one symmetry operation is possible.
+  return make_c2_r(h);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::d6_r1(game_hash_t h) {
   return ((h << 10) | (h >> 50)) & C_MASK;
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_r2(game_hash_t h) {
-  return c_r1(c_r1(h));
+game_hash_t GameHash<NPawns>::d6_r2(game_hash_t h) {
+  return d6_r1(d6_r1(h));
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_r3(game_hash_t h) {
-  return c_r1(c_r2(h));
+game_hash_t GameHash<NPawns>::d6_r3(game_hash_t h) {
+  return d6_r1(d6_r2(h));
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_r4(game_hash_t h) {
-  return c_r1(c_r3(h));
+game_hash_t GameHash<NPawns>::d6_r4(game_hash_t h) {
+  return d6_r1(d6_r3(h));
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_r5(game_hash_t h) {
-  return c_r1(c_r4(h));
+game_hash_t GameHash<NPawns>::d6_r5(game_hash_t h) {
+  return d6_r1(d6_r4(h));
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::v_r2(game_hash_t h) {
-  return ((h << 21) | (h >> 42)) & V_MASK;
-}
-
-template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::v_r4(game_hash_t h) {
-  return v_r2(v_r2(h));
-}
-
-template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::e_r3(game_hash_t h) {
-  return (h << 32) | (h >> 32);
-}
-
-template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_s0(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d6_s0(game_hash_t h) {
   uint64_t b14 = h & 0x000000ffc00003ff;
   uint64_t b26 = h & 0x0ffc0000000ffc00;
   uint64_t b35 = h & 0x0003ff003ff00000;
@@ -570,7 +672,7 @@ game_hash_t GameHash<NPawns>::c_s0(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_s1(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d6_s1(game_hash_t h) {
   uint64_t b12 = h & 0x00000000000fffff;
   uint64_t b36 = h & 0x0ffc00003ff00000;
   uint64_t b45 = h & 0x0003ffffc0000000;
@@ -582,7 +684,7 @@ game_hash_t GameHash<NPawns>::c_s1(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_s2(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d6_s2(game_hash_t h) {
   uint64_t b13 = h & 0x000000003ff003ff;
   uint64_t b25 = h & 0x0003ff00000ffc00;
   uint64_t b46 = h & 0x0ffc00ffc0000000;
@@ -593,7 +695,7 @@ game_hash_t GameHash<NPawns>::c_s2(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_s3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d6_s3(game_hash_t h) {
   uint64_t b14 = h & 0x000000ffc00003ff;
   uint64_t b23 = h & 0x000000003ffffc00;
   uint64_t b56 = h & 0x0fffff0000000000;
@@ -605,7 +707,7 @@ game_hash_t GameHash<NPawns>::c_s3(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_s4(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d6_s4(game_hash_t h) {
   uint64_t b15 = h & 0x0003ff00000003ff;
   uint64_t b24 = h & 0x000000ffc00ffc00;
   uint64_t b36 = h & 0x0ffc00003ff00000;
@@ -616,7 +718,7 @@ game_hash_t GameHash<NPawns>::c_s4(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c_s5(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d6_s5(game_hash_t h) {
   uint64_t b16 = h & 0x0ffc0000000003ff;
   uint64_t b25 = h & 0x0003ff00000ffc00;
   uint64_t b34 = h & 0x000000fffff00000;
@@ -628,7 +730,17 @@ game_hash_t GameHash<NPawns>::c_s5(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::v_s1(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d3_r2(game_hash_t h) {
+  return ((h << 21) | (h >> 42)) & V_MASK;
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::d3_r4(game_hash_t h) {
+  return d3_r2(d3_r2(h));
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::d3_s1(game_hash_t h) {
   uint64_t b1 = h & 0x00000000001fffff;
   uint64_t b2 = h & 0x000003ffffe00000;
   uint64_t b3 = h & 0x7ffffc0000000000;
@@ -639,7 +751,7 @@ game_hash_t GameHash<NPawns>::v_s1(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::v_s3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d3_s3(game_hash_t h) {
   uint64_t b1 = h & 0x00000000001fffff;
   uint64_t b2 = h & 0x000003ffffe00000;
   uint64_t b3 = h & 0x7ffffc0000000000;
@@ -650,7 +762,7 @@ game_hash_t GameHash<NPawns>::v_s3(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::v_s5(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d3_s5(game_hash_t h) {
   uint64_t b13 = h & 0x7ffffc00001fffff;
   uint64_t b2 = h & 0x000003ffffe00000;
 
@@ -659,17 +771,34 @@ game_hash_t GameHash<NPawns>::v_s5(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::e_s0(game_hash_t h) {
+game_hash_t GameHash<NPawns>::k4_r3(game_hash_t h) {
+  uint64_t b = __builtin_bswap64(h);
+  uint64_t b1357 = b & 0x00ff00ff00ff00ff;
+  uint64_t b2468 = b & 0xff00ff00ff00ff00;
+
+  return (b1357 << 8) | (b2468 >> 8);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::k4_s0(game_hash_t h) {
   return (h << 32) | (h >> 32);
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::e_s3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::k4_s3(game_hash_t h) {
+  uint64_t b13 = h & 0x0000ffff0000ffff;
+  uint64_t b24 = h & 0xffff0000ffff0000;
+
+  return (b13 << 16) | (b24 >> 16);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::c2_r(game_hash_t h) {
   return (h << 32) | (h >> 32);
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_c_r1(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d6_r1(game_hash_t h) {
   // Repeat the first 10 bits across the remaining 50 bits, leaving the end
   // zeroed out.
   game_hash_t b = h & UINT64_C(0x3ff);
@@ -678,22 +807,7 @@ game_hash_t GameHash<NPawns>::make_c_r1(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_v_r2(game_hash_t h) {
-  // Repeat the first 21 bits across the remaining 42 bits, leaving the end
-  // zeroed out.
-  game_hash_t b = h & UINT64_C(0x1fffff);
-  return b | (b << 21) | (b << 42);
-}
-
-template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_e_r3(game_hash_t h) {
-  // Repat the first 32 bits across the remaining 30 bits.
-  game_hash_t b = h & UINT64_C(0xffffffff);
-  return b | (b << 32);
-}
-
-template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_c_s0(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d6_s0(game_hash_t h) {
   uint64_t b14 = h & 0x000000ffc00003ff;
   uint64_t b26 = h & 0x00000000000ffc00;
   uint64_t b35 = h & 0x000000003ff00000;
@@ -704,7 +818,7 @@ game_hash_t GameHash<NPawns>::make_c_s0(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_c_s1(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d6_s1(game_hash_t h) {
   uint64_t b12 = h & 0x00000000000003ff;
   uint64_t b36 = h & 0x000000003ff00000;
   uint64_t b45 = h & 0x000000ffc0000000;
@@ -716,7 +830,7 @@ game_hash_t GameHash<NPawns>::make_c_s1(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_c_s2(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d6_s2(game_hash_t h) {
   uint64_t b13 = h & 0x00000000000003ff;
   uint64_t b25 = h & 0x0003ff00000ffc00;
   uint64_t b46 = h & 0x000000ffc0000000;
@@ -727,7 +841,7 @@ game_hash_t GameHash<NPawns>::make_c_s2(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_c_s3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d6_s3(game_hash_t h) {
   uint64_t b14 = h & 0x00000000000003ff;
   uint64_t b23 = h & 0x00000000000ffc00;
   uint64_t b56 = h & 0x0003ff0000000000;
@@ -739,7 +853,7 @@ game_hash_t GameHash<NPawns>::make_c_s3(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_c_s4(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d6_s4(game_hash_t h) {
   uint64_t b15 = h & 0x00000000000003ff;
   uint64_t b24 = h & 0x00000000000ffc00;
   uint64_t b36 = h & 0x0ffc00003ff00000;
@@ -750,7 +864,7 @@ game_hash_t GameHash<NPawns>::make_c_s4(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_c_s5(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d6_s5(game_hash_t h) {
   uint64_t b16 = h & 0x00000000000003ff;
   uint64_t b25 = h & 0x00000000000ffc00;
   uint64_t b34 = h & 0x000000003ff00000;
@@ -762,7 +876,15 @@ game_hash_t GameHash<NPawns>::make_c_s5(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_v_s1(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d3_r2(game_hash_t h) {
+  // Repeat the first 21 bits across the remaining 42 bits, leaving the end
+  // zeroed out.
+  game_hash_t b = h & UINT64_C(0x1fffff);
+  return b | (b << 21) | (b << 42);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_d3_s1(game_hash_t h) {
   uint64_t b1 = h & 0x00000000001fffff;
   uint64_t b23 = h & 0x000003ffffe00000;
 
@@ -771,7 +893,7 @@ game_hash_t GameHash<NPawns>::make_v_s1(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_v_s3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d3_s3(game_hash_t h) {
   uint64_t b12 = h & 0x00000000001fffff;
   uint64_t b3 = h & 0x7ffffc0000000000;
 
@@ -780,7 +902,7 @@ game_hash_t GameHash<NPawns>::make_v_s3(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_v_s5(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d3_s5(game_hash_t h) {
   uint64_t b13 = h & 0x00000000001fffff;
   uint64_t b2 = h & 0x000003ffffe00000;
 
@@ -789,14 +911,28 @@ game_hash_t GameHash<NPawns>::make_v_s5(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_e_s0(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_k4_r3(game_hash_t h) {
+  game_hash_t b1 = h & UINT64_C(0xffff);
+  game_hash_t b2 = h & UINT64_C(0xffff0000);
+  return b1 | b2 | (b2 << 16) | (b1 << 48);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_k4_s0(game_hash_t h) {
   uint64_t b12 = h & 0x00000000ffffffff;
 
   return b12 | (b12 << 32);
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_e_s3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_k4_s3(game_hash_t h) {
+  uint64_t b13 = h & 0x0000ffff0000ffff;
+
+  return b13 | (b13 << 16);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_c2_r(game_hash_t h) {
   uint64_t b12 = h & 0x00000000ffffffff;
 
   return b12 | (b12 << 32);
@@ -827,7 +963,8 @@ void GameHash<NPawns>::initSymmTables() {
     game_hash_t d6w = gen_rand64() & C_MASK;
 
     if (p == HexPos::origin()) {
-      d6_table_[i] = { make_c_s0(make_c_r1(d6b)), make_c_s0(make_c_r1(d6w)) };
+      d6_table_[i] = { make_d6_s0(make_d6_r1(d6b)),
+                       make_d6_s0(make_d6_r1(d6w)) };
     } else {
       // Try the other 5 rotational symmetries
       HexPos s = p;
@@ -925,9 +1062,43 @@ d6_hash_calc_done:;
 d3_hash_calc_done:;
     }
 
+    // Initialize K4 table
+    game_hash_t k4b = gen_rand64();
+    game_hash_t k4w = gen_rand64();
+
+    {
+      // Check the 3 symmetries for existing hashes.
+      for (K4 op : { K4(C2(1), C2(0)), K4(C2(0), C2(1)), K4(C2(1), C2(1)) }) {
+        HexPos s = p.apply_k4_e(op);
+
+        if (shouldReuse(i, s)) {
+          const HashEl& el =
+              k4_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+          k4_table_[i] = { apply_k4(op, el.black_hash),
+                           apply_k4(op, el.white_hash) };
+
+          goto k4_hash_calc_done;
+        }
+      }
+
+      // Check the symmetries for self-mapping.
+      for (K4 op : { K4(C2(1), C2(1)), K4(C2(1), C2(0)), K4(C2(0), C2(1)) }) {
+        HexPos s = p.apply_k4_e(op);
+
+        if (s == p) {
+          k4_table_[i] = { make_invariant_k4(op, k4b),
+                           make_invariant_k4(op, k4w) };
+          goto k4_hash_calc_done;
+        }
+      }
+
+      // Otherwise, create a new hash value
+      k4_table_[i] = { k4b, k4w };
+
+k4_hash_calc_done:;
+    }
+
     /*
-    game_hash_t c2c2b = gen_rand64();
-    game_hash_t c2c2w = gen_rand64();
     game_hash_t c2cvb = gen_rand64();
     game_hash_t c2cvw = gen_rand64();
     game_hash_t c2ceb = gen_rand64();

@@ -114,37 +114,6 @@ endif()
 set_property(TARGET onoro PROPERTY CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD 17)
 
-add_subdirectory(modules/abseil-cpp EXCLUDE_FROM_ALL)
-
-target_include_directories(onoro
-	PRIVATE
-		"/usr/local/include"
-	PUBLIC
-		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/include>
-		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/abseil-cpp>
-)
-
-target_link_libraries(onoro
-	PUBLIC
-		"${LINK_LIBS}" absl::flat_hash_map
-)
-
-if (${ENABLE_TESTING})
-	find_library(check check REQUIRED)
-
-	target_link_directories(onoro
-		PUBLIC "/usr/local/lib"
-	)
-
-	target_link_libraries(onoro
-		PUBLIC
-			check
-	)
-
-	add_subdirectory(test)
-endif()
-
-
 ############################################################
 # Installation Rules
 ############################################################
@@ -169,4 +138,40 @@ add_custom_command(
     COMMAND xargs rm -vf < install_manifest.txt || echo Nothing in
             install_manifest.txt to be uninstalled!
 )
+
+############################################################
+# Add submodules
+############################################################
+
+add_subdirectory(modules/abseil-cpp EXCLUDE_FROM_ALL)
+add_subdirectory(modules/utils EXCLUDE_FROM_ALL)
+
+target_include_directories(onoro
+	PRIVATE
+		"/usr/local/include"
+	PUBLIC
+		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/include>
+		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/abseil-cpp>
+		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/utils/include>
+)
+
+target_link_libraries(onoro
+	PUBLIC
+		"${LINK_LIBS}" absl::flat_hash_map utils
+)
+
+if (${ENABLE_TESTING})
+	find_library(check check REQUIRED)
+
+	target_link_directories(onoro
+		PUBLIC "/usr/local/lib"
+	)
+
+	target_link_libraries(onoro
+		PUBLIC
+			check
+	)
+
+	add_subdirectory(test)
+endif()
 

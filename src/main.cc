@@ -2,7 +2,6 @@
 #include <absl/container/flat_hash_map.h>
 #include <unistd.h>
 
-#include "dihedral_group.h"
 #include "game_hash.h"
 #include "onoro.h"
 #include "print_csi.h"
@@ -180,15 +179,6 @@ int main(int argc, char* argv[]) {
   } else {
     printf("Valid!\n");
   }
-
-  /*
-  typedef DihedralEl<6> D6;
-  D6 r1(D6::Action::ROT, 1);
-  D6 r5(D6::Action::ROT, 5);
-  D6 s0(D6::Action::REFL, 0);
-  D6 rot = r1 * (s0 * r5);
-  std::cout << rot.toString() << std::endl;
-  */
 
   return 0;
 }
