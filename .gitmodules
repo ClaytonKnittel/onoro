@@ -1,3 +1,6 @@
 [submodule "modules/utils"]
 	path = modules/utils
 	url = https://github.com/ClaytonKnittel/Utils.git
+[submodule "modules/abseil-cpp"]
+	path = modules/abseil-cpp
+	url = https://github.com/abseil/abseil-cpp.git
