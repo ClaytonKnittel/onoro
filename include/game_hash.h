@@ -351,8 +351,6 @@ constexpr bool GameHash<NPawns>::validate() const {
                 printK4Hash(hs.black_hash).c_str(),
                 printK4Hash(h.white_hash).c_str(),
                 printK4Hash(hs.white_hash).c_str());
-            printf("%s\n", printK4Hash(h.black_hash).c_str());
-            printf("%s\n", printK4Hash(apply_k4(op, h.black_hash)).c_str());
             return false;
           }
         }
