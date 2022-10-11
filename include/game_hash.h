@@ -129,13 +129,36 @@ class GameHash {
    */
   class BoardSymmStateData {
    public:
+    constexpr BoardSymmStateData() : data_(0) {}
     constexpr BoardSymmStateData(D6 op, SymmetryClass symm_class)
         : data_(static_cast<uint8_t>(
               op.ordinal() | (static_cast<uint32_t>(symm_class) << 4))) {}
 
+    static constexpr HexPos COMOffsetToHexPos(COMOffset offset) {
+      switch (offset) {
+        case COMOffset::x0y0: {
+          return { 0, 0 };
+        }
+        case COMOffset::x1y0: {
+          return { 1, 0 };
+        }
+        case COMOffset::x0y1: {
+          return { 0, 1 };
+        }
+        case COMOffset::x1y1: {
+          return { 1, 1 };
+        }
+        default: {
+          __builtin_unreachable();
+        }
+      }
+    }
+
     BoardSymmetryState parseSymmetryState() const {
-      return (BoardSymmetryState){ D6(data_ & 0x0fu),
-                                   static_cast<SymmetryClass>(data_ >> 4), 0 };
+      return (BoardSymmetryState){
+        D6(data_ & 0x0fu), static_cast<SymmetryClass>(data_ >> 4),
+        COMOffsetToHexPos(boardSymmStateOpToCOMOffset[data_ & 0x0fu])
+      };
     }
 
    private:
@@ -290,6 +313,13 @@ class GameHash {
   HashEl c2_ev_table_[getSymmTableSize()];
   HashEl trivial_table_[getSymmTableSize()];
 
+  /*
+   * Mapping from regions of the tiling unit square to the offset from the
+   * coordinate in the bottom right corner of the unit square to the center of
+   * the hex tile this region is a part of, indexed by the D6 symmetry op
+   * associated with the region. See the description of genSymmStateTable() for
+   * this mapping from symmetry op to region..
+   */
   static constexpr COMOffset boardSymmStateOpToCOMOffset[D6::order()] = {
     // r0
     COMOffset::x0y1,
@@ -329,8 +359,8 @@ class GameHash {
    * board's symmetry state, and the average of 2*NPawns (the number of pawns in
    * play in phase 2 of the game) is a multiple of 1 / (2*NPawns).
    */
-  static constexpr BoardSymmStateData
-      symm_state_table[getSymmStateTableSize()] = genSymmStateTable();
+  static constexpr std::array<BoardSymmStateData, getSymmStateTableSize()>
+      symm_state_table = genSymmStateTable();
 };
 
 template <uint32_t NPawns>
@@ -343,8 +373,29 @@ game_hash_t GameHash<NPawns>::operator()(const Game<NPawns>& g) const noexcept {
   return 0;
 }
 
+#include "utils/fun/print_colors.h"
 template <uint32_t NPawns>
 constexpr bool GameHash<NPawns>::validate() const {
+  constexpr uint32_t N = getSymmStateTableWidth();
+
+  for (uint32_t i = 0; i < D6::order(); i++) {
+    for (uint32_t y = N - 1; y < N; y--) {
+      for (uint32_t x = 0; x < N; x++) {
+        BoardSymmStateData d = symm_state_table[x + y * N];
+        BoardSymmetryState s = d.parseSymmetryState();
+
+        if (s.op.ordinal() == i) {
+          printf(P_RED "%s  " P_DEFAULT, s.op.toString().c_str());
+        } else {
+          printf("%s  ", s.op.toString().c_str());
+        }
+      }
+      printf("\n");
+    }
+
+    printf("\n");
+  }
+
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
     HexPos p = Game<NPawns>::idxToPos(toIdx(i));
 
@@ -645,7 +696,7 @@ std::string GameHash<NPawns>::printC2Hash(game_hash_t h) {
 
 template <uint32_t NPawns>
 constexpr uint32_t GameHash<NPawns>::getSymmTableLen() {
-  return Game<NPawns>::getBoardLen() * 2 + 1;
+  return 2 * NPawns + 1;
 }
 
 template <uint32_t NPawns>
@@ -670,14 +721,14 @@ constexpr D6 GameHash<NPawns>::symmStateOp(uint32_t x, uint32_t y,
   uint32_t x2 = std::max(x, y);
   uint32_t y2 = std::min(x, y);
 
-  // (x3, y3) is (x2, y2) folded across the line y = 2*NPawns - x
-  uint32_t x3 = std::min(x2, 2 * x2 - 1);
-  uint32_t y3 = std::min(y2, x2 + y2 - 1);
+  // (x3, y3) is (x2, y2) folded across the line y = n_pawns - x
+  uint32_t x3 = std::min(x2, n_pawns - y2);
+  uint32_t y3 = std::min(y2, n_pawns - x2);
 
-  bool c1 = y <= x;
-  bool c2 = x2 + y2 <= n_pawns;
-  bool c3a = 2 * y3 <= 4 * x3 - n_pawns;
-  bool c3b = x3 <= 2 * y3;
+  bool c1 = y < x;
+  bool c2 = x2 + y2 < n_pawns;
+  bool c3a = y3 + n_pawns <= 2 * x3;
+  bool c3b = 2 * y3 <= x3;
 
   if (c1) {
     if (c2) {
