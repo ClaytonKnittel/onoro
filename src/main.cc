@@ -173,7 +173,7 @@ int main(int argc, char* argv[]) {
 
   // return benchmark();
   // return playout();
-  Onoro::GameHash<0> h;
+  Onoro::GameHash<1> h;
   if (!h.validate()) {
     printf("Invalid\n");
   } else {

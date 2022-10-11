@@ -63,11 +63,98 @@ class GameHash {
     game_hash_t white_hash;
   };
 
+  enum class SymmetryClass {
+    // Center of mass lies in the center of a hexagonal tile.
+    C,
+    // Center of mass lies on a vertex of a hexagonal tile.
+    V,
+    // Center of mass lies on the midpoint of an edge of a hexagonal tile.
+    E,
+    // Center of mass lies on a line connecting the center of a hexagonal tile
+    // to one of its vertices.
+    CV,
+    // Center of mass lies on a line connecting the center of a hexagonal tile
+    // to the midpoint of one if its edges.
+    CE,
+    // Center of mass lies on the edge of a hexagonal tile.
+    EV,
+    // Center of mass is none of the above.
+    TRIVIAL,
+  };
+
+  enum class COMOffset {
+    // Offset by (0, 0)
+    x0y0,
+    // Offset by (1, 0)
+    x1y0,
+    // Offset by (0, 1)
+    x0y1,
+    // Offset by (1, 1)
+    x1y1,
+  };
+
+  struct BoardSymmetryState {
+    /*
+     * The group operation to perform on the board before calculating the hash.
+     * This is used to align board states on all symmetry axes which the board
+     * isn't possibly symmetric about itself.
+     */
+    D6 op;
+
+    /*
+     * The symmetry class this board state belongs in, which depends on where
+     * the center of mass lies. If the location of the center of mass is
+     * symmetric to itself under some group operations, then those symmetries
+     * must be checked when looking up in the hash table.
+     */
+    SymmetryClass symm_class;
+
+    /*
+     * The offset to apply when calculating the integer-coordinate, symmetry
+     * invariant "center of mass"
+     */
+    HexPos center_offset;
+  };
+
+  /*
+   * Compressed format of BoardSymmetryState to be stored in the board symmetry
+   * state table.
+   *
+   * Layout:
+   *  first 4 bits: op.ordinal()
+   *  next 3 bits: symm_class
+   *  last bit: unused
+   *
+   * Center offset can be computed using the boardSymmStateOpToCOMOffset table.
+   */
+  class BoardSymmStateData {
+   public:
+    constexpr BoardSymmStateData(D6 op, SymmetryClass symm_class)
+        : data_(static_cast<uint8_t>(
+              op.ordinal() | (static_cast<uint32_t>(symm_class) << 4))) {}
+
+    BoardSymmetryState parseSymmetryState() const {
+      return (BoardSymmetryState){ D6(data_ & 0x0fu),
+                                   static_cast<SymmetryClass>(data_ >> 4), 0 };
+    }
+
+   private:
+    uint8_t data_;
+  };
+
   // Returns the length of the symm tables in one dimension.
   static constexpr uint32_t getSymmTableLen();
 
   // Returns the total number of tiles in each symm table.
   static constexpr uint32_t getSymmTableSize();
+
+  static constexpr uint32_t getSymmStateTableWidth();
+
+  // Returns the size of the symm state table, in terms of number of elements.
+  static constexpr uint32_t getSymmStateTableSize();
+
+  static constexpr std::array<BoardSymmStateData, getSymmStateTableSize()>
+  genSymmStateTable();
 
   // Returns the tile designated as the origin tile for this board.
   static constexpr HexPos getCenter();
@@ -94,15 +181,8 @@ class GameHash {
   static constexpr game_hash_t E_MASK = UINT64_C(0xffffffffffffffff);
 
   /*
-   * Rotates the hash 60, 120, and 180 degrees (R1, R2, R3).
-   *
-   * d6_r1 rotates 60 degrees about the center of the origin tile.
-   * d3_r2 rotates 120 degrees about the top right vertex of the origin tile.
-   * k4_r3 rotates 180 degrees about the center of the right edge of the origin
-   * tile.
-   *
-   * Note: these algorithms are incompatible with each other, i.e.
-   * d6_r1(d6_r1(x)) != d3_r2(x).
+   * Performs group operations on hashes commutative with xor. The four groups
+   * represented are D6, D3, K4 (C2 x C2), and C2.
    */
   static game_hash_t d6_r1(game_hash_t h);
   static game_hash_t d6_r2(game_hash_t h);
@@ -116,17 +196,17 @@ class GameHash {
   static game_hash_t d6_s4(game_hash_t h);
   static game_hash_t d6_s5(game_hash_t h);
 
+  static game_hash_t d3_r1(game_hash_t h);
   static game_hash_t d3_r2(game_hash_t h);
-  static game_hash_t d3_r4(game_hash_t h);
+  static game_hash_t d3_s0(game_hash_t h);
   static game_hash_t d3_s1(game_hash_t h);
-  static game_hash_t d3_s3(game_hash_t h);
-  static game_hash_t d3_s5(game_hash_t h);
+  static game_hash_t d3_s2(game_hash_t h);
 
-  static game_hash_t k4_r3(game_hash_t h);
-  static game_hash_t k4_s0(game_hash_t h);
-  static game_hash_t k4_s3(game_hash_t h);
+  static game_hash_t k4_a(game_hash_t h);
+  static game_hash_t k4_b(game_hash_t h);
+  static game_hash_t k4_c(game_hash_t h);
 
-  static game_hash_t c2_r(game_hash_t h);
+  static game_hash_t c2_a(game_hash_t h);
 
   /*
    * Given a hash, compresses it to make it invariant under the corresponding
@@ -140,16 +220,16 @@ class GameHash {
   static game_hash_t make_d6_s4(game_hash_t h);
   static game_hash_t make_d6_s5(game_hash_t h);
 
-  static game_hash_t make_d3_r2(game_hash_t h);
+  static game_hash_t make_d3_r1(game_hash_t h);
+  static game_hash_t make_d3_s0(game_hash_t h);
   static game_hash_t make_d3_s1(game_hash_t h);
-  static game_hash_t make_d3_s3(game_hash_t h);
-  static game_hash_t make_d3_s5(game_hash_t h);
+  static game_hash_t make_d3_s2(game_hash_t h);
 
-  static game_hash_t make_k4_r3(game_hash_t h);
-  static game_hash_t make_k4_s0(game_hash_t h);
-  static game_hash_t make_k4_s3(game_hash_t h);
+  static game_hash_t make_k4_a(game_hash_t h);
+  static game_hash_t make_k4_b(game_hash_t h);
+  static game_hash_t make_k4_c(game_hash_t h);
 
-  static game_hash_t make_c2_r(game_hash_t h);
+  static game_hash_t make_c2_a(game_hash_t h);
 
   void initSymmTables();
 
@@ -192,6 +272,48 @@ class GameHash {
   HashEl c2_ce_table_[getSymmTableSize()];
   HashEl c2_ev_table_[getSymmTableSize()];
   HashEl trivial_table_[getSymmTableSize()];
+
+  static constexpr COMOffset boardSymmStateOpToCOMOffset[D6::order()] = {
+    // r0
+    COMOffset::x0y1,
+    // r1
+    COMOffset::x1y1,
+    // r2
+    COMOffset::x1y1,
+    // r3
+    COMOffset::x1y0,
+    // r4
+    COMOffset::x0y0,
+    // r5
+    COMOffset::x0y0,
+    // s0
+    COMOffset::x0y1,
+    // s1
+    COMOffset::x0y0,
+    // s2
+    COMOffset::x0y0,
+    // s3
+    COMOffset::x1y0,
+    // s4
+    COMOffset::x1y1,
+    // s5
+    COMOffset::x1y1,
+  };
+
+  /*
+   * The board symmetry state data table is a cache of the BoardSymmStateData
+   * values for points (x % (2*NPawns), y % (2*NPawns)). Since the unit square
+   * in HexPos coordinates ((0, 0) to (1, 1)) tiles the plane correctly, we only
+   * need the symmetry states for one instance of this tiling, with points
+   * looking up their folded mapping onto the representative tile.
+   *
+   * The reason for 4 * NPawns * NPawns entries is that the position of the
+   * center of mass modulo the width/height of the unit square determines a
+   * board's symmetry state, and the average of 2*NPawns (the number of pawns in
+   * play in phase 2 of the game) is a multiple of 1 / (2*NPawns).
+   */
+  static constexpr BoardSymmStateData
+      symm_state_table[getSymmStateTableSize()] = genSymmStateTable();
 };
 
 template <uint32_t NPawns>
@@ -515,6 +637,125 @@ constexpr uint32_t GameHash<NPawns>::getSymmTableSize() {
 }
 
 template <uint32_t NPawns>
+constexpr uint32_t GameHash<NPawns>::getSymmStateTableWidth() {
+  return 2 * NPawns;
+}
+
+template <uint32_t NPawns>
+constexpr uint32_t GameHash<NPawns>::getSymmStateTableSize() {
+  return getSymmStateTableWidth() * getSymmStateTableWidth();
+}
+
+template <uint32_t NPawns>
+constexpr std::array<typename GameHash<NPawns>::BoardSymmStateData,
+                     GameHash<NPawns>::getSymmStateTableSize()>
+GameHash<NPawns>::genSymmStateTable() {
+  constexpr uint32_t N = getSymmStateTableWidth();
+
+  std::array<BoardSymmStateData, getSymmStateTableSize()> table;
+
+  /*
+   * The symmetry table is populated like so:
+   *
+   * +-------------------------------+
+   * |`            /    s4     _ _ | |
+   * |  `    r0   /       _ _    |   |
+   * |    `      /   _ _       |     |
+   * |  s0  `   / _          |       |
+   * |     _ _`/     r2    |        /|
+   * |  _     / `        |         / |
+   * |       /    `    |     s5   /  |
+   * |  r4  /       `|           /   |
+   * |     /  s2   |  `         / r1 |
+   * |    /      |      `      /  - -|
+   * |   /     |    r5    `  -/-     |
+   * |  /    |          - - `/    s3 |
+   * | /   |       - -      / `      |
+   * |/  |    - -          /    `    |
+   * | | - -        s1    /  r3   `  |
+   * +-------------------------------+
+   */
+  for (uint32_t x = 0; x < 2 * NPawns; x++) {
+    for (uint32_t y = 0; y < 2 * NPawns; y++) {
+      D6 symm_op;
+      SymmetryClass symm_class;
+
+      // (x2, y2) is (x, y) folded across the line y = x
+      uint32_t x2 = std::max(x, y);
+      uint32_t y2 = std::min(x, y);
+
+      // (x3, y3) is (x2, y2) folded across the line y = 2*NPawns - x
+      uint32_t x3 = std::min(x2, 2 * x2 - 1);
+      uint32_t y3 = std::min(y2, x2 + y2 - 1);
+
+      bool c1 = y <= x;
+      bool c2 = x2 + y2 <= N;
+      bool c3a = 2 * y3 <= 4 * x3 - N;
+      bool c3b = x3 <= 2 * y3;
+
+      if (c1) {
+        if (c2) {
+          if (c3a) {
+            symm_op = D6(D6::Action::ROT, 3);
+          } else if (c3b) {
+            symm_op = D6(D6::Action::REFL, 1);
+          } else {
+            symm_op = D6(D6::Action::ROT, 5);
+          }
+        } else {
+          if (c3a) {
+            symm_op = D6(D6::Action::REFL, 3);
+          } else if (c3b) {
+            symm_op = D6(D6::Action::ROT, 1);
+          } else {
+            symm_op = D6(D6::Action::REFL, 5);
+          }
+        }
+      } else {
+        if (c2) {
+          if (c3a) {
+            symm_op = D6(D6::Action::REFL, 0);
+          } else if (c3b) {
+            symm_op = D6(D6::Action::ROT, 4);
+          } else {
+            symm_op = D6(D6::Action::REFL, 2);
+          }
+        } else {
+          if (c3a) {
+            symm_op = D6(D6::Action::ROT, 0);
+          } else if (c3b) {
+            symm_op = D6(D6::Action::REFL, 4);
+          } else {
+            symm_op = D6(D6::Action::ROT, 2);
+          }
+        }
+      }
+
+      // Calculate the symmetry class of this position.
+      if (x == 0 && y == 0) {
+        symm_class = SymmetryClass::C;
+      } else if (3 * x2 == 2 * N && 3 * y2 == N) {
+        symm_class = SymmetryClass::V;
+      } else if (2 * x2 == N && (y2 == 0 || 2 * y2 == N)) {
+        symm_class = SymmetryClass::E;
+      } else if (2 * x2 == y2) {
+        symm_class = SymmetryClass::CV;
+      } else if (x2 == y2 || y2 == 0) {
+        symm_class = SymmetryClass::CE;
+      } else if (x2 + y2 == 1 && 3 * y2 > N) {
+        symm_class = SymmetryClass::EV;
+      } else {
+        symm_class = SymmetryClass::TRIVIAL;
+      }
+
+      table[x + y * N] = BoardSymmStateData(symm_op, symm_class);
+    }
+  }
+
+  return table;
+}
+
+template <uint32_t NPawns>
 constexpr HexPos GameHash<NPawns>::getCenter() {
   return { getSymmTableLen() / 2 + getSymmTableLen() / 4,
            getSymmTableLen() / 2 };
@@ -588,19 +829,19 @@ constexpr game_hash_t GameHash<NPawns>::apply_d3(D3 op, game_hash_t h) {
       return h;
     }
     case D3(D3::Action::ROT, 1).ordinal(): {
-      return d3_r2(h);
+      return d3_r1(h);
     }
     case D3(D3::Action::ROT, 2).ordinal(): {
-      return d3_r4(h);
+      return d3_r2(h);
     }
     case D3(D3::Action::REFL, 0).ordinal(): {
-      return d3_s1(h);
+      return d3_s0(h);
     }
     case D3(D3::Action::REFL, 1).ordinal(): {
-      return d3_s3(h);
+      return d3_s1(h);
     }
     case D3(D3::Action::REFL, 2).ordinal(): {
-      return d3_s5(h);
+      return d3_s2(h);
     }
     default: {
       __builtin_unreachable();
@@ -615,13 +856,13 @@ constexpr game_hash_t GameHash<NPawns>::apply_k4(K4 op, game_hash_t h) {
       return h;
     }
     case K4(C2(1), C2(0)).ordinal(): {
-      return k4_s0(h);
+      return k4_a(h);
     }
     case K4(C2(0), C2(1)).ordinal(): {
-      return k4_s3(h);
+      return k4_b(h);
     }
     case K4(C2(1), C2(1)).ordinal(): {
-      return k4_r3(h);
+      return k4_c(h);
     }
     default: {
       __builtin_unreachable();
@@ -636,7 +877,7 @@ constexpr game_hash_t GameHash<NPawns>::apply_c2(C2 op, game_hash_t h) {
       return h;
     }
     case C2(1).ordinal(): {
-      return c2_r(h);
+      return c2_a(h);
     }
     default: {
       __builtin_unreachable();
@@ -688,16 +929,16 @@ constexpr game_hash_t GameHash<NPawns>::make_invariant_d3(D3 op,
                                                           game_hash_t h) {
   switch (op.ordinal()) {
     case D3(D3::Action::ROT, 1).ordinal(): {
-      return make_d3_r2(h);
+      return make_d3_r1(h);
     }
     case D3(D3::Action::REFL, 0).ordinal(): {
-      return make_d3_s1(h);
+      return make_d3_s0(h);
     }
     case D3(D3::Action::REFL, 1).ordinal(): {
-      return make_d3_s3(h);
+      return make_d3_s1(h);
     }
     case D3(D3::Action::REFL, 2).ordinal(): {
-      return make_d3_s5(h);
+      return make_d3_s2(h);
     }
 
     // Don't support making invariant under rotations other than the basic
@@ -715,13 +956,13 @@ constexpr game_hash_t GameHash<NPawns>::make_invariant_k4(K4 op,
                                                           game_hash_t h) {
   switch (op.ordinal()) {
     case K4(C2(1), C2(0)).ordinal(): {
-      return make_k4_s0(h);
+      return make_k4_a(h);
     }
     case K4(C2(0), C2(1)).ordinal(): {
-      return make_k4_s3(h);
+      return make_k4_b(h);
     }
     case K4(C2(1), C2(1)).ordinal(): {
-      return make_k4_r3(h);
+      return make_k4_c(h);
     }
 
     // Don't support making invariant under identity.
@@ -736,7 +977,7 @@ template <uint32_t NPawns>
 constexpr game_hash_t GameHash<NPawns>::make_invariant_c2(C2 op,
                                                           game_hash_t h) {
   // Only one symmetry operation is possible.
-  return make_c2_r(h);
+  return make_c2_a(h);
 }
 
 template <uint32_t NPawns>
@@ -834,17 +1075,17 @@ game_hash_t GameHash<NPawns>::d6_s5(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::d3_r2(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d3_r1(game_hash_t h) {
   return ((h << 21) | (h >> 42)) & V_MASK;
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::d3_r4(game_hash_t h) {
-  return d3_r2(d3_r2(h));
+game_hash_t GameHash<NPawns>::d3_r2(game_hash_t h) {
+  return d3_r1(d3_r1(h));
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::d3_s1(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d3_s0(game_hash_t h) {
   uint64_t b1 = h & 0x00000000001fffff;
   uint64_t b2 = h & 0x000003ffffe00000;
   uint64_t b3 = h & 0x7ffffc0000000000;
@@ -855,7 +1096,7 @@ game_hash_t GameHash<NPawns>::d3_s1(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::d3_s3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d3_s1(game_hash_t h) {
   uint64_t b1 = h & 0x00000000001fffff;
   uint64_t b2 = h & 0x000003ffffe00000;
   uint64_t b3 = h & 0x7ffffc0000000000;
@@ -866,7 +1107,7 @@ game_hash_t GameHash<NPawns>::d3_s3(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::d3_s5(game_hash_t h) {
+game_hash_t GameHash<NPawns>::d3_s2(game_hash_t h) {
   uint64_t b13 = h & 0x7ffffc00001fffff;
   uint64_t b2 = h & 0x000003ffffe00000;
 
@@ -875,7 +1116,20 @@ game_hash_t GameHash<NPawns>::d3_s5(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::k4_r3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::k4_a(game_hash_t h) {
+  return (h << 32) | (h >> 32);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::k4_b(game_hash_t h) {
+  uint64_t b13 = h & 0x0000ffff0000ffff;
+  uint64_t b24 = h & 0xffff0000ffff0000;
+
+  return (b13 << 16) | (b24 >> 16);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::k4_c(game_hash_t h) {
   uint64_t b = __builtin_bswap64(h);
   uint64_t b1357 = b & 0x00ff00ff00ff00ff;
   uint64_t b2468 = b & 0xff00ff00ff00ff00;
@@ -884,20 +1138,7 @@ game_hash_t GameHash<NPawns>::k4_r3(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::k4_s0(game_hash_t h) {
-  return (h << 32) | (h >> 32);
-}
-
-template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::k4_s3(game_hash_t h) {
-  uint64_t b13 = h & 0x0000ffff0000ffff;
-  uint64_t b24 = h & 0xffff0000ffff0000;
-
-  return (b13 << 16) | (b24 >> 16);
-}
-
-template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::c2_r(game_hash_t h) {
+game_hash_t GameHash<NPawns>::c2_a(game_hash_t h) {
   return (h << 32) | (h >> 32);
 }
 
@@ -980,7 +1221,7 @@ game_hash_t GameHash<NPawns>::make_d6_s5(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_d3_r2(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d3_r1(game_hash_t h) {
   // Repeat the first 21 bits across the remaining 42 bits, leaving the end
   // zeroed out.
   game_hash_t b = h & UINT64_C(0x1fffff);
@@ -988,7 +1229,7 @@ game_hash_t GameHash<NPawns>::make_d3_r2(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_d3_s1(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d3_s0(game_hash_t h) {
   uint64_t b1 = h & 0x00000000001fffff;
   uint64_t b23 = h & 0x000003ffffe00000;
 
@@ -997,7 +1238,7 @@ game_hash_t GameHash<NPawns>::make_d3_s1(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_d3_s3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d3_s1(game_hash_t h) {
   uint64_t b12 = h & 0x00000000001fffff;
   uint64_t b3 = h & 0x7ffffc0000000000;
 
@@ -1006,7 +1247,7 @@ game_hash_t GameHash<NPawns>::make_d3_s3(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_d3_s5(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_d3_s2(game_hash_t h) {
   uint64_t b13 = h & 0x00000000001fffff;
   uint64_t b2 = h & 0x000003ffffe00000;
 
@@ -1015,28 +1256,28 @@ game_hash_t GameHash<NPawns>::make_d3_s5(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_k4_r3(game_hash_t h) {
-  game_hash_t b1 = h & UINT64_C(0xffff);
-  game_hash_t b2 = h & UINT64_C(0xffff0000);
-  return b1 | b2 | (b2 << 16) | (b1 << 48);
-}
-
-template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_k4_s0(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_k4_a(game_hash_t h) {
   uint64_t b12 = h & 0x00000000ffffffff;
 
   return b12 | (b12 << 32);
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_k4_s3(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_k4_b(game_hash_t h) {
   uint64_t b13 = h & 0x0000ffff0000ffff;
 
   return b13 | (b13 << 16);
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::make_c2_r(game_hash_t h) {
+game_hash_t GameHash<NPawns>::make_k4_c(game_hash_t h) {
+  game_hash_t b1 = h & UINT64_C(0xffff);
+  game_hash_t b2 = h & UINT64_C(0xffff0000);
+  return b1 | b2 | (b2 << 16) | (b1 << 48);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::make_c2_a(game_hash_t h) {
   uint64_t b12 = h & 0x00000000ffffffff;
 
   return b12 | (b12 << 32);
