@@ -153,6 +153,23 @@ class GameHash {
   // Returns the size of the symm state table, in terms of number of elements.
   static constexpr uint32_t getSymmStateTableSize();
 
+  /*
+   * Returns the symmetry state operation corresponding to the point (x, y) in
+   * the unit square scaled by n_pawns.
+   *
+   * n_pawns is the number of pawns currently in play.
+   */
+  static constexpr D6 symmStateOp(uint32_t x, uint32_t y, uint32_t n_pawns);
+
+  /*
+   * Returns the symmetry class corresponding to the point (x, y) in the unit
+   * square scaled by n_pawns.
+   *
+   * n_pawns is the number of pawns currently in play.
+   */
+  static constexpr SymmetryClass symmStateClass(uint32_t x, uint32_t y,
+                                                uint32_t n_pawns);
+
   static constexpr std::array<BoardSymmStateData, getSymmStateTableSize()>
   genSymmStateTable();
 
@@ -647,6 +664,170 @@ constexpr uint32_t GameHash<NPawns>::getSymmStateTableSize() {
 }
 
 template <uint32_t NPawns>
+constexpr D6 GameHash<NPawns>::symmStateOp(uint32_t x, uint32_t y,
+                                           uint32_t n_pawns) {
+  // (x2, y2) is (x, y) folded across the line y = x
+  uint32_t x2 = std::max(x, y);
+  uint32_t y2 = std::min(x, y);
+
+  // (x3, y3) is (x2, y2) folded across the line y = 2*NPawns - x
+  uint32_t x3 = std::min(x2, 2 * x2 - 1);
+  uint32_t y3 = std::min(y2, x2 + y2 - 1);
+
+  bool c1 = y <= x;
+  bool c2 = x2 + y2 <= n_pawns;
+  bool c3a = 2 * y3 <= 4 * x3 - n_pawns;
+  bool c3b = x3 <= 2 * y3;
+
+  if (c1) {
+    if (c2) {
+      if (c3a) {
+        return D6(D6::Action::ROT, 3);
+      } else if (c3b) {
+        return D6(D6::Action::REFL, 1);
+      } else {
+        return D6(D6::Action::ROT, 5);
+      }
+    } else {
+      if (c3a) {
+        return D6(D6::Action::REFL, 3);
+      } else if (c3b) {
+        return D6(D6::Action::ROT, 1);
+      } else {
+        return D6(D6::Action::REFL, 5);
+      }
+    }
+  } else {
+    if (c2) {
+      if (c3a) {
+        return D6(D6::Action::REFL, 0);
+      } else if (c3b) {
+        return D6(D6::Action::ROT, 4);
+      } else {
+        return D6(D6::Action::REFL, 2);
+      }
+    } else {
+      if (c3a) {
+        return D6(D6::Action::ROT, 0);
+      } else if (c3b) {
+        return D6(D6::Action::REFL, 4);
+      } else {
+        return D6(D6::Action::ROT, 2);
+      }
+    }
+  }
+}
+
+template <uint32_t NPawns>
+constexpr typename GameHash<NPawns>::SymmetryClass
+GameHash<NPawns>::symmStateClass(uint32_t x, uint32_t y, uint32_t n_pawns) {
+  // (x2, y2) is (x, y) folded across the line y = x
+  uint32_t x2 = std::max(x, y);
+  uint32_t y2 = std::min(x, y);
+
+  // Calculate the symmetry class of this position.
+  if (x == 0 && y == 0) {
+    return SymmetryClass::C;
+  } else if (3 * x2 == 2 * n_pawns && 3 * y2 == n_pawns) {
+    return SymmetryClass::V;
+  } else if (2 * x2 == n_pawns && (y2 == 0 || 2 * y2 == n_pawns)) {
+    return SymmetryClass::E;
+  } else if (2 * x2 == y2) {
+    return SymmetryClass::CV;
+  } else if (x2 == y2 || y2 == 0) {
+    return SymmetryClass::CE;
+  } else if (x2 + y2 == 1 && 3 * y2 > n_pawns) {
+    return SymmetryClass::EV;
+  } else {
+    return SymmetryClass::TRIVIAL;
+  }
+}
+
+/*
+ * The purpose of the symmetry table is to provide a quick way to canonicalize
+ * boards when computing and checking for symmetries. Since the center of mass
+ * transforms the same as tiles under symmetry operations, we can use the
+ * position of the center of mass to prune the list of possible layouts of
+ * boards symmetric to this one. For example, if the center of mass does not
+ * lie on any symmetry lines, then if we orient the center of mass in the same
+ * segment of the origin hexagon, all other game boards which are symmetric to
+ * this one will have oriented their center of masses to the same position,
+ * meaning the coordinates of all pawns in both boards will be the same.
+ *
+ * We choose to place the center of mass within the triangle extending from
+ * the center of the origin hex to the center of its right edge (+x), and up
+ * to its top-right vertex. This triangle has coordinates (0, 0), (1/2, 0),
+ * (2/3, 1/3) in HexPos space.
+ *
+ * A unit square centered at (1/2, 1/2) in HexPos space is a possible unit
+ * tile for the hexagonal grid (keep in mind that the hexagons are not regular
+ * hexagons in HexPos space). Pictured below is a mapping from regions on this
+ * unit square to D6 operations (about the origin) to transform the points
+ * within the corresponding region to a point within the designated triangle
+ * defined above.
+ *
+ * +-------------------------------+
+ * |`            /    s4     _ _ | |
+ * |  `    r0   /       _ _    |   |
+ * |    `      /   _ _       |     |
+ * |  s0  `   / _          |       |
+ * |     _ _`v     r2    |        /|
+ * |  _     / `        |         / |
+ * e       /    `    |     s5   /  |
+ * |  r4  /       `e           /   |
+ * |     /  s2   |  `         / r1 |
+ * |    /      |      `      /    -|
+ * |   /     |    r5    `   /- -   |
+ * |  /    |            - `v    s3 |
+ * | /   |         - -    / `      |
+ * |/  |      - -        /    `    |
+ * | |   - -      s1    /  r3   `  |
+ * +-------------------e-----------+
+ *
+ * This image is composed of lines:
+ *  y = 2x
+ *  y = 1/2(x + 1)
+ *  y = x
+ *  y = 1 - x
+ *  y = 1/2x
+ *  y = 2x - 1
+ *
+ * These lines divie the unit square into 12 equally-sized regions in
+ * cartesian space, and listed in each region is the D6 group operation to map
+ * that region to the designated triangle.
+ *
+ * Since the lines given above are the symmetry lines of the hexagonal grid,
+ * we can use them to determine which symmetry group the board state belongs
+ * in.
+ *
+ * Let (x, y) = (n_pawns * (com.x % 1), n_pawns * (com.y % 1)) be the folded
+ * center of mass within the unit square, scaled by n_pawns in play. Note that
+ * x and y are integers.
+ *
+ * Let (x2, y2) = (max(x, y), min(x, y)) be (x, y) folded across the symmetry
+ * line y = x. Note that the diagram above is also symmetryc about y = x, save
+ * for the group operations in the regions.
+ *
+ * - C is the symmetry group D6 about the origin, which is only possible when
+ *     the center of mass lies on the origin, so (x, y) = (0, 0).
+ * - V is the symmetry group D3 about a vertex, which are labeled as 'v' in
+ *     the diagram. These are the points (2/3 n_pawns, 1/3 n_pawns) and (1/3
+ *     n_pawns, 2/3 n_pawns), or (x2, y2) = (2/3 n_pawns, 1/3 n_pawns).
+ * - E is the symmetry group K4 about the center of an edge, which are labeled
+ *     as 'e' in the diagram. These are the points (1/2 n_pawns, 0), (1/2
+ *     n_pawns, 1/2 n_pawns), and (0, 1/2 n_pawns), or (x2, y2) =
+ *     (1/2 n_pawns, 0) or (1/2 n_pawns, 1/2 n_pawns).
+ * - CV is the symmetry group C2 about a line passing through the center of
+ *     the origin hex and one of its vertices.
+ * - CE is the symmetry group C2 about a line passing through the center of
+ *     the origin hex and the center of one of its edges.
+ * - EV is the symmetry group C2 about a line tangent to one of the edges of
+ *     the origin hex.
+ * - TRIVIAL is a group with no symmetries other than the identity, so all
+ *     board states with center of masses which don't lie on any symmetry
+ *     lines are part of this group.
+ */
+template <uint32_t NPawns>
 constexpr std::array<typename GameHash<NPawns>::BoardSymmStateData,
                      GameHash<NPawns>::getSymmStateTableSize()>
 GameHash<NPawns>::genSymmStateTable() {
@@ -654,101 +835,10 @@ GameHash<NPawns>::genSymmStateTable() {
 
   std::array<BoardSymmStateData, getSymmStateTableSize()> table;
 
-  /*
-   * The symmetry table is populated like so:
-   *
-   * +-------------------------------+
-   * |`            /    s4     _ _ | |
-   * |  `    r0   /       _ _    |   |
-   * |    `      /   _ _       |     |
-   * |  s0  `   / _          |       |
-   * |     _ _`/     r2    |        /|
-   * |  _     / `        |         / |
-   * |       /    `    |     s5   /  |
-   * |  r4  /       `|           /   |
-   * |     /  s2   |  `         / r1 |
-   * |    /      |      `      /  - -|
-   * |   /     |    r5    `  -/-     |
-   * |  /    |          - - `/    s3 |
-   * | /   |       - -      / `      |
-   * |/  |    - -          /    `    |
-   * | | - -        s1    /  r3   `  |
-   * +-------------------------------+
-   */
   for (uint32_t x = 0; x < 2 * NPawns; x++) {
     for (uint32_t y = 0; y < 2 * NPawns; y++) {
-      D6 symm_op;
-      SymmetryClass symm_class;
-
-      // (x2, y2) is (x, y) folded across the line y = x
-      uint32_t x2 = std::max(x, y);
-      uint32_t y2 = std::min(x, y);
-
-      // (x3, y3) is (x2, y2) folded across the line y = 2*NPawns - x
-      uint32_t x3 = std::min(x2, 2 * x2 - 1);
-      uint32_t y3 = std::min(y2, x2 + y2 - 1);
-
-      bool c1 = y <= x;
-      bool c2 = x2 + y2 <= N;
-      bool c3a = 2 * y3 <= 4 * x3 - N;
-      bool c3b = x3 <= 2 * y3;
-
-      if (c1) {
-        if (c2) {
-          if (c3a) {
-            symm_op = D6(D6::Action::ROT, 3);
-          } else if (c3b) {
-            symm_op = D6(D6::Action::REFL, 1);
-          } else {
-            symm_op = D6(D6::Action::ROT, 5);
-          }
-        } else {
-          if (c3a) {
-            symm_op = D6(D6::Action::REFL, 3);
-          } else if (c3b) {
-            symm_op = D6(D6::Action::ROT, 1);
-          } else {
-            symm_op = D6(D6::Action::REFL, 5);
-          }
-        }
-      } else {
-        if (c2) {
-          if (c3a) {
-            symm_op = D6(D6::Action::REFL, 0);
-          } else if (c3b) {
-            symm_op = D6(D6::Action::ROT, 4);
-          } else {
-            symm_op = D6(D6::Action::REFL, 2);
-          }
-        } else {
-          if (c3a) {
-            symm_op = D6(D6::Action::ROT, 0);
-          } else if (c3b) {
-            symm_op = D6(D6::Action::REFL, 4);
-          } else {
-            symm_op = D6(D6::Action::ROT, 2);
-          }
-        }
-      }
-
-      // Calculate the symmetry class of this position.
-      if (x == 0 && y == 0) {
-        symm_class = SymmetryClass::C;
-      } else if (3 * x2 == 2 * N && 3 * y2 == N) {
-        symm_class = SymmetryClass::V;
-      } else if (2 * x2 == N && (y2 == 0 || 2 * y2 == N)) {
-        symm_class = SymmetryClass::E;
-      } else if (2 * x2 == y2) {
-        symm_class = SymmetryClass::CV;
-      } else if (x2 == y2 || y2 == 0) {
-        symm_class = SymmetryClass::CE;
-      } else if (x2 + y2 == 1 && 3 * y2 > N) {
-        symm_class = SymmetryClass::EV;
-      } else {
-        symm_class = SymmetryClass::TRIVIAL;
-      }
-
-      table[x + y * N] = BoardSymmStateData(symm_op, symm_class);
+      table[x + y * N] =
+          BoardSymmStateData(symmStateOp(x, y, N), symmStateClass(x, y, N));
     }
   }
 
