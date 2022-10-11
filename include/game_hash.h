@@ -53,6 +53,7 @@ class GameHash {
   static std::string printD6Hash(game_hash_t);
   static std::string printD3Hash(game_hash_t);
   static std::string printK4Hash(game_hash_t);
+  static std::string printC2Hash(game_hash_t);
 
  private:
   struct HashEl {
@@ -356,6 +357,99 @@ constexpr bool GameHash<NPawns>::validate() const {
         }
       }
     }
+
+    // Check C2_cv table
+    for (uint32_t i = 0; i < getSymmTableSize(); i++) {
+      HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+
+      p -= getCenter();
+
+      const HashEl& h = c2_cv_table_[i];
+
+      C2 op = C2(1);
+      HexPos s = p.apply_c2_cv(op);
+
+      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      if (inBounds(idx)) {
+        const HashEl& hs =
+            c2_cv_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        if (apply_c2(op, h.black_hash) != hs.black_hash ||
+            apply_c2(op, h.white_hash) != hs.white_hash) {
+          printf(
+              "C2 cv hashes not equal between position (%d, %d) and (%d, %d) "
+              "under "
+              "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
+              p.x, p.y, s.x, s.y, op.toString().c_str(),
+              printC2Hash(h.black_hash).c_str(),
+              printC2Hash(hs.black_hash).c_str(),
+              printC2Hash(h.white_hash).c_str(),
+              printC2Hash(hs.white_hash).c_str());
+          return false;
+        }
+      }
+    }
+
+    // Check C2_ce table
+    for (uint32_t i = 0; i < getSymmTableSize(); i++) {
+      HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+
+      p -= getCenter();
+
+      const HashEl& h = c2_ce_table_[i];
+
+      C2 op = C2(1);
+      HexPos s = p.apply_c2_ce(op);
+
+      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      if (inBounds(idx)) {
+        const HashEl& hs =
+            c2_ce_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        if (apply_c2(op, h.black_hash) != hs.black_hash ||
+            apply_c2(op, h.white_hash) != hs.white_hash) {
+          printf(
+              "C2 ce hashes not equal between position (%d, %d) and (%d, %d) "
+              "under "
+              "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
+              p.x, p.y, s.x, s.y, op.toString().c_str(),
+              printC2Hash(h.black_hash).c_str(),
+              printC2Hash(hs.black_hash).c_str(),
+              printC2Hash(h.white_hash).c_str(),
+              printC2Hash(hs.white_hash).c_str());
+          return false;
+        }
+      }
+    }
+
+    // Check C2_ev table
+    for (uint32_t i = 0; i < getSymmTableSize(); i++) {
+      HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+
+      p -= getCenter();
+
+      const HashEl& h = c2_ev_table_[i];
+
+      C2 op = C2(1);
+      HexPos s = p.apply_c2_ev(op);
+
+      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      if (inBounds(idx)) {
+        const HashEl& hs =
+            c2_ev_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        if (apply_c2(op, h.black_hash) != hs.black_hash ||
+            apply_c2(op, h.white_hash) != hs.white_hash) {
+          printf(
+              "C2 ev hashes not equal between position (%d, %d) and (%d, %d) "
+              "under "
+              "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
+              p.x, p.y, s.x, s.y, op.toString().c_str(),
+              printC2Hash(h.black_hash).c_str(),
+              printC2Hash(hs.black_hash).c_str(),
+              printC2Hash(h.white_hash).c_str(),
+              printC2Hash(hs.white_hash).c_str());
+          return false;
+        }
+      }
+    }
   }
   return true;
 }
@@ -394,6 +488,18 @@ std::string GameHash<NPawns>::printK4Hash(game_hash_t h) {
   ostr << " 0x" << std::setfill('0') << std::setw(4) << ((h >> 16) & 0xffff);
   ostr << " 0x" << std::setfill('0') << std::setw(4) << ((h >> 32) & 0xffff);
   ostr << " 0x" << std::setfill('0') << std::setw(4) << ((h >> 48) & 0xffff);
+
+  return ostr.str();
+}
+
+template <uint32_t NPawns>
+std::string GameHash<NPawns>::printC2Hash(game_hash_t h) {
+  std::ostringstream ostr;
+
+  ostr << std::hex << "0x" << std::setfill('0') << std::setw(8)
+       << (h & 0xffffffff);
+  ostr << " 0x" << std::setfill('0') << std::setw(8)
+       << ((h >> 32) & 0xffffffff);
 
   return ostr.str();
 }
@@ -956,17 +1062,21 @@ void GameHash<NPawns>::initSymmTables() {
       return i < p_idx && inBounds(idx);
     };
 
-    // Initialize D6 table
-    game_hash_t d6b = gen_rand64() & C_MASK;
-    game_hash_t d6w = gen_rand64() & C_MASK;
+    {
+      // Initialize D6 table
+      game_hash_t d6b = gen_rand64() & C_MASK;
+      game_hash_t d6w = gen_rand64() & C_MASK;
 
-    if (p == HexPos::origin()) {
-      d6_table_[i] = { make_d6_s0(make_d6_r1(d6b)),
-                       make_d6_s0(make_d6_r1(d6w)) };
-    } else {
-      // Try the other 5 rotational symmetries
       HexPos s = p;
       D6 op;
+
+      if (p == HexPos::origin()) {
+        d6_table_[i] = { make_d6_s0(make_d6_r1(d6b)),
+                         make_d6_s0(make_d6_r1(d6w)) };
+        goto d6_hash_calc_done;
+      }
+
+      // Try the other 5 rotational symmetries
       for (uint32_t _i = 0; _i < 5; _i++) {
         s = s.c_r1();
         // Accumulate the inverses of the operations we have been doing.
@@ -1011,10 +1121,11 @@ void GameHash<NPawns>::initSymmTables() {
 d6_hash_calc_done:;
     }
 
-    game_hash_t d3b = gen_rand64() & V_MASK;
-    game_hash_t d3w = gen_rand64() & V_MASK;
-
     {
+      // Initialize D3 table
+      game_hash_t d3b = gen_rand64() & V_MASK;
+      game_hash_t d3w = gen_rand64() & V_MASK;
+
       // Try the 2 rotational symmetries
       HexPos s = p;
       D3 op;
@@ -1060,11 +1171,11 @@ d6_hash_calc_done:;
 d3_hash_calc_done:;
     }
 
-    // Initialize K4 table
-    game_hash_t k4b = gen_rand64();
-    game_hash_t k4w = gen_rand64();
-
     {
+      // Initialize K4 table
+      game_hash_t k4b = gen_rand64();
+      game_hash_t k4w = gen_rand64();
+
       // Check the 3 symmetries for existing hashes.
       for (K4 op : { K4(C2(1), C2(0)), K4(C2(0), C2(1)), K4(C2(1), C2(1)) }) {
         HexPos s = p.apply_k4_e(op);
@@ -1096,16 +1207,73 @@ d3_hash_calc_done:;
 k4_hash_calc_done:;
     }
 
-    /*
-    game_hash_t c2cvb = gen_rand64();
-    game_hash_t c2cvw = gen_rand64();
-    game_hash_t c2ceb = gen_rand64();
-    game_hash_t c2cew = gen_rand64();
-    game_hash_t c2evb = gen_rand64();
-    game_hash_t c2evw = gen_rand64();
-    game_hash_t trb = gen_rand64();
-    game_hash_t trw = gen_rand64();
-    */
+    {
+      // Initialize C2_cv table
+      game_hash_t c2cvb = gen_rand64();
+      game_hash_t c2cvw = gen_rand64();
+
+      // check the symmetry for existing hashes/self-mapping
+      HexPos s = p.apply_c2_cv(C2(1));
+      if (s == p) {
+        c2_cv_table_[i] = { make_invariant_c2(C2(1), c2cvb),
+                            make_invariant_c2(C2(1), c2cvw) };
+      } else if (shouldReuse(i, s)) {
+        const HashEl& el =
+            c2_cv_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        c2_cv_table_[i] = { apply_c2(C2(1), el.black_hash),
+                            apply_c2(C2(1), el.white_hash) };
+      } else {
+        c2_cv_table_[i] = { c2cvb, c2cvw };
+      }
+    }
+
+    {
+      // Initialize C2_ce table
+      game_hash_t c2ceb = gen_rand64();
+      game_hash_t c2cew = gen_rand64();
+
+      // check the symmetry for existing hashes/self-mapping
+      HexPos s = p.apply_c2_ce(C2(1));
+      if (s == p) {
+        c2_ce_table_[i] = { make_invariant_c2(C2(1), c2ceb),
+                            make_invariant_c2(C2(1), c2cew) };
+      } else if (shouldReuse(i, s)) {
+        const HashEl& el =
+            c2_ce_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        c2_ce_table_[i] = { apply_c2(C2(1), el.black_hash),
+                            apply_c2(C2(1), el.white_hash) };
+      } else {
+        c2_ce_table_[i] = { c2ceb, c2cew };
+      }
+    }
+
+    {
+      // Initialize C2_ev table
+      game_hash_t c2evb = gen_rand64();
+      game_hash_t c2evw = gen_rand64();
+
+      // check the symmetry for existing hashes/self-mapping
+      HexPos s = p.apply_c2_ev(C2(1));
+      if (s == p) {
+        c2_ev_table_[i] = { make_invariant_c2(C2(1), c2evb),
+                            make_invariant_c2(C2(1), c2evw) };
+      } else if (shouldReuse(i, s)) {
+        const HashEl& el =
+            c2_ev_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        c2_ev_table_[i] = { apply_c2(C2(1), el.black_hash),
+                            apply_c2(C2(1), el.white_hash) };
+      } else {
+        c2_ev_table_[i] = { c2evb, c2evw };
+      }
+    }
+
+    {
+      // Initialize trivial table
+      game_hash_t trb = gen_rand64();
+      game_hash_t trw = gen_rand64();
+
+      trivial_table_[i] = { trb, trw };
+    }
   }
 }
 }  // namespace Onoro
