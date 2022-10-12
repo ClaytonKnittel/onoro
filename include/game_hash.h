@@ -46,7 +46,9 @@ class GameHash {
  public:
   GameHash();
 
-  game_hash_t operator()(const Game<NPawns>& g) const noexcept;
+  game_hash_t operator()(const Game<NPawns>& game) const noexcept;
+
+  constexpr game_hash_t calcHash(const Game<NPawns>& game) const noexcept;
 
   bool validate() const;
 
@@ -55,7 +57,7 @@ class GameHash {
   static std::string printK4Hash(game_hash_t);
   static std::string printC2Hash(game_hash_t);
 
- private:
+ public:  // TODO revert to private
   struct HashEl {
     // hash to use for black pawn in this tile.
     game_hash_t black_hash_;
@@ -155,6 +157,14 @@ class GameHash {
   void initSymmTables();
 
   /*
+   * Returns the hash table associated with the given symmetry class.
+   */
+  const HashEl* getHashTable(
+      typename Game<NPawns>::SymmetryClass symm_class) const;
+
+  static HashEl hashLookup(const HashEl* table, HexPos pos);
+
+  /*
    * The infinite hexagonal plane centered at a fixed point forms a dihedral
    * group D6, which has group operations R1 (Rn = rotate by n*60 degrees
    * about the fixed point) and r0 (rn = reflect about a line at angle n*pi/6
@@ -201,8 +211,57 @@ GameHash<NPawns>::GameHash() {
 }
 
 template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::operator()(const Game<NPawns>& g) const noexcept {
-  return 0;
+game_hash_t GameHash<NPawns>::operator()(
+    const Game<NPawns>& game) const noexcept {
+  return calcHash(game);
+}
+
+template <uint32_t NPawns>
+constexpr game_hash_t GameHash<NPawns>::calcHash(
+    const Game<NPawns>& game) const noexcept {
+  typename Game<NPawns>::BoardSymmetryState symm_state =
+      game.calcSymmetryState();
+  if (symm_state.op == D6(D6::Action::ROT, 0)) {
+    symm_state.op = D6(D6::Action::REFL, 0);
+  }
+  HexPos origin = game.originTile(symm_state);
+
+  printf("Origin: (%d, %d) (%u)\n", origin.x, origin.y, game.nPawnsInPlay());
+  printf("%s\n", game.Print().c_str());
+
+  const char* states[7] = {
+    "C", "V", "E", "CV", "CE", "EV", "trivial",
+  };
+  printf("symm state: %s\n",
+         states[static_cast<uint32_t>(symm_state.symm_class)]);
+  printf("op: %s\n", symm_state.op.toString().c_str());
+  printf("trans: (%d, %d)\n", symm_state.center_offset.x,
+         symm_state.center_offset.y);
+
+  const HashEl* hash_table = getHashTable(symm_state.symm_class);
+
+  game_hash_t h = 0;
+  game.forEachPawn([&game, &h, symm_state, origin, hash_table](idx_t pawn_idx) {
+    HexPos pawn_pos = Game<NPawns>::idxToPos(pawn_idx);
+
+    printf("Trans (%d, %d) -> ", (pawn_pos - origin).x, (pawn_pos - origin).y);
+
+    // transform pawn_pos according to symm_state.op
+    pawn_pos = (pawn_pos - origin).apply_d6_c(symm_state.op) + getCenter();
+    HashEl hash_el = hashLookup(hash_table, pawn_pos);
+
+    printf("(%d, %d)\n", (pawn_pos - getCenter()).x,
+           (pawn_pos - getCenter()).y);
+
+    if (game.getTile(pawn_idx) == Game<NPawns>::TileState::TILE_BLACK) {
+      h = h ^ hash_el.black_hash();
+    } else {
+      h = h ^ hash_el.white_hash();
+    }
+    return true;
+  });
+
+  return h;
 }
 
 template <uint32_t NPawns>
@@ -1054,7 +1113,7 @@ game_hash_t GameHash<NPawns>::make_c2_a(game_hash_t h) {
 
 template <uint32_t NPawns>
 void GameHash<NPawns>::initSymmTables() {
-  seed_rand(0, 0);
+  seed_rand(1421040218, 0);
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
     HexPos p = Game<NPawns>::idxToPos(toIdx(i));
@@ -1264,4 +1323,44 @@ k4_hash_calc_done:;
     }
   }
 }
+
+template <uint32_t NPawns>
+const typename GameHash<NPawns>::HashEl* GameHash<NPawns>::getHashTable(
+    typename Game<NPawns>::SymmetryClass symm_class) const {
+  typedef typename Game<NPawns>::SymmetryClass SymmetryClass;
+
+  switch (symm_class) {
+    case SymmetryClass::C: {
+      return d6_table_;
+    }
+    case SymmetryClass::V: {
+      return d3_table_;
+    }
+    case SymmetryClass::E: {
+      return k4_table_;
+    }
+    case SymmetryClass::CV: {
+      return c2_cv_table_;
+    }
+    case SymmetryClass::CE: {
+      return c2_ce_table_;
+    }
+    case SymmetryClass::EV: {
+      return c2_ev_table_;
+    }
+    case SymmetryClass::TRIVIAL: {
+      return trivial_table_;
+    }
+    default: {
+      __builtin_unreachable();
+    }
+  }
+}
+
+template <uint32_t NPawns>
+typename GameHash<NPawns>::HashEl GameHash<NPawns>::hashLookup(
+    const HashEl* table, HexPos pos) {
+  return table[fromIdx(Game<NPawns>::posToIdx(pos))];
+}
+
 }  // namespace onoro

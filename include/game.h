@@ -19,30 +19,26 @@ typedef std::pair<int32_t, int32_t> idx_t;
 template <uint32_t NPawns>
 class GameHash;
 
+// Forward declare GameEq
+template <uint32_t NPawns>
+class GameEq;
+
 template <uint32_t NPawns>
 class Game;
-
-template <uint32_t NPawns>
-class GameEq {
- public:
-  GameEq() = default;
-
-  bool operator()(const Game<NPawns>& g1,
-                  const Game<NPawns>& g2) const noexcept;
-};
 
 template <uint32_t NPawns>
 class Game {
   friend class GameHash<NPawns>;
   friend class GameEq<NPawns>;
 
- private:
+ public:
   enum class TileState {
     TILE_EMPTY = 0,
     TILE_BLACK = 1,
     TILE_WHITE = 2,
   };
 
+ public:  // TODO mark this private
   struct GameState {
     // You can play this game with a max of 8 pawns, and turn count stops
     // incrementing after the end of phase 1
@@ -266,10 +262,12 @@ class Game {
 
   std::string Print() const;
 
+  bool validate() const;
+
   static void printSymmStateTableOps(uint32_t n_reps = 1);
   static void printSymmStateTableSymms(uint32_t n_reps = 1);
 
- private:
+ public:  // TODO make this private
   static constexpr std::array<BoardSymmStateData, getSymmStateTableSize()>
   genSymmStateTable();
 
@@ -349,11 +347,14 @@ class Game {
   bool forEachMoveP2(CallbackFnT cb) const;
 
  private:
+  BoardSymmetryState calcSymmetryState() const;
+
   /*
-   * Returns the truncated center of mass of the grid (i.e. the center of mass,
-   * rounded down to the nearest integer coordinates).
+   * Gives the chosen origin tile for the board given the BoardSymmetryState.
+   * The origin is guaranteed to be the same tile for equivalent boards under
+   * symmetries.
    */
-  HexPos truncatedCenter() const;
+  constexpr HexPos originTile(const BoardSymmetryState& state) const;
 
   /*
    * Iterates over all pawns on the board, calling cb with the idx_t of the pawn
@@ -371,12 +372,6 @@ class Game {
   template <class CallbackFnT>
   bool forEachPlayablePawn(CallbackFnT cb) const;
 };
-
-template <uint32_t NPawns>
-bool GameEq<NPawns>::operator()(const Game<NPawns>& g1,
-                                const Game<NPawns>& g2) const noexcept {
-  return true;
-}
 
 template <uint32_t NPawns>
 constexpr uint32_t Game<NPawns>::getBoardLen() {
@@ -668,6 +663,49 @@ std::string Game<NPawns>::Print() const {
     }
   }
   return ostr.str();
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::validate() const {
+  uint32_t n_b_pawns = 0;
+  uint32_t n_w_pawns = 0;
+  HexPos sum_of_mass = { 0, 0 };
+
+  if (!forEachPawn([this, &n_b_pawns, &n_w_pawns, &sum_of_mass](idx_t idx) {
+        sum_of_mass += idxToPos(idx);
+
+        if (getTile(idx) == TileState::TILE_BLACK) {
+          n_b_pawns++;
+        } else if (getTile(idx) == TileState::TILE_WHITE) {
+          n_w_pawns++;
+        } else {
+          printf("Unexpected empty tile at (%d, %d)\n", idx.first, idx.second);
+          return false;
+        }
+        return true;
+      })) {
+    return false;
+  }
+
+  if (n_b_pawns + n_w_pawns != nPawnsInPlay()) {
+    printf("Expected %u pawns in play, but found %u\n", nPawnsInPlay(),
+           n_b_pawns + n_w_pawns);
+    return false;
+  }
+
+  if (n_b_pawns != n_w_pawns + !state_.blackTurn) {
+    printf("Expected %u black pawns and %u white pawns, but found %u and %u\n",
+           (nPawnsInPlay() + 1) / 2, nPawnsInPlay() / 2, n_b_pawns, n_w_pawns);
+    return false;
+  }
+
+  if (sum_of_mass != sum_of_mass_) {
+    printf("Sum of mass not correct: expect (%d, %d), but have (%d, %d)\n",
+           sum_of_mass.x, sum_of_mass.y, sum_of_mass_.x, sum_of_mass_.y);
+    return false;
+  }
+
+  return true;
 }
 
 template <uint32_t NPawns>
@@ -1297,9 +1335,40 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
 }
 
 template <uint32_t NPawns>
-HexPos Game<NPawns>::truncatedCenter() const {
+typename Game<NPawns>::BoardSymmetryState Game<NPawns>::calcSymmetryState()
+    const {
   auto [x, y] = sum_of_mass_;
-  return HexPos(x / nPawnsInPlay(), y / nPawnsInPlay());
+  uint32_t n_pawns = nPawnsInPlay();
+
+  if (n_pawns == NPawns) {
+    x %= NPawns;
+    y %= NPawns;
+
+    return symm_state_table[x + y * getSymmStateTableWidth()]
+        .parseSymmetryState();
+  } else {
+    x %= n_pawns;
+    y %= n_pawns;
+
+    D6 op = symmStateOp(x, y, n_pawns);
+    SymmetryClass symm_class = symmStateClass(x, y, n_pawns);
+    HexPos center_off = BoardSymmStateData::COMOffsetToHexPos(
+        boardSymmStateOpToCOMOffset[op.ordinal()]);
+
+    return { op, symm_class, center_off };
+  }
+}
+
+template <uint32_t NPawns>
+constexpr HexPos Game<NPawns>::originTile(
+    const typename Game<NPawns>::BoardSymmetryState& state) const {
+  // Operate under the assumption that x, y >= 0
+  uint32_t x = static_cast<uint32_t>(sum_of_mass_.x);
+  uint32_t y = static_cast<uint32_t>(sum_of_mass_.y);
+  uint32_t n_pawns = nPawnsInPlay();
+  HexPos truncated_com = { static_cast<int32_t>(x / n_pawns),
+                           static_cast<int32_t>(y / n_pawns) };
+  return truncated_com + state.center_offset;
 }
 
 template <uint32_t NPawns>

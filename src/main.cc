@@ -3,8 +3,8 @@
 #include <unistd.h>
 
 #include "game.h"
+#include "game_eq.h"
 #include "game_hash.h"
-#include "game_view.h"
 #include "print_csi.h"
 
 static constexpr uint32_t n_pawns = 16;
@@ -191,6 +191,26 @@ static int playout() {
   return 0;
 }
 
+bool test_symms() {
+  using namespace onoro;
+
+  constexpr uint32_t n_pawns = 3;
+  HexPos som1 = { 2, 1 };
+
+  int32_t x = som1.x % n_pawns;
+  int32_t y = som1.y % n_pawns;
+
+  D6 op = Game<n_pawns>::symmStateOp(x, y, n_pawns);
+  typename Game<n_pawns>::SymmetryClass symm_class =
+      Game<n_pawns>::symmStateClass(x, y, n_pawns);
+  HexPos center_off = Game<n_pawns>::BoardSymmStateData::COMOffsetToHexPos(
+      Game<n_pawns>::boardSymmStateOpToCOMOffset[op.ordinal()]);
+
+  printf("Op: %s\n", op.toString().c_str());
+
+  return true;
+}
+
 int main(int argc, char* argv[]) {
   srand(0);
   static constexpr const uint32_t N = 16;
@@ -199,16 +219,54 @@ int main(int argc, char* argv[]) {
 
   // return benchmark();
   // return playout();
+  return test_symms();
   onoro::GameHash<N> h;
 
   onoro::Game<N>::printSymmStateTableOps();
   printf("\n");
   onoro::Game<N>::printSymmStateTableSymms();
 
+  onoro::Game<3>::printSymmStateTableOps();
+  printf("\n");
+  onoro::Game<3>::printSymmStateTableSymms();
+
   if (!h.validate()) {
     printf("Invalid\n");
   } else {
     printf("Valid!\n");
+  }
+
+  onoro::Game<N> g1;
+  onoro::Game<N> g2;
+
+  g2.clearTile((onoro::idx_t){ 7, 7 });
+  g2.clearTile((onoro::idx_t){ 7, 8 });
+  g2.setTile((onoro::idx_t){ 8, 8 }, onoro::Game<N>::TileState::TILE_WHITE);
+  g2.setTile((onoro::idx_t){ 7, 8 }, onoro::Game<N>::TileState::TILE_BLACK);
+  g2.sum_of_mass_ += (onoro::HexPos){ 2, 1 };
+
+  if (!g1.validate() || !g2.validate()) {
+    return -1;
+  } else {
+    printf("Valid states\n");
+  }
+
+  for (const auto& g : { g1, g2 }) {
+    onoro::game_hash_t hash_val = h.calcHash(g);
+    printf("Hash: %016llx\n", hash_val);
+    printf("D3 hash: %s\n", onoro::GameHash<N>::printD3Hash(hash_val).c_str());
+    /*printf("D6 hash: %s\nD3 hash: %s\nK4 hash: %s\nC2 hash: %s\n",
+           onoro::GameHash<N>::printD6Hash(hash_val).c_str(),
+           onoro::GameHash<N>::printD3Hash(hash_val).c_str(),
+           onoro::GameHash<N>::printK4Hash(hash_val).c_str(),
+           onoro::GameHash<N>::printC2Hash(hash_val).c_str());*/
+
+    printf("r2:      %s\n",
+           onoro::GameHash<N>::printD3Hash(onoro::GameHash<N>::d3_r1(hash_val))
+               .c_str());
+    printf("r4:      %s\n",
+           onoro::GameHash<N>::printD3Hash(onoro::GameHash<N>::d3_r2(hash_val))
+               .c_str());
   }
 
   return 0;
