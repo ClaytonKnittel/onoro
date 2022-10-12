@@ -92,6 +92,18 @@ static std::pair<int32_t, Onoro::idx_t> findMove(const Onoro::Game<NPawns>& g,
   int32_t best_score = -2;
   Onoro::idx_t best_move;
 
+  if (!g.forEachMove([&g, &best_move, &best_score](Onoro::idx_t idx) {
+        Onoro::Game<NPawns> g2(g, idx);
+        if (g2.isFinished()) {
+          best_score = 1;
+          best_move = idx;
+          return false;
+        }
+        return true;
+      })) {
+    return { best_score, best_move };
+  }
+
   g.forEachMove(
       [&g, &m, &best_move, &best_score, depth, &alpha, beta](Onoro::idx_t idx) {
         Onoro::Game<NPawns> g2(g, idx);
@@ -140,17 +152,17 @@ static int playout() {
   printf("%s\n", g.Print().c_str());
 
   TranspositionTable m;
+  uint32_t max_depth = 13;
 
   for (uint32_t i = 0; i < n_pawns - 3; i++) {
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    // auto [score, move] = findMove(g, m, std::min(1000u, n_pawns - 4 -
-    // i));
-    auto [score, move] = findMove(g, m, n_pawns - 4 - i);
+    auto [score, move] = findMove(g, m, max_depth);
+    // auto [score, move] = findMove(g, m, n_pawns - 4 - i);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
     printf("Move search time at depth %u: %lf s\n", timespec_diff(&start, &end),
-           n_pawns - 3 - i);
+           max_depth);
 
     if (score == -2) {
       printf("No moves available\n");
