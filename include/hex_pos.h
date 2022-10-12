@@ -1,6 +1,10 @@
 #pragma once
 
-namespace Onoro {
+#include <utils/math/group/cyclic.h>
+#include <utils/math/group/dihedral.h>
+#include <utils/math/group/direct_product.h>
+
+namespace onoro {
 
 typedef util::math::group::Dihedral<6> D6;
 typedef util::math::group::Dihedral<3> D3;
@@ -336,4 +340,4 @@ HexPos HexPos::e_s3() const {
   return e_s0().e_r3();
 }
 
-}  // namespace Onoro
+}  // namespace onoro

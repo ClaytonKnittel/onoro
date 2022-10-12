@@ -7,10 +7,10 @@
 
 #include <iomanip>
 
+#include "game.h"
 #include "hex_pos.h"
-#include "onoro.h"
 
-namespace Onoro {
+namespace onoro {
 
 typedef std::size_t game_hash_t;
 
@@ -90,7 +90,7 @@ class GameHash {
   static constexpr game_hash_t make_invariant_c2(C2 op, game_hash_t h);
 
   static constexpr game_hash_t C_MASK = UINT64_C(0x0fffffffffffffff);
-  static constexpr game_hash_t V_MASK = UINT64_C(0x7fffffffffffffff);
+  static constexpr game_hash_t V_MASK = UINT64_C(0x0fffffffffffffff);
   static constexpr game_hash_t E_MASK = UINT64_C(0xffffffffffffffff);
 
   /*
@@ -829,7 +829,7 @@ game_hash_t GameHash<NPawns>::d6_s5(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d3_r1(game_hash_t h) {
-  return ((h << 21) | (h >> 42)) & V_MASK;
+  return ((h << 20) | (h >> 40)) & V_MASK;
 }
 
 template <uint32_t NPawns>
@@ -839,32 +839,32 @@ game_hash_t GameHash<NPawns>::d3_r2(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d3_s0(game_hash_t h) {
-  uint64_t b1 = h & 0x00000000001fffff;
-  uint64_t b2 = h & 0x000003ffffe00000;
-  uint64_t b3 = h & 0x7ffffc0000000000;
+  uint64_t b1 = h & 0x00000000000fffff;
+  uint64_t b2 = h & 0x000000fffff00000;
+  uint64_t b3 = h & 0x0fffff0000000000;
 
-  b2 = b2 << 21;
-  b3 = b3 >> 21;
+  b2 = b2 << 20;
+  b3 = b3 >> 20;
   return b1 | b2 | b3;
 }
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d3_s1(game_hash_t h) {
-  uint64_t b1 = h & 0x00000000001fffff;
-  uint64_t b2 = h & 0x000003ffffe00000;
-  uint64_t b3 = h & 0x7ffffc0000000000;
+  uint64_t b1 = h & 0x00000000000fffff;
+  uint64_t b2 = h & 0x000000fffff00000;
+  uint64_t b3 = h & 0x0fffff0000000000;
 
-  b1 = b1 << 21;
-  b2 = b2 >> 21;
+  b1 = b1 << 20;
+  b2 = b2 >> 20;
   return b1 | b2 | b3;
 }
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d3_s2(game_hash_t h) {
-  uint64_t b13 = h & 0x7ffffc00001fffff;
-  uint64_t b2 = h & 0x000003ffffe00000;
+  uint64_t b13 = h & 0x0fffff00000fffff;
+  uint64_t b2 = h & 0x000000fffff00000;
 
-  b13 = (b13 << 42) | (b13 >> 42);
+  b13 = (b13 << 40) | (b13 >> 40);
   return b13 | b2;
 }
 
@@ -977,34 +977,34 @@ template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d3_r1(game_hash_t h) {
   // Repeat the first 21 bits across the remaining 42 bits, leaving the end
   // zeroed out.
-  game_hash_t b = h & UINT64_C(0x1fffff);
-  return b | (b << 21) | (b << 42);
+  game_hash_t b = h & UINT64_C(0xfffff);
+  return b | (b << 20) | (b << 40);
 }
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d3_s0(game_hash_t h) {
-  uint64_t b1 = h & 0x00000000001fffff;
-  uint64_t b23 = h & 0x000003ffffe00000;
+  uint64_t b1 = h & 0x00000000000fffff;
+  uint64_t b23 = h & 0x000000fffff00000;
 
-  b23 = b23 | (b23 << 21);
+  b23 = b23 | (b23 << 20);
   return b1 | b23;
 }
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d3_s1(game_hash_t h) {
-  uint64_t b12 = h & 0x00000000001fffff;
-  uint64_t b3 = h & 0x7ffffc0000000000;
+  uint64_t b12 = h & 0x00000000000fffff;
+  uint64_t b3 = h & 0x0fffff0000000000;
 
-  b12 = b12 | (b12 << 21);
+  b12 = b12 | (b12 << 20);
   return b12 | b3;
 }
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d3_s2(game_hash_t h) {
-  uint64_t b13 = h & 0x00000000001fffff;
-  uint64_t b2 = h & 0x000003ffffe00000;
+  uint64_t b13 = h & 0x00000000000fffff;
+  uint64_t b2 = h & 0x000000fffff00000;
 
-  b13 = b13 | (b13 << 42);
+  b13 = b13 | (b13 << 40);
   return b13 | b2;
 }
 
@@ -1270,4 +1270,4 @@ k4_hash_calc_done:;
     }
   }
 }
-}  // namespace Onoro
+}  // namespace onoro

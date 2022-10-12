@@ -10,7 +10,7 @@
 #include "union_find.h"
 #include "utils/fun/print_colors.h"
 
-namespace Onoro {
+namespace onoro {
 
 // (x, y) coordinates as an index.
 typedef std::pair<int32_t, int32_t> idx_t;
@@ -91,8 +91,11 @@ class Game {
   };
 
   /*
+   * Table of offsets to apply when calculating the integer-coordinate, symmetry
+   * invariant "center of mass"
+   *
    * Mapping from regions of the tiling unit square to the offset from the
-   * coordinate in the bottom right corner of the unit square to the center of
+   * coordinate in the bottom left corner of the unit square to the center of
    * the hex tile this region is a part of, indexed by the D6 symmetry op
    * associated with the region. See the description of genSymmStateTable() for
    * this mapping from symmetry op to region..
@@ -186,9 +189,10 @@ class Game {
     }
 
     BoardSymmetryState parseSymmetryState() const {
+      uint32_t symm_class = static_cast<uint32_t>(data_) & 0x0fu;
       return (BoardSymmetryState){
-        D6(data_ & 0x0fu), static_cast<SymmetryClass>(data_ >> 4),
-        COMOffsetToHexPos(boardSymmStateOpToCOMOffset[data_ & 0x0fu])
+        D6(symm_class), static_cast<SymmetryClass>(data_ >> 4),
+        COMOffsetToHexPos(boardSymmStateOpToCOMOffset[symm_class])
       };
     }
 
@@ -221,6 +225,8 @@ class Game {
    * the unit square scaled by n_pawns.
    *
    * n_pawns is the number of pawns currently in play.
+   *
+   * (x, y) are elements of {0, 1, ... n_pawns-1} x {0, 1, ... n_pawns-1}
    */
   static constexpr D6 symmStateOp(uint32_t x, uint32_t y, uint32_t n_pawns);
 
@@ -229,6 +235,8 @@ class Game {
    * square scaled by n_pawns.
    *
    * n_pawns is the number of pawns currently in play.
+   *
+   * (x, y) are elements of {0, 1, ... n_pawns-1} x {0, 1, ... n_pawns-1}
    */
   static constexpr SymmetryClass symmStateClass(uint32_t x, uint32_t y,
                                                 uint32_t n_pawns);
@@ -341,6 +349,12 @@ class Game {
   bool forEachMoveP2(CallbackFnT cb) const;
 
  private:
+  /*
+   * Returns the truncated center of mass of the grid (i.e. the center of mass,
+   * rounded down to the nearest integer coordinates).
+   */
+  HexPos truncatedCenter() const;
+
   /*
    * Iterates over all pawns on the board, calling cb with the idx_t of the pawn
    * as the only argument. If cb returns false, iteration halts and this method
@@ -1283,6 +1297,12 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
 }
 
 template <uint32_t NPawns>
+HexPos Game<NPawns>::truncatedCenter() const {
+  auto [x, y] = sum_of_mass_;
+  return HexPos(x / nPawnsInPlay(), y / nPawnsInPlay());
+}
+
+template <uint32_t NPawns>
 template <class CallbackFnT>
 bool Game<NPawns>::forEachPawn(CallbackFnT cb) const {
   for (uint64_t i = 0; i < getBoardSize(); i++) {
@@ -1343,4 +1363,4 @@ bool Game<NPawns>::forEachPlayablePawn(CallbackFnT cb) const {
 
   return true;
 }
-}  // namespace Onoro
+}  // namespace onoro

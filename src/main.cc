@@ -2,8 +2,9 @@
 #include <absl/container/flat_hash_map.h>
 #include <unistd.h>
 
+#include "game.h"
 #include "game_hash.h"
-#include "onoro.h"
+#include "game_view.h"
 #include "print_csi.h"
 
 static constexpr uint32_t n_pawns = 16;
@@ -17,21 +18,21 @@ static double timespec_diff(struct timespec* start, struct timespec* end) {
 }
 
 static int benchmark() {
-  Onoro::Game<n_pawns> g;
+  onoro::Game<n_pawns> g;
 
   static constexpr uint32_t n_moves = 6000000;
 
   for (uint32_t i = 0; i < n_pawns * 2 - 3; i++) {
     uint32_t move_cnt = 0;
-    g.forEachMove([&move_cnt](Onoro::idx_t idx) {
+    g.forEachMove([&move_cnt](onoro::idx_t idx) {
       move_cnt++;
       return true;
     });
 
     int which = rand() % move_cnt;
-    g.forEachMove([&g, &which](Onoro::idx_t idx) {
+    g.forEachMove([&g, &which](onoro::idx_t idx) {
       if (which == 0) {
-        Onoro::Game<n_pawns> g2(g, idx);
+        onoro::Game<n_pawns> g2(g, idx);
         g = std::move(g2);
         return false;
       } else {
@@ -46,7 +47,7 @@ static int benchmark() {
 
   for (uint32_t i = 0; i < n_moves; i++) {
     /*int move_cnt = 0;
-    g.forEachMoveP2([&move_cnt](Onoro::idx_t to, Onoro::idx_t from) {
+    g.forEachMoveP2([&move_cnt](onoro::idx_t to, onoro::idx_t from) {
       move_cnt++;
       return true;
     });
@@ -57,9 +58,9 @@ static int benchmark() {
     }*/
 
     int which = 0;  // rand() % move_cnt;
-    g.forEachMoveP2([&g, &which](Onoro::idx_t to, Onoro::idx_t from) {
+    g.forEachMoveP2([&g, &which](onoro::idx_t to, onoro::idx_t from) {
       if (which == 0) {
-        Onoro::Game<n_pawns> g2(g, to, from);
+        onoro::Game<n_pawns> g2(g, to, from);
         g = std::move(g2);
         return false;
       } else {
@@ -75,8 +76,8 @@ static int benchmark() {
   return 0;
 }
 
-typedef absl::flat_hash_map<Onoro::Game<n_pawns>, int32_t,
-                            Onoro::GameHash<n_pawns>, Onoro::GameEq<n_pawns>>
+typedef absl::flat_hash_map<onoro::Game<n_pawns>, int32_t,
+                            onoro::GameHash<n_pawns>, onoro::GameEq<n_pawns>>
     TranspositionTable;
 
 /*
@@ -85,15 +86,15 @@ typedef absl::flat_hash_map<Onoro::Game<n_pawns>, int32_t,
  * loses.
  */
 template <uint32_t NPawns>
-static std::pair<int32_t, Onoro::idx_t> findMove(const Onoro::Game<NPawns>& g,
+static std::pair<int32_t, onoro::idx_t> findMove(const onoro::Game<NPawns>& g,
                                                  TranspositionTable& m,
                                                  int depth, int32_t alpha = -3,
                                                  int32_t beta = 3) {
   int32_t best_score = -2;
-  Onoro::idx_t best_move;
+  onoro::idx_t best_move;
 
-  if (!g.forEachMove([&g, &best_move, &best_score](Onoro::idx_t idx) {
-        Onoro::Game<NPawns> g2(g, idx);
+  if (!g.forEachMove([&g, &best_move, &best_score](onoro::idx_t idx) {
+        onoro::Game<NPawns> g2(g, idx);
         if (g2.isFinished()) {
           best_score = 1;
           best_move = idx;
@@ -105,8 +106,8 @@ static std::pair<int32_t, Onoro::idx_t> findMove(const Onoro::Game<NPawns>& g,
   }
 
   g.forEachMove(
-      [&g, &m, &best_move, &best_score, depth, &alpha, beta](Onoro::idx_t idx) {
-        Onoro::Game<NPawns> g2(g, idx);
+      [&g, &m, &best_move, &best_score, depth, &alpha, beta](onoro::idx_t idx) {
+        onoro::Game<NPawns> g2(g, idx);
         g_n_moves++;
         int32_t score;
 
@@ -148,7 +149,7 @@ static std::pair<int32_t, Onoro::idx_t> findMove(const Onoro::Game<NPawns>& g,
 
 static int playout() {
   struct timespec start, end;
-  Onoro::Game<n_pawns> g;
+  onoro::Game<n_pawns> g;
   printf("%s\n", g.Print().c_str());
 
   TranspositionTable m;
@@ -171,7 +172,7 @@ static int playout() {
 
     printf("Move (%d, %d), score %d (%llu playouts)\n", move.first, move.second,
            score, g_n_moves);
-    g = Onoro::Game<n_pawns>(g, move);
+    g = onoro::Game<n_pawns>(g, move);
     printf("%s\n", g.Print().c_str());
 
     if (g.isFinished()) {
@@ -194,15 +195,15 @@ int main(int argc, char* argv[]) {
   srand(0);
   static constexpr const uint32_t N = 16;
 
-  printf("Game size: %zu bytes\n", sizeof(Onoro::Game<N>));
+  printf("Game size: %zu bytes\n", sizeof(onoro::Game<N>));
 
   // return benchmark();
-  return playout();
-  Onoro::GameHash<N> h;
+  // return playout();
+  onoro::GameHash<N> h;
 
-  Onoro::Game<N>::printSymmStateTableOps();
+  onoro::Game<N>::printSymmStateTableOps();
   printf("\n");
-  Onoro::Game<N>::printSymmStateTableSymms();
+  onoro::Game<N>::printSymmStateTableSymms();
 
   if (!h.validate()) {
     printf("Invalid\n");
