@@ -87,45 +87,49 @@ typedef absl::flat_hash_map<Onoro::Game<n_pawns>, int32_t,
 template <uint32_t NPawns>
 static std::pair<int32_t, Onoro::idx_t> findMove(const Onoro::Game<NPawns>& g,
                                                  TranspositionTable& m,
-                                                 int depth) {
+                                                 int depth, int32_t alpha = -3,
+                                                 int32_t beta = 3) {
   int32_t best_score = -2;
   Onoro::idx_t best_move;
 
-  g.forEachMove([&g, &m, &best_move, &best_score, depth](Onoro::idx_t idx) {
-    Onoro::Game<NPawns> g2(g, idx);
-    g_n_moves++;
-    int32_t score;
+  g.forEachMove(
+      [&g, &m, &best_move, &best_score, depth, &alpha, beta](Onoro::idx_t idx) {
+        Onoro::Game<NPawns> g2(g, idx);
+        g_n_moves++;
+        int32_t score;
 
-    // If this move finished the game, it means playing it made us win.
-    if (g2.isFinished()) {
-      score = 1;
-    } else {
-      if (depth > 0) {
-        /*auto [it, inserted] = m.insert(std::make_pair(std::move(g2), 0));
-        if (!inserted) {
-          score = it->second;
-        } else {*/
-        auto [_score, _] = findMove(g2, m, depth - 1);
-        score = std::min(-_score, 1);
+        // If this move finished the game, it means playing it made us win.
+        if (g2.isFinished()) {
+          score = 1;
+        } else {
+          if (depth > 0) {
+            /*auto [it, inserted] = m.insert(std::make_pair(std::move(g2), 0));
+            if (!inserted) {
+              score = it->second;
+            } else {*/
+            auto [_score, _] = findMove(g2, m, depth - 1, -beta, -alpha);
+            score = std::min(-_score, 1);
 
-        /*
-          it->second = score;
-        }*/
-      } else {
-        score = 0;
-      }
-    }
+            /*
+              it->second = score;
+            }*/
+          } else {
+            score = 0;
+          }
+        }
 
-    if (score > best_score) {
-      best_move = idx;
-      best_score = score;
+        if (score > best_score) {
+          best_move = idx;
+          best_score = score;
 
-      if (best_score == 1) {
-        return false;
-      }
-    }
-    return true;
-  });
+          if (best_score == 1 || best_score >= beta) {
+            return false;
+          }
+
+          alpha = std::max(alpha, best_score);
+        }
+        return true;
+      });
 
   return { best_score, best_move };
 }
@@ -153,7 +157,7 @@ static int playout() {
       break;
     }
 
-    printf("Move (%u, %u), score %d (%llu playouts)\n", move.first, move.second,
+    printf("Move (%d, %d), score %d (%llu playouts)\n", move.first, move.second,
            score, g_n_moves);
     g = Onoro::Game<n_pawns>(g, move);
     printf("%s\n", g.Print().c_str());
@@ -176,7 +180,9 @@ static int playout() {
 
 int main(int argc, char* argv[]) {
   srand(0);
-  static constexpr const uint32_t N = 24;
+  static constexpr const uint32_t N = 16;
+
+  printf("Game size: %zu bytes\n", sizeof(Onoro::Game<N>));
 
   // return benchmark();
   return playout();

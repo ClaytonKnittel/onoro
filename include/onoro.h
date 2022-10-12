@@ -12,7 +12,7 @@
 namespace Onoro {
 
 // (x, y) coordinates as an index.
-typedef std::pair<uint32_t, uint32_t> idx_t;
+typedef std::pair<int32_t, int32_t> idx_t;
 
 // Forward declare GameHash
 template <uint32_t NPawns>
@@ -106,11 +106,6 @@ class Game {
   // Sum of all HexPos's of pieces on the board
   HexPos sum_of_mass_;
 
-  // Min x/y index values of any piece
-  idx_t min_idx_;
-  // Max x/y index values of any piece
-  idx_t max_idx_;
-
  public:
   /*
    * Converts an absolute index to an idx_t.
@@ -190,7 +185,7 @@ bool GameEq<NPawns>::operator()(const Game<NPawns>& g1,
 
 template <uint32_t NPawns>
 constexpr uint32_t Game<NPawns>::getBoardLen() {
-  return NPawns + 2;
+  return NPawns - 1;
 }
 
 template <uint32_t NPawns>
@@ -248,19 +243,19 @@ std::pair<int, HexPos> Game<NPawns>::calcMoveShiftAndOffset(const Game& g,
                                                             idx_t move) {
   int shift = 0;
   HexPos offset = { 0, 0 };
-  if (move.second == 0 && g.max_idx_.second < getBoardLen() - 1) {
+  if (move.second < 0) {
     shift = getBoardLen() * 2;
     offset.x = 1;
     offset.y = 2;
-  } else if (move.second == getBoardLen() - 1 && g.max_idx_.second > 0) {
+  } else if (move.second > static_cast<int32_t>(getBoardLen() - 1)) {
     shift = -static_cast<int>(getBoardLen() * 2);
     offset.x = -1;
     offset.y = -2;
   }
-  if (move.first == 0 && g.max_idx_.first < getBoardLen() - 1) {
+  if (move.first < 0) {
     shift++;
     offset.x++;
-  } else if (move.first == getBoardLen() - 1 && g.max_idx_.first > 0) {
+  } else if (move.first > static_cast<int32_t>(getBoardLen() - 1)) {
     shift--;
     offset.x--;
   }
@@ -289,7 +284,7 @@ Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
 
   memset(this->board_, 0, getBoardSize() * sizeof(uint64_t));
 
-  uint32_t mid_idx = (getBoardLen() - 1) / 2;
+  int32_t mid_idx = (getBoardLen() - 1) / 2;
 
   if (true) {
     idx_t b_start = { mid_idx, mid_idx };
@@ -300,8 +295,6 @@ Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
     setTile(w_start, TileState::TILE_WHITE);
     setTile(b_next, TileState::TILE_BLACK);
 
-    min_idx_ = b_start;
-    max_idx_ = { mid_idx + 1, mid_idx + 1 };
     sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next);
   } else {
     idx_t b_start = { mid_idx + !(mid_idx & 1), mid_idx - 1 };
@@ -318,8 +311,6 @@ Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
     setTile(b_next2, TileState::TILE_BLACK);
     setTile(w_next2, TileState::TILE_WHITE);
 
-    min_idx_ = { mid_idx - (mid_idx & 1), mid_idx - 1 };
-    max_idx_ = { mid_idx + 1, mid_idx + 1 };
     sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next) +
                    idxToPos(w_next) + idxToPos(b_next2) + idxToPos(w_next2);
     state_.turn = 5;
@@ -335,12 +326,6 @@ Game<NPawns>::Game(const Game<NPawns>& g, idx_t move)
                reinterpret_cast<const uint64_t*>(g.board_), getBoardSize(),
                shift * bits_per_tile);
 
-  min_idx_ = { std::min(move.first, g.min_idx_.first),
-               std::min(move.second, g.min_idx_.second) };
-  max_idx_ = { std::max(move.first, g.max_idx_.first),
-               std::max(move.second, g.max_idx_.second) };
-  min_idx_ = posToIdx(idxToPos(min_idx_) + offset);
-  max_idx_ = posToIdx(idxToPos(max_idx_) + offset);
   sum_of_mass_ = g.sum_of_mass_ + idxToPos(move) + nPawnsInPlay() * offset;
 
   setTile(posToIdx(idxToPos(move) + offset),
@@ -357,12 +342,6 @@ Game<NPawns>::Game(const Game& g, idx_t move, idx_t from)
                reinterpret_cast<const uint64_t*>(g.board_), getBoardSize(),
                shift * bits_per_tile);
 
-  min_idx_ = { std::min(move.first, g.min_idx_.first),
-               std::min(move.second, g.min_idx_.second) };
-  max_idx_ = { std::max(move.first, g.max_idx_.first),
-               std::max(move.second, g.max_idx_.second) };
-  min_idx_ = posToIdx(idxToPos(min_idx_) + offset);
-  max_idx_ = posToIdx(idxToPos(max_idx_) + offset);
   sum_of_mass_ =
       g.sum_of_mass_ + idxToPos(move) - idxToPos(from) + NPawns * offset;
 
@@ -408,25 +387,24 @@ idx_t Game<NPawns>::toIdx(uint32_t i) {
 
 template <uint32_t NPawns>
 uint32_t Game<NPawns>::fromIdx(idx_t idx) {
-  return idx.first + idx.second * getBoardLen();
+  return static_cast<uint32_t>(idx.first + idx.second * getBoardLen());
 }
 
 template <uint32_t NPawns>
 HexPos Game<NPawns>::idxToPos(idx_t idx) {
-  return { static_cast<int32_t>(idx.first + idx.second / 2),
-           static_cast<int32_t>(idx.second) };
+  return { idx.first + (idx.second >> 1), idx.second };
 }
 
 template <uint32_t NPawns>
 idx_t Game<NPawns>::posToIdx(HexPos pos) {
-  return { static_cast<uint32_t>(pos.x - static_cast<uint32_t>(pos.y) / 2),
-           static_cast<uint32_t>(pos.y) };
+  return { pos.x - (pos.y >> 1), pos.y };
 }
 
 template <uint32_t NPawns>
 bool Game<NPawns>::inBounds(idx_t idx) {
   auto [x, y] = idx;
-  return x >= 0 && x < getBoardLen() && y >= 0 && y < getBoardLen();
+  return x >= 0 && x < static_cast<int32_t>(getBoardLen()) && y >= 0 &&
+         y < static_cast<int32_t>(getBoardLen());
 }
 
 template <uint32_t NPawns>
@@ -450,7 +428,7 @@ typename Game<NPawns>::TileState Game<NPawns>::getTile(uint32_t i) const {
 template <uint32_t NPawns>
 typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
   auto [x, y] = idx;
-  uint32_t i = x + y * getBoardLen();
+  uint32_t i = static_cast<uint32_t>(x + y * getBoardLen());
 
   uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
   uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
@@ -470,8 +448,7 @@ void Game<NPawns>::setTile(uint32_t i, TileState piece) {
 
 template <uint32_t NPawns>
 void Game<NPawns>::setTile(idx_t idx, TileState piece) {
-  auto [x, y] = idx;
-  uint32_t i = x + y * getBoardLen();
+  uint32_t i = fromIdx(idx);
 
   uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
   uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
@@ -483,8 +460,7 @@ void Game<NPawns>::setTile(idx_t idx, TileState piece) {
 
 template <uint32_t NPawns>
 void Game<NPawns>::clearTile(idx_t idx) {
-  auto [x, y] = idx;
-  uint32_t i = x + y * getBoardLen();
+  uint32_t i = fromIdx(idx);
 
   uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
   uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
@@ -596,8 +572,8 @@ bool Game<NPawns>::forEachNeighbor(idx_t idx, CallbackFnT cb) const {
   if (y > 0) {
     CB_OR_RET({ x, y - 1 });
 
-    if (y % 2 == 0) {
-      if (x < getBoardLen() - 1) {
+    if ((y & 1) == 0) {
+      if (x < static_cast<int32_t>(getBoardLen() - 1)) {
         CB_OR_RET({ x + 1, y - 1 });
       }
     } else {
@@ -609,14 +585,14 @@ bool Game<NPawns>::forEachNeighbor(idx_t idx, CallbackFnT cb) const {
   if (x > 0) {
     CB_OR_RET({ x - 1, y });
   }
-  if (x < getBoardLen() - 1) {
+  if (x < static_cast<int32_t>(getBoardLen() - 1)) {
     CB_OR_RET({ x + 1, y });
   }
-  if (y < getBoardLen() - 1) {
+  if (y < static_cast<int32_t>(getBoardLen() - 1)) {
     CB_OR_RET({ x, y + 1 });
 
-    if (y % 2 == 0) {
-      if (x < getBoardLen() - 1) {
+    if ((y & 1) == 0) {
+      if (x < static_cast<int32_t>(getBoardLen() - 1)) {
         CB_OR_RET({ x + 1, y + 1 });
       }
     } else {
@@ -643,8 +619,8 @@ bool Game<NPawns>::forEachTopLeftNeighbor(idx_t idx, CallbackFnT cb) const {
   if (y > 0) {
     CB_OR_RET({ x, y - 1 });
 
-    if (y % 2 == 0) {
-      if (x < getBoardLen() - 1) {
+    if ((y & 1) == 0) {
+      if (x < static_cast<int32_t>(getBoardLen() - 1)) {
         CB_OR_RET({ x + 1, y - 1 });
       }
     } else {

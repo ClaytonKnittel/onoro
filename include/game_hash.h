@@ -712,7 +712,7 @@ void GameHash<NPawns>::printSymmStateTableSymms(uint32_t n_reps) {
       BoardSymmetryState s = d.parseSymmetryState();
 
       // clang-format off
-      printf(P_256_BG_COLOR(% u) "  " P_256_BG_DEFAULT,
+      printf(P_256_BG_COLOR(%u) "  " P_256_BG_DEFAULT,
              id[static_cast<uint32_t>(s.symm_class)]);
       // clang-format on
     }
@@ -945,8 +945,9 @@ constexpr uint32_t GameHash<NPawns>::fromIdx(idx_t idx) {
 
 template <uint32_t NPawns>
 constexpr bool GameHash<NPawns>::inBounds(idx_t idx) {
-  return idx.first >= 0 && idx.second >= 0 && idx.first < getSymmTableLen() &&
-         idx.second < getSymmTableLen();
+  return idx.first >= 0 && idx.second >= 0 &&
+         idx.first < static_cast<int32_t>(getSymmTableLen()) &&
+         idx.second < static_cast<int32_t>(getSymmTableLen());
 }
 
 template <uint32_t NPawns>
