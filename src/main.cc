@@ -6,7 +6,7 @@
 #include "onoro.h"
 #include "print_csi.h"
 
-static constexpr uint32_t n_pawns = 8;
+static constexpr uint32_t n_pawns = 10;
 static uint64_t g_n_moves = 0;
 
 void TestUnionFind();
@@ -131,15 +131,18 @@ static std::pair<int32_t, Onoro::idx_t> findMove(const Onoro::Game<NPawns>& g,
 }
 
 static int playout() {
+  struct timespec start, end;
   Onoro::Game<n_pawns> g;
   printf("%s\n", g.Print().c_str());
 
+  clock_gettime(CLOCK_MONOTONIC, &start);
+
   TranspositionTable m;
 
-  for (uint32_t i = 0; i < n_pawns * 2 - 3; i++) {
-    // auto [score, move] = findMove(g, m, std::min(1000u, n_pawns * 2 - 4 -
+  for (uint32_t i = 0; i < n_pawns - 3; i++) {
+    // auto [score, move] = findMove(g, m, std::min(1000u, n_pawns - 4 -
     // i));
-    auto [score, move] = findMove(g, m, n_pawns * 2 - 4 - i);
+    auto [score, move] = findMove(g, m, n_pawns - 4 - i);
 
     if (score == -2) {
       printf("No moves available\n");
@@ -158,6 +161,10 @@ static int playout() {
     break;
   }
 
+  clock_gettime(CLOCK_MONOTONIC, &end);
+
+  printf("Total time: %lf s\n", timespec_diff(&start, &end));
+
   /*
   printf("Printing table contents:\n");
   for (auto it = m.cbegin(); it != m.cend(); it++) {
@@ -173,7 +180,7 @@ int main(int argc, char* argv[]) {
   static constexpr const uint32_t N = 24;
 
   // return benchmark();
-  // return playout();
+  return playout();
   Onoro::GameHash<N> h;
 
   Onoro::GameHash<N>::printSymmStateTableOps();

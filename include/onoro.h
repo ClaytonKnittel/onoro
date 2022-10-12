@@ -190,7 +190,7 @@ bool GameEq<NPawns>::operator()(const Game<NPawns>& g1,
 
 template <uint32_t NPawns>
 constexpr uint32_t Game<NPawns>::getBoardLen() {
-  return NPawns * 2 + 2;
+  return NPawns + 2;
 }
 
 template <uint32_t NPawns>
@@ -364,7 +364,7 @@ Game<NPawns>::Game(const Game& g, idx_t move, idx_t from)
   min_idx_ = posToIdx(idxToPos(min_idx_) + offset);
   max_idx_ = posToIdx(idxToPos(max_idx_) + offset);
   sum_of_mass_ =
-      g.sum_of_mass_ + idxToPos(move) - idxToPos(from) + (NPawns * 2) * offset;
+      g.sum_of_mass_ + idxToPos(move) - idxToPos(from) + NPawns * offset;
 
   setTile(posToIdx(idxToPos(move) + offset),
           g.state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
@@ -446,7 +446,7 @@ uint32_t Game<NPawns>::nPawnsInPlay() const {
 
 template <uint32_t NPawns>
 bool Game<NPawns>::inPhase2() const {
-  return state_.turn == NPawns * 2 - 1;
+  return state_.turn == NPawns - 1;
 }
 
 template <uint32_t NPawns>
