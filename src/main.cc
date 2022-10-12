@@ -170,10 +170,16 @@ static int playout() {
 
 int main(int argc, char* argv[]) {
   srand(0);
+  static constexpr const uint32_t N = 24;
 
   // return benchmark();
   // return playout();
-  Onoro::GameHash<8> h;
+  Onoro::GameHash<N> h;
+
+  Onoro::GameHash<N>::printSymmStateTableOps();
+  printf("\n");
+  Onoro::GameHash<N>::printSymmStateTableSymms();
+
   if (!h.validate()) {
     printf("Invalid\n");
   } else {

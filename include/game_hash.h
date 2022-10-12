@@ -48,12 +48,15 @@ class GameHash {
 
   game_hash_t operator()(const Game<NPawns>& g) const noexcept;
 
-  constexpr bool validate() const;
+  bool validate() const;
 
   static std::string printD6Hash(game_hash_t);
   static std::string printD3Hash(game_hash_t);
   static std::string printK4Hash(game_hash_t);
   static std::string printC2Hash(game_hash_t);
+
+  static void printSymmStateTableOps(uint32_t n_reps = 1);
+  static void printSymmStateTableSymms(uint32_t n_reps = 1);
 
  private:
   struct HashEl {
@@ -349,12 +352,12 @@ class GameHash {
 
   /*
    * The board symmetry state data table is a cache of the BoardSymmStateData
-   * values for points (x % (2*NPawns), y % (2*NPawns)). Since the unit square
+   * values for points (x % NPawns, y % NPawns). Since the unit square
    * in HexPos coordinates ((0, 0) to (1, 1)) tiles the plane correctly, we only
    * need the symmetry states for one instance of this tiling, with points
    * looking up their folded mapping onto the representative tile.
    *
-   * The reason for 4 * NPawns * NPawns entries is that the position of the
+   * The reason for NPawns * NPawns entries is that the position of the
    * center of mass modulo the width/height of the unit square determines a
    * board's symmetry state, and the average of 2*NPawns (the number of pawns in
    * play in phase 2 of the game) is a multiple of 1 / (2*NPawns).
@@ -375,27 +378,7 @@ game_hash_t GameHash<NPawns>::operator()(const Game<NPawns>& g) const noexcept {
 
 #include "utils/fun/print_colors.h"
 template <uint32_t NPawns>
-constexpr bool GameHash<NPawns>::validate() const {
-  constexpr uint32_t N = getSymmStateTableWidth();
-
-  for (uint32_t i = 0; i < D6::order(); i++) {
-    for (uint32_t y = N - 1; y < N; y--) {
-      for (uint32_t x = 0; x < N; x++) {
-        BoardSymmStateData d = symm_state_table[x + y * N];
-        BoardSymmetryState s = d.parseSymmetryState();
-
-        if (s.op.ordinal() == i) {
-          printf(P_RED "%s  " P_DEFAULT, s.op.toString().c_str());
-        } else {
-          printf("%s  ", s.op.toString().c_str());
-        }
-      }
-      printf("\n");
-    }
-
-    printf("\n");
-  }
-
+bool GameHash<NPawns>::validate() const {
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
     HexPos p = Game<NPawns>::idxToPos(toIdx(i));
 
@@ -695,6 +678,49 @@ std::string GameHash<NPawns>::printC2Hash(game_hash_t h) {
 }
 
 template <uint32_t NPawns>
+void GameHash<NPawns>::printSymmStateTableOps(uint32_t n_reps) {
+  static constexpr const uint32_t id[D6::order()] = {
+    1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13,
+  };
+
+  constexpr uint32_t N = getSymmStateTableWidth();
+
+  for (uint32_t y = n_reps * N - 1; y < n_reps * N; y--) {
+    for (uint32_t x = 0; x < n_reps * N; x++) {
+      BoardSymmStateData d = symm_state_table[(x % N) + (y % N) * N];
+      BoardSymmetryState s = d.parseSymmetryState();
+
+      // clang-format off
+      printf(P_256_BG_COLOR(%u) "  " P_256_BG_DEFAULT, id[s.op.ordinal()]);
+      // clang-format on
+    }
+    printf("\n");
+  }
+}
+
+template <uint32_t NPawns>
+void GameHash<NPawns>::printSymmStateTableSymms(uint32_t n_reps) {
+  static constexpr const uint32_t id[7] = {
+    1, 2, 3, 4, 5, 6, 7,
+  };
+
+  constexpr uint32_t N = getSymmStateTableWidth();
+
+  for (uint32_t y = n_reps * N - 1; y < n_reps * N; y--) {
+    for (uint32_t x = 0; x < n_reps * N; x++) {
+      BoardSymmStateData d = symm_state_table[(x % N) + (y % N) * N];
+      BoardSymmetryState s = d.parseSymmetryState();
+
+      // clang-format off
+      printf(P_256_BG_COLOR(% u) "  " P_256_BG_DEFAULT,
+             id[static_cast<uint32_t>(s.symm_class)]);
+      // clang-format on
+    }
+    printf("\n");
+  }
+}
+
+template <uint32_t NPawns>
 constexpr uint32_t GameHash<NPawns>::getSymmTableLen() {
   return 2 * NPawns + 1;
 }
@@ -706,7 +732,7 @@ constexpr uint32_t GameHash<NPawns>::getSymmTableSize() {
 
 template <uint32_t NPawns>
 constexpr uint32_t GameHash<NPawns>::getSymmStateTableWidth() {
-  return 2 * NPawns;
+  return NPawns;
 }
 
 template <uint32_t NPawns>
@@ -776,6 +802,10 @@ GameHash<NPawns>::symmStateClass(uint32_t x, uint32_t y, uint32_t n_pawns) {
   uint32_t x2 = std::max(x, y);
   uint32_t y2 = std::min(x, y);
 
+  // (x3, y3) is (x2, y2) folded across the line y = n_pawns - x
+  uint32_t x3 = std::min(x2, n_pawns - y2);
+  uint32_t y3 = std::min(y2, n_pawns - x2);
+
   // Calculate the symmetry class of this position.
   if (x == 0 && y == 0) {
     return SymmetryClass::C;
@@ -783,11 +813,12 @@ GameHash<NPawns>::symmStateClass(uint32_t x, uint32_t y, uint32_t n_pawns) {
     return SymmetryClass::V;
   } else if (2 * x2 == n_pawns && (y2 == 0 || 2 * y2 == n_pawns)) {
     return SymmetryClass::E;
-  } else if (2 * x2 == y2) {
+  } else if (2 * y3 == x3 || (x2 + y2 == n_pawns && 3 * y2 < n_pawns)) {
     return SymmetryClass::CV;
   } else if (x2 == y2 || y2 == 0) {
     return SymmetryClass::CE;
-  } else if (x2 + y2 == 1 && 3 * y2 > n_pawns) {
+  } else if (y3 + n_pawns == 2 * x3 ||
+             (x2 + y2 == n_pawns && 3 * y2 > n_pawns)) {
     return SymmetryClass::EV;
   } else {
     return SymmetryClass::TRIVIAL;
@@ -886,8 +917,8 @@ GameHash<NPawns>::genSymmStateTable() {
 
   std::array<BoardSymmStateData, getSymmStateTableSize()> table;
 
-  for (uint32_t x = 0; x < 2 * NPawns; x++) {
-    for (uint32_t y = 0; y < 2 * NPawns; y++) {
+  for (uint32_t x = 0; x < N; x++) {
+    for (uint32_t y = 0; y < N; y++) {
       table[x + y * N] =
           BoardSymmStateData(symmStateOp(x, y, N), symmStateClass(x, y, N));
     }
