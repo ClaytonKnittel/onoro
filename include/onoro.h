@@ -388,17 +388,7 @@ std::string Game<NPawns>::Print() const {
     }
 
     for (uint32_t x = 0; x < getBoardLen(); x++) {
-      auto [mx, my] = posToIdx(sum_of_mass_);
-      mx = (mx + nPawnsInPlay() / 2) / nPawnsInPlay();
-      my = (my + nPawnsInPlay() / 2) / nPawnsInPlay();
-
-      if (x == mx && y == my) {
-        ostr << "\033[0;32m";
-      }
       ostr << tile_str[static_cast<int>(getTile({ x, y }))];
-      if (x == mx && y == my) {
-        ostr << "\033[0;39m";
-      }
       if (x < getBoardLen() - 1) {
         ostr << " ";
       }
