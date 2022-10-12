@@ -782,6 +782,19 @@ void Game<NPawns>::printSymmStateTableSymms(uint32_t n_reps) {
  * - TRIVIAL is a group with no symmetries other than the identity, so all
  *     board states with center of masses which don't lie on any symmetry
  *     lines are part of this group.
+ *
+ * In the case that the center of mass lies on a symmetry line/point, it is
+ * classified into one of 6 symmetry groups above. These symmetry groups are
+ * subgroups of D6, and are uniquely defined by the remaining symmetries after
+ * canonicalizing the symmetry line/point by the operations given in the
+ * graphic. As an example, the e's on the graphic will all be mapped to the e in
+ * the bottom center of the graphic, but there are 4 possible orientations of
+ * the board with this constraint applied. The group of these 4 orientations is
+ * K4 (C2 + C2), which is precisely the symmetries of the infinite hexagonal
+ * grid centered at the midpoint of an edge (nix translation). This also means
+ * that it does not matter which of the 4 group operations we choose to apply to
+ * the game state when canonicalizing if the center of mass lies on an e, since
+ * they are symmetries of each other in this K4 group.
  */
 template <uint32_t NPawns>
 constexpr std::array<typename Game<NPawns>::BoardSymmStateData,
