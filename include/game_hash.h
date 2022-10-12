@@ -58,9 +58,15 @@ class GameHash {
  private:
   struct HashEl {
     // hash to use for black pawn in this tile.
-    game_hash_t black_hash;
-    // hash to use for white pawn in this tile.
-    game_hash_t white_hash;
+    game_hash_t black_hash_;
+
+    constexpr game_hash_t black_hash() const {
+      return black_hash_;
+    }
+
+    constexpr game_hash_t white_hash() const {
+      return color_swap(black_hash_);
+    }
   };
 
   // Returns the length of the symm tables in one dimension.
@@ -120,6 +126,8 @@ class GameHash {
   static game_hash_t k4_c(game_hash_t h);
 
   static game_hash_t c2_a(game_hash_t h);
+
+  static game_hash_t color_swap(game_hash_t h);
 
   /*
    * Given a hash, compresses it to make it invariant under the corresponding
@@ -216,17 +224,17 @@ bool GameHash<NPawns>::validate() const {
       if (inBounds(idx)) {
         const HashEl& hs =
             d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        if (apply_d6(op, h.black_hash) != hs.black_hash ||
-            apply_d6(op, h.white_hash) != hs.white_hash) {
+        if (apply_d6(op, h.black_hash()) != hs.black_hash() ||
+            apply_d6(op, h.white_hash()) != hs.white_hash()) {
           printf(
               "D6 hashes not equal between position (%d, %d) and (%d, %d) "
               "under "
               "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
               p.x, p.y, s.x, s.y, op.toString().c_str(),
-              printD6Hash(h.black_hash).c_str(),
-              printD6Hash(hs.black_hash).c_str(),
-              printD6Hash(h.white_hash).c_str(),
-              printD6Hash(hs.white_hash).c_str());
+              printD6Hash(h.black_hash()).c_str(),
+              printD6Hash(hs.black_hash()).c_str(),
+              printD6Hash(h.white_hash()).c_str(),
+              printD6Hash(hs.white_hash()).c_str());
           return false;
         }
       }
@@ -239,17 +247,17 @@ bool GameHash<NPawns>::validate() const {
       if (inBounds(idx)) {
         const HashEl& hs =
             d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        if (apply_d6(op, h.black_hash) != hs.black_hash ||
-            apply_d6(op, h.white_hash) != hs.white_hash) {
+        if (apply_d6(op, h.black_hash()) != hs.black_hash() ||
+            apply_d6(op, h.white_hash()) != hs.white_hash()) {
           printf(
               "D6 hashes not equal between position (%d, %d) and (%d, %d) "
               "under "
               "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
               p.x, p.y, s.x, s.y, op.toString().c_str(),
-              printD6Hash(h.black_hash).c_str(),
-              printD6Hash(hs.black_hash).c_str(),
-              printD6Hash(h.white_hash).c_str(),
-              printD6Hash(hs.white_hash).c_str());
+              printD6Hash(h.black_hash()).c_str(),
+              printD6Hash(hs.black_hash()).c_str(),
+              printD6Hash(h.white_hash()).c_str(),
+              printD6Hash(hs.white_hash()).c_str());
           return false;
         }
       }
@@ -277,17 +285,17 @@ bool GameHash<NPawns>::validate() const {
       if (inBounds(idx)) {
         const HashEl& hs =
             d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        if (apply_d3(op, h.black_hash) != hs.black_hash ||
-            apply_d3(op, h.white_hash) != hs.white_hash) {
+        if (apply_d3(op, h.black_hash()) != hs.black_hash() ||
+            apply_d3(op, h.white_hash()) != hs.white_hash()) {
           printf(
               "D3 hashes not equal between position (%d, %d) and (%d, %d) "
               "under "
               "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
               p.x, p.y, s.x, s.y, op.toString().c_str(),
-              printD3Hash(h.black_hash).c_str(),
-              printD3Hash(hs.black_hash).c_str(),
-              printD3Hash(h.white_hash).c_str(),
-              printD3Hash(hs.white_hash).c_str());
+              printD3Hash(h.black_hash()).c_str(),
+              printD3Hash(hs.black_hash()).c_str(),
+              printD3Hash(h.white_hash()).c_str(),
+              printD3Hash(hs.white_hash()).c_str());
           return false;
         }
       }
@@ -300,17 +308,17 @@ bool GameHash<NPawns>::validate() const {
       if (inBounds(idx)) {
         const HashEl& hs =
             d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        if (apply_d3(op, h.black_hash) != hs.black_hash ||
-            apply_d3(op, h.white_hash) != hs.white_hash) {
+        if (apply_d3(op, h.black_hash()) != hs.black_hash() ||
+            apply_d3(op, h.white_hash()) != hs.white_hash()) {
           printf(
               "D3 hashes not equal between position (%d, %d) and (%d, %d) "
               "under "
               "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
               p.x, p.y, s.x, s.y, op.toString().c_str(),
-              printD3Hash(h.black_hash).c_str(),
-              printD3Hash(hs.black_hash).c_str(),
-              printD3Hash(h.white_hash).c_str(),
-              printD3Hash(hs.white_hash).c_str());
+              printD3Hash(h.black_hash()).c_str(),
+              printD3Hash(hs.black_hash()).c_str(),
+              printD3Hash(h.white_hash()).c_str(),
+              printD3Hash(hs.white_hash()).c_str());
           return false;
         }
       }
@@ -334,17 +342,17 @@ bool GameHash<NPawns>::validate() const {
         if (inBounds(idx)) {
           const HashEl& hs =
               k4_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-          if (apply_k4(op, h.black_hash) != hs.black_hash ||
-              apply_k4(op, h.white_hash) != hs.white_hash) {
+          if (apply_k4(op, h.black_hash()) != hs.black_hash() ||
+              apply_k4(op, h.white_hash()) != hs.white_hash()) {
             printf(
                 "K4 hashes not equal between position (%d, %d) and (%d, %d) "
                 "under "
                 "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
                 p.x, p.y, s.x, s.y, op.toString().c_str(),
-                printK4Hash(h.black_hash).c_str(),
-                printK4Hash(hs.black_hash).c_str(),
-                printK4Hash(h.white_hash).c_str(),
-                printK4Hash(hs.white_hash).c_str());
+                printK4Hash(h.black_hash()).c_str(),
+                printK4Hash(hs.black_hash()).c_str(),
+                printK4Hash(h.white_hash()).c_str(),
+                printK4Hash(hs.white_hash()).c_str());
             return false;
           }
         }
@@ -366,17 +374,17 @@ bool GameHash<NPawns>::validate() const {
       if (inBounds(idx)) {
         const HashEl& hs =
             c2_cv_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        if (apply_c2(op, h.black_hash) != hs.black_hash ||
-            apply_c2(op, h.white_hash) != hs.white_hash) {
+        if (apply_c2(op, h.black_hash()) != hs.black_hash() ||
+            apply_c2(op, h.white_hash()) != hs.white_hash()) {
           printf(
               "C2 cv hashes not equal between position (%d, %d) and (%d, %d) "
               "under "
               "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
               p.x, p.y, s.x, s.y, op.toString().c_str(),
-              printC2Hash(h.black_hash).c_str(),
-              printC2Hash(hs.black_hash).c_str(),
-              printC2Hash(h.white_hash).c_str(),
-              printC2Hash(hs.white_hash).c_str());
+              printC2Hash(h.black_hash()).c_str(),
+              printC2Hash(hs.black_hash()).c_str(),
+              printC2Hash(h.white_hash()).c_str(),
+              printC2Hash(hs.white_hash()).c_str());
           return false;
         }
       }
@@ -397,17 +405,17 @@ bool GameHash<NPawns>::validate() const {
       if (inBounds(idx)) {
         const HashEl& hs =
             c2_ce_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        if (apply_c2(op, h.black_hash) != hs.black_hash ||
-            apply_c2(op, h.white_hash) != hs.white_hash) {
+        if (apply_c2(op, h.black_hash()) != hs.black_hash() ||
+            apply_c2(op, h.white_hash()) != hs.white_hash()) {
           printf(
               "C2 ce hashes not equal between position (%d, %d) and (%d, %d) "
               "under "
               "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
               p.x, p.y, s.x, s.y, op.toString().c_str(),
-              printC2Hash(h.black_hash).c_str(),
-              printC2Hash(hs.black_hash).c_str(),
-              printC2Hash(h.white_hash).c_str(),
-              printC2Hash(hs.white_hash).c_str());
+              printC2Hash(h.black_hash()).c_str(),
+              printC2Hash(hs.black_hash()).c_str(),
+              printC2Hash(h.white_hash()).c_str(),
+              printC2Hash(hs.white_hash()).c_str());
           return false;
         }
       }
@@ -428,17 +436,17 @@ bool GameHash<NPawns>::validate() const {
       if (inBounds(idx)) {
         const HashEl& hs =
             c2_ev_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        if (apply_c2(op, h.black_hash) != hs.black_hash ||
-            apply_c2(op, h.white_hash) != hs.white_hash) {
+        if (apply_c2(op, h.black_hash()) != hs.black_hash() ||
+            apply_c2(op, h.white_hash()) != hs.white_hash()) {
           printf(
               "C2 ev hashes not equal between position (%d, %d) and (%d, %d) "
               "under "
               "%s:\nblack:\n\t%s\n\t%s\nwhite\n\t%s\n\t%s\n",
               p.x, p.y, s.x, s.y, op.toString().c_str(),
-              printC2Hash(h.black_hash).c_str(),
-              printC2Hash(hs.black_hash).c_str(),
-              printC2Hash(h.white_hash).c_str(),
-              printC2Hash(hs.white_hash).c_str());
+              printC2Hash(h.black_hash()).c_str(),
+              printC2Hash(hs.black_hash()).c_str(),
+              printC2Hash(h.white_hash()).c_str(),
+              printC2Hash(hs.white_hash()).c_str());
           return false;
         }
       }
@@ -760,9 +768,9 @@ game_hash_t GameHash<NPawns>::d6_r5(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d6_s0(game_hash_t h) {
-  uint64_t b14 = h & 0x000000ffc00003ff;
-  uint64_t b26 = h & 0x0ffc0000000ffc00;
-  uint64_t b35 = h & 0x0003ff003ff00000;
+  game_hash_t b14 = h & 0x000000ffc00003ff;
+  game_hash_t b26 = h & 0x0ffc0000000ffc00;
+  game_hash_t b35 = h & 0x0003ff003ff00000;
 
   b26 = (b26 << 40) | (b26 >> 40);
   b35 = ((b35 << 20) | (b35 >> 20)) & 0x0003ff003ff00000;
@@ -771,9 +779,9 @@ game_hash_t GameHash<NPawns>::d6_s0(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d6_s1(game_hash_t h) {
-  uint64_t b12 = h & 0x00000000000fffff;
-  uint64_t b36 = h & 0x0ffc00003ff00000;
-  uint64_t b45 = h & 0x0003ffffc0000000;
+  game_hash_t b12 = h & 0x00000000000fffff;
+  game_hash_t b36 = h & 0x0ffc00003ff00000;
+  game_hash_t b45 = h & 0x0003ffffc0000000;
 
   b12 = ((b12 << 10) | (b12 >> 10)) & 0x00000000000fffff;
   b36 = (b36 << 30) | (b36 >> 30);
@@ -783,9 +791,9 @@ game_hash_t GameHash<NPawns>::d6_s1(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d6_s2(game_hash_t h) {
-  uint64_t b13 = h & 0x000000003ff003ff;
-  uint64_t b25 = h & 0x0003ff00000ffc00;
-  uint64_t b46 = h & 0x0ffc00ffc0000000;
+  game_hash_t b13 = h & 0x000000003ff003ff;
+  game_hash_t b25 = h & 0x0003ff00000ffc00;
+  game_hash_t b46 = h & 0x0ffc00ffc0000000;
 
   b13 = ((b13 << 20) | (b13 >> 20)) & 0x000000003ff003ff;
   b46 = ((b46 << 20) | (b46 >> 20)) & 0x0ffc00ffc0000000;
@@ -794,9 +802,9 @@ game_hash_t GameHash<NPawns>::d6_s2(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d6_s3(game_hash_t h) {
-  uint64_t b14 = h & 0x000000ffc00003ff;
-  uint64_t b23 = h & 0x000000003ffffc00;
-  uint64_t b56 = h & 0x0fffff0000000000;
+  game_hash_t b14 = h & 0x000000ffc00003ff;
+  game_hash_t b23 = h & 0x000000003ffffc00;
+  game_hash_t b56 = h & 0x0fffff0000000000;
 
   b14 = ((b14 << 30) | (b14 >> 30)) & 0x000000ffc00003ff;
   b23 = ((b23 << 10) | (b23 >> 10)) & 0x000000003ffffc00;
@@ -806,9 +814,9 @@ game_hash_t GameHash<NPawns>::d6_s3(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d6_s4(game_hash_t h) {
-  uint64_t b15 = h & 0x0003ff00000003ff;
-  uint64_t b24 = h & 0x000000ffc00ffc00;
-  uint64_t b36 = h & 0x0ffc00003ff00000;
+  game_hash_t b15 = h & 0x0003ff00000003ff;
+  game_hash_t b24 = h & 0x000000ffc00ffc00;
+  game_hash_t b36 = h & 0x0ffc00003ff00000;
 
   b15 = (b15 << 40) | (b15 >> 40);
   b24 = ((b24 << 20) | (b24 >> 20)) & 0x000000ffc00ffc00;
@@ -817,9 +825,9 @@ game_hash_t GameHash<NPawns>::d6_s4(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d6_s5(game_hash_t h) {
-  uint64_t b16 = h & 0x0ffc0000000003ff;
-  uint64_t b25 = h & 0x0003ff00000ffc00;
-  uint64_t b34 = h & 0x000000fffff00000;
+  game_hash_t b16 = h & 0x0ffc0000000003ff;
+  game_hash_t b25 = h & 0x0003ff00000ffc00;
+  game_hash_t b34 = h & 0x000000fffff00000;
 
   b16 = (b16 << 50) | (b16 >> 50);
   b25 = (b25 << 30) | (b25 >> 30);
@@ -839,9 +847,9 @@ game_hash_t GameHash<NPawns>::d3_r2(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d3_s0(game_hash_t h) {
-  uint64_t b1 = h & 0x00000000000fffff;
-  uint64_t b2 = h & 0x000000fffff00000;
-  uint64_t b3 = h & 0x0fffff0000000000;
+  game_hash_t b1 = h & 0x00000000000fffff;
+  game_hash_t b2 = h & 0x000000fffff00000;
+  game_hash_t b3 = h & 0x0fffff0000000000;
 
   b2 = b2 << 20;
   b3 = b3 >> 20;
@@ -850,9 +858,9 @@ game_hash_t GameHash<NPawns>::d3_s0(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d3_s1(game_hash_t h) {
-  uint64_t b1 = h & 0x00000000000fffff;
-  uint64_t b2 = h & 0x000000fffff00000;
-  uint64_t b3 = h & 0x0fffff0000000000;
+  game_hash_t b1 = h & 0x00000000000fffff;
+  game_hash_t b2 = h & 0x000000fffff00000;
+  game_hash_t b3 = h & 0x0fffff0000000000;
 
   b1 = b1 << 20;
   b2 = b2 >> 20;
@@ -861,8 +869,8 @@ game_hash_t GameHash<NPawns>::d3_s1(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::d3_s2(game_hash_t h) {
-  uint64_t b13 = h & 0x0fffff00000fffff;
-  uint64_t b2 = h & 0x000000fffff00000;
+  game_hash_t b13 = h & 0x0fffff00000fffff;
+  game_hash_t b2 = h & 0x000000fffff00000;
 
   b13 = (b13 << 40) | (b13 >> 40);
   return b13 | b2;
@@ -875,17 +883,17 @@ game_hash_t GameHash<NPawns>::k4_a(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::k4_b(game_hash_t h) {
-  uint64_t b13 = h & 0x0000ffff0000ffff;
-  uint64_t b24 = h & 0xffff0000ffff0000;
+  game_hash_t b13 = h & 0x0000ffff0000ffff;
+  game_hash_t b24 = h & 0xffff0000ffff0000;
 
   return (b13 << 16) | (b24 >> 16);
 }
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::k4_c(game_hash_t h) {
-  uint64_t b = __builtin_bswap64(h);
-  uint64_t b1357 = b & 0x00ff00ff00ff00ff;
-  uint64_t b2468 = b & 0xff00ff00ff00ff00;
+  game_hash_t b = __builtin_bswap64(h);
+  game_hash_t b1357 = b & 0x00ff00ff00ff00ff;
+  game_hash_t b2468 = b & 0xff00ff00ff00ff00;
 
   return (b1357 << 8) | (b2468 >> 8);
 }
@@ -893,6 +901,14 @@ game_hash_t GameHash<NPawns>::k4_c(game_hash_t h) {
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::c2_a(game_hash_t h) {
   return (h << 32) | (h >> 32);
+}
+
+template <uint32_t NPawns>
+game_hash_t GameHash<NPawns>::color_swap(game_hash_t h) {
+  game_hash_t hl = h & UINT64_C(0x5555555555555555);
+  game_hash_t hr = h & UINT64_C(0xaaaaaaaaaaaaaaaa);
+
+  return (hl << 1) | (hr >> 1);
 }
 
 template <uint32_t NPawns>
@@ -906,9 +922,9 @@ game_hash_t GameHash<NPawns>::make_d6_r1(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d6_s0(game_hash_t h) {
-  uint64_t b14 = h & 0x000000ffc00003ff;
-  uint64_t b26 = h & 0x00000000000ffc00;
-  uint64_t b35 = h & 0x000000003ff00000;
+  game_hash_t b14 = h & 0x000000ffc00003ff;
+  game_hash_t b26 = h & 0x00000000000ffc00;
+  game_hash_t b35 = h & 0x000000003ff00000;
 
   b26 = b26 | (b26 << 40);
   b35 = b35 | (b35 << 20);
@@ -917,9 +933,9 @@ game_hash_t GameHash<NPawns>::make_d6_s0(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d6_s1(game_hash_t h) {
-  uint64_t b12 = h & 0x00000000000003ff;
-  uint64_t b36 = h & 0x000000003ff00000;
-  uint64_t b45 = h & 0x000000ffc0000000;
+  game_hash_t b12 = h & 0x00000000000003ff;
+  game_hash_t b36 = h & 0x000000003ff00000;
+  game_hash_t b45 = h & 0x000000ffc0000000;
 
   b12 = b12 | (b12 << 10);
   b36 = b36 | (b36 << 30);
@@ -929,9 +945,9 @@ game_hash_t GameHash<NPawns>::make_d6_s1(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d6_s2(game_hash_t h) {
-  uint64_t b13 = h & 0x00000000000003ff;
-  uint64_t b25 = h & 0x0003ff00000ffc00;
-  uint64_t b46 = h & 0x000000ffc0000000;
+  game_hash_t b13 = h & 0x00000000000003ff;
+  game_hash_t b25 = h & 0x0003ff00000ffc00;
+  game_hash_t b46 = h & 0x000000ffc0000000;
 
   b13 = b13 | (b13 << 20);
   b46 = b46 | (b46 << 20);
@@ -940,9 +956,9 @@ game_hash_t GameHash<NPawns>::make_d6_s2(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d6_s3(game_hash_t h) {
-  uint64_t b14 = h & 0x00000000000003ff;
-  uint64_t b23 = h & 0x00000000000ffc00;
-  uint64_t b56 = h & 0x0003ff0000000000;
+  game_hash_t b14 = h & 0x00000000000003ff;
+  game_hash_t b23 = h & 0x00000000000ffc00;
+  game_hash_t b56 = h & 0x0003ff0000000000;
 
   b14 = b14 | (b14 << 30);
   b23 = b23 | (b23 << 10);
@@ -952,9 +968,9 @@ game_hash_t GameHash<NPawns>::make_d6_s3(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d6_s4(game_hash_t h) {
-  uint64_t b15 = h & 0x00000000000003ff;
-  uint64_t b24 = h & 0x00000000000ffc00;
-  uint64_t b36 = h & 0x0ffc00003ff00000;
+  game_hash_t b15 = h & 0x00000000000003ff;
+  game_hash_t b24 = h & 0x00000000000ffc00;
+  game_hash_t b36 = h & 0x0ffc00003ff00000;
 
   b15 = b15 | (b15 << 40);
   b24 = b24 | (b24 << 20);
@@ -963,9 +979,9 @@ game_hash_t GameHash<NPawns>::make_d6_s4(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d6_s5(game_hash_t h) {
-  uint64_t b16 = h & 0x00000000000003ff;
-  uint64_t b25 = h & 0x00000000000ffc00;
-  uint64_t b34 = h & 0x000000003ff00000;
+  game_hash_t b16 = h & 0x00000000000003ff;
+  game_hash_t b25 = h & 0x00000000000ffc00;
+  game_hash_t b34 = h & 0x000000003ff00000;
 
   b16 = b16 | (b16 << 50);
   b25 = b25 | (b25 << 30);
@@ -983,8 +999,8 @@ game_hash_t GameHash<NPawns>::make_d3_r1(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d3_s0(game_hash_t h) {
-  uint64_t b1 = h & 0x00000000000fffff;
-  uint64_t b23 = h & 0x000000fffff00000;
+  game_hash_t b1 = h & 0x00000000000fffff;
+  game_hash_t b23 = h & 0x000000fffff00000;
 
   b23 = b23 | (b23 << 20);
   return b1 | b23;
@@ -992,8 +1008,8 @@ game_hash_t GameHash<NPawns>::make_d3_s0(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d3_s1(game_hash_t h) {
-  uint64_t b12 = h & 0x00000000000fffff;
-  uint64_t b3 = h & 0x0fffff0000000000;
+  game_hash_t b12 = h & 0x00000000000fffff;
+  game_hash_t b3 = h & 0x0fffff0000000000;
 
   b12 = b12 | (b12 << 20);
   return b12 | b3;
@@ -1001,8 +1017,8 @@ game_hash_t GameHash<NPawns>::make_d3_s1(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_d3_s2(game_hash_t h) {
-  uint64_t b13 = h & 0x00000000000fffff;
-  uint64_t b2 = h & 0x000000fffff00000;
+  game_hash_t b13 = h & 0x00000000000fffff;
+  game_hash_t b2 = h & 0x000000fffff00000;
 
   b13 = b13 | (b13 << 40);
   return b13 | b2;
@@ -1010,14 +1026,14 @@ game_hash_t GameHash<NPawns>::make_d3_s2(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_k4_a(game_hash_t h) {
-  uint64_t b12 = h & 0x00000000ffffffff;
+  game_hash_t b12 = h & 0x00000000ffffffff;
 
   return b12 | (b12 << 32);
 }
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_k4_b(game_hash_t h) {
-  uint64_t b13 = h & 0x0000ffff0000ffff;
+  game_hash_t b13 = h & 0x0000ffff0000ffff;
 
   return b13 | (b13 << 16);
 }
@@ -1031,7 +1047,7 @@ game_hash_t GameHash<NPawns>::make_k4_c(game_hash_t h) {
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::make_c2_a(game_hash_t h) {
-  uint64_t b12 = h & 0x00000000ffffffff;
+  game_hash_t b12 = h & 0x00000000ffffffff;
 
   return b12 | (b12 << 32);
 }
@@ -1059,14 +1075,12 @@ void GameHash<NPawns>::initSymmTables() {
     {
       // Initialize D6 table
       game_hash_t d6b = gen_rand64() & C_MASK;
-      game_hash_t d6w = gen_rand64() & C_MASK;
 
       HexPos s = p;
       D6 op;
 
       if (p == HexPos::origin()) {
-        d6_table_[i] = { make_d6_s0(make_d6_r1(d6b)),
-                         make_d6_s0(make_d6_r1(d6w)) };
+        d6_table_[i] = { make_d6_s0(make_d6_r1(d6b)) };
         goto d6_hash_calc_done;
       }
 
@@ -1079,8 +1093,7 @@ void GameHash<NPawns>::initSymmTables() {
         if (shouldReuse(i, s)) {
           const HashEl& el =
               d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-          d6_table_[i] = { apply_d6(op, el.black_hash),
-                           apply_d6(op, el.white_hash) };
+          d6_table_[i] = { apply_d6(op, el.black_hash()) };
           goto d6_hash_calc_done;
         }
       }
@@ -1091,16 +1104,14 @@ void GameHash<NPawns>::initSymmTables() {
       for (uint32_t _i = 0; _i < 6; _i++) {
         if (s == p) {
           // This tile is symmetric to itself under some reflection
-          d6_table_[i] = { make_invariant_d6(op, d6b),
-                           make_invariant_d6(op, d6w) };
+          d6_table_[i] = { make_invariant_d6(op, d6b) };
           goto d6_hash_calc_done;
         }
 
         if (shouldReuse(i, s)) {
           const HashEl& el =
               d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-          d6_table_[i] = { apply_d6(op, el.black_hash),
-                           apply_d6(op, el.white_hash) };
+          d6_table_[i] = { apply_d6(op, el.black_hash()) };
           goto d6_hash_calc_done;
         }
 
@@ -1110,7 +1121,7 @@ void GameHash<NPawns>::initSymmTables() {
       }
 
       // Otherwise, create a new hash value
-      d6_table_[i] = { d6b, d6w };
+      d6_table_[i] = { d6b };
 
 d6_hash_calc_done:;
     }
@@ -1118,7 +1129,6 @@ d6_hash_calc_done:;
     {
       // Initialize D3 table
       game_hash_t d3b = gen_rand64() & V_MASK;
-      game_hash_t d3w = gen_rand64() & V_MASK;
 
       // Try the 2 rotational symmetries
       HexPos s = p;
@@ -1130,8 +1140,7 @@ d6_hash_calc_done:;
         if (shouldReuse(i, s)) {
           const HashEl& el =
               d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-          d3_table_[i] = { apply_d3(op, el.black_hash),
-                           apply_d3(op, el.white_hash) };
+          d3_table_[i] = { apply_d3(op, el.black_hash()) };
           goto d3_hash_calc_done;
         }
       }
@@ -1142,16 +1151,14 @@ d6_hash_calc_done:;
       for (uint32_t _i = 0; _i < 3; _i++) {
         if (s == p) {
           // This tile is symmetric to itself under some reflection
-          d3_table_[i] = { make_invariant_d3(op, d3b),
-                           make_invariant_d3(op, d3w) };
+          d3_table_[i] = { make_invariant_d3(op, d3b) };
           goto d3_hash_calc_done;
         }
 
         if (shouldReuse(i, s)) {
           const HashEl& el =
               d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-          d3_table_[i] = { apply_d3(op, el.black_hash),
-                           apply_d3(op, el.white_hash) };
+          d3_table_[i] = { apply_d3(op, el.black_hash()) };
           goto d3_hash_calc_done;
         }
 
@@ -1160,7 +1167,7 @@ d6_hash_calc_done:;
       }
 
       // Otherwise, create a new hash value
-      d3_table_[i] = { d3b, d3w };
+      d3_table_[i] = { d3b };
 
 d3_hash_calc_done:;
     }
@@ -1168,7 +1175,6 @@ d3_hash_calc_done:;
     {
       // Initialize K4 table
       game_hash_t k4b = gen_rand64();
-      game_hash_t k4w = gen_rand64();
 
       // Check the 3 symmetries for existing hashes.
       for (K4 op : { K4(C2(1), C2(0)), K4(C2(0), C2(1)), K4(C2(1), C2(1)) }) {
@@ -1177,8 +1183,7 @@ d3_hash_calc_done:;
         if (shouldReuse(i, s)) {
           const HashEl& el =
               k4_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-          k4_table_[i] = { apply_k4(op, el.black_hash),
-                           apply_k4(op, el.white_hash) };
+          k4_table_[i] = { apply_k4(op, el.black_hash()) };
 
           goto k4_hash_calc_done;
         }
@@ -1189,14 +1194,13 @@ d3_hash_calc_done:;
         HexPos s = p.apply_k4_e(op);
 
         if (s == p) {
-          k4_table_[i] = { make_invariant_k4(op, k4b),
-                           make_invariant_k4(op, k4w) };
+          k4_table_[i] = { make_invariant_k4(op, k4b) };
           goto k4_hash_calc_done;
         }
       }
 
       // Otherwise, create a new hash value
-      k4_table_[i] = { k4b, k4w };
+      k4_table_[i] = { k4b };
 
 k4_hash_calc_done:;
     }
@@ -1204,69 +1208,59 @@ k4_hash_calc_done:;
     {
       // Initialize C2_cv table
       game_hash_t c2cvb = gen_rand64();
-      game_hash_t c2cvw = gen_rand64();
 
       // check the symmetry for existing hashes/self-mapping
       HexPos s = p.apply_c2_cv(C2(1));
       if (s == p) {
-        c2_cv_table_[i] = { make_invariant_c2(C2(1), c2cvb),
-                            make_invariant_c2(C2(1), c2cvw) };
+        c2_cv_table_[i] = { make_invariant_c2(C2(1), c2cvb) };
       } else if (shouldReuse(i, s)) {
         const HashEl& el =
             c2_cv_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        c2_cv_table_[i] = { apply_c2(C2(1), el.black_hash),
-                            apply_c2(C2(1), el.white_hash) };
+        c2_cv_table_[i] = { apply_c2(C2(1), el.black_hash()) };
       } else {
-        c2_cv_table_[i] = { c2cvb, c2cvw };
+        c2_cv_table_[i] = { c2cvb };
       }
     }
 
     {
       // Initialize C2_ce table
       game_hash_t c2ceb = gen_rand64();
-      game_hash_t c2cew = gen_rand64();
 
       // check the symmetry for existing hashes/self-mapping
       HexPos s = p.apply_c2_ce(C2(1));
       if (s == p) {
-        c2_ce_table_[i] = { make_invariant_c2(C2(1), c2ceb),
-                            make_invariant_c2(C2(1), c2cew) };
+        c2_ce_table_[i] = { make_invariant_c2(C2(1), c2ceb) };
       } else if (shouldReuse(i, s)) {
         const HashEl& el =
             c2_ce_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        c2_ce_table_[i] = { apply_c2(C2(1), el.black_hash),
-                            apply_c2(C2(1), el.white_hash) };
+        c2_ce_table_[i] = { apply_c2(C2(1), el.black_hash()) };
       } else {
-        c2_ce_table_[i] = { c2ceb, c2cew };
+        c2_ce_table_[i] = { c2ceb };
       }
     }
 
     {
       // Initialize C2_ev table
       game_hash_t c2evb = gen_rand64();
-      game_hash_t c2evw = gen_rand64();
 
       // check the symmetry for existing hashes/self-mapping
       HexPos s = p.apply_c2_ev(C2(1));
       if (s == p) {
-        c2_ev_table_[i] = { make_invariant_c2(C2(1), c2evb),
-                            make_invariant_c2(C2(1), c2evw) };
+        c2_ev_table_[i] = { make_invariant_c2(C2(1), c2evb) };
       } else if (shouldReuse(i, s)) {
         const HashEl& el =
             c2_ev_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
-        c2_ev_table_[i] = { apply_c2(C2(1), el.black_hash),
-                            apply_c2(C2(1), el.white_hash) };
+        c2_ev_table_[i] = { apply_c2(C2(1), el.black_hash()) };
       } else {
-        c2_ev_table_[i] = { c2evb, c2evw };
+        c2_ev_table_[i] = { c2evb };
       }
     }
 
     {
       // Initialize trivial table
       game_hash_t trb = gen_rand64();
-      game_hash_t trw = gen_rand64();
 
-      trivial_table_[i] = { trb, trw };
+      trivial_table_[i] = { trb };
     }
   }
 }
