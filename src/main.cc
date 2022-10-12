@@ -200,9 +200,9 @@ int main(int argc, char* argv[]) {
   return playout();
   Onoro::GameHash<N> h;
 
-  Onoro::GameHash<N>::printSymmStateTableOps();
+  Onoro::Game<N>::printSymmStateTableOps();
   printf("\n");
-  Onoro::GameHash<N>::printSymmStateTableSymms();
+  Onoro::Game<N>::printSymmStateTableSymms();
 
   if (!h.validate()) {
     printf("Invalid\n");
