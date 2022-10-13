@@ -1,6 +1,7 @@
 #pragma once
 
 #include "game.h"
+#include "game_view.h"
 
 namespace onoro {
 
@@ -9,13 +10,13 @@ class GameEq {
  public:
   GameEq() = default;
 
-  bool operator()(const Game<NPawns>& game1,
-                  const Game<NPawns>& game2) const noexcept;
+  bool operator()(const GameView<NPawns>& view1,
+                  const GameView<NPawns>& view2) const noexcept;
 };
 
 template <uint32_t NPawns>
-bool GameEq<NPawns>::operator()(const Game<NPawns>& game1,
-                                const Game<NPawns>& game2) const noexcept {
+bool GameEq<NPawns>::operator()(const GameView<NPawns>& view1,
+                                const GameView<NPawns>& view2) const noexcept {
   return true;
 }
 

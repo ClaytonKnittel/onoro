@@ -5,6 +5,7 @@
 #include "game.h"
 #include "game_eq.h"
 #include "game_hash.h"
+#include "game_view.h"
 #include "print_csi.h"
 
 static constexpr uint32_t n_pawns = 16;
@@ -76,7 +77,7 @@ static int benchmark() {
   return 0;
 }
 
-typedef absl::flat_hash_map<onoro::Game<n_pawns>, int32_t,
+typedef absl::flat_hash_map<onoro::GameView<n_pawns>, int32_t,
                             onoro::GameHash<n_pawns>, onoro::GameEq<n_pawns>>
     TranspositionTable;
 
@@ -191,26 +192,6 @@ static int playout() {
   return 0;
 }
 
-bool test_symms() {
-  using namespace onoro;
-
-  constexpr uint32_t n_pawns = 3;
-  HexPos som1 = { 2, 1 };
-
-  int32_t x = som1.x % n_pawns;
-  int32_t y = som1.y % n_pawns;
-
-  D6 op = Game<n_pawns>::symmStateOp(x, y, n_pawns);
-  typename Game<n_pawns>::SymmetryClass symm_class =
-      Game<n_pawns>::symmStateClass(x, y, n_pawns);
-  HexPos center_off = Game<n_pawns>::BoardSymmStateData::COMOffsetToHexPos(
-      Game<n_pawns>::boardSymmStateOpToCOMOffset[op.ordinal()]);
-
-  printf("Op: %s\n", op.toString().c_str());
-
-  return true;
-}
-
 int main(int argc, char* argv[]) {
   srand(0);
   static constexpr const uint32_t N = 16;
@@ -219,7 +200,6 @@ int main(int argc, char* argv[]) {
 
   // return benchmark();
   // return playout();
-  // return test_symms();
   onoro::GameHash<N> h;
 
   onoro::Game<N>::printSymmStateTableOps();
@@ -259,7 +239,8 @@ int main(int argc, char* argv[]) {
   }
 
   for (const auto& g : { g1, g2 }) {
-    onoro::game_hash_t hash_val = h.calcHash(g);
+    onoro::GameView<N> view(&g);
+    onoro::game_hash_t hash_val = h(view);
     printf("Hash: %016llx\n", hash_val);
     printf("K4 hash: %s\n", onoro::GameHash<N>::printK4Hash(hash_val).c_str());
     /*printf("D6 hash: %s\nD3 hash: %s\nK4 hash: %s\nC2 hash: %s\n",

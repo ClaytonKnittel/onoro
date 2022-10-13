@@ -299,18 +299,18 @@ class Game {
   /*
    * Converts an absolute index to an idx_t.
    */
-  static idx_t toIdx(uint32_t i);
+  static constexpr idx_t toIdx(uint32_t i);
 
   /*
    * Converts an idx_t to an absolute index.
    */
-  static uint32_t fromIdx(idx_t idx);
+  static constexpr uint32_t fromIdx(idx_t idx);
 
-  static HexPos idxToPos(idx_t idx);
+  static constexpr HexPos idxToPos(idx_t idx);
 
-  static idx_t posToIdx(HexPos pos);
+  static constexpr idx_t posToIdx(HexPos pos);
 
-  static bool inBounds(idx_t idx);
+  static constexpr bool inBounds(idx_t idx);
 
   uint32_t nPawnsInPlay() const;
 
@@ -934,27 +934,27 @@ Game<NPawns>::genSymmStateTable() {
 }
 
 template <uint32_t NPawns>
-idx_t Game<NPawns>::toIdx(uint32_t i) {
+constexpr idx_t Game<NPawns>::toIdx(uint32_t i) {
   return { i % getBoardLen(), i / getBoardLen() };
 }
 
 template <uint32_t NPawns>
-uint32_t Game<NPawns>::fromIdx(idx_t idx) {
+constexpr uint32_t Game<NPawns>::fromIdx(idx_t idx) {
   return static_cast<uint32_t>(idx.first + idx.second * getBoardLen());
 }
 
 template <uint32_t NPawns>
-HexPos Game<NPawns>::idxToPos(idx_t idx) {
+constexpr HexPos Game<NPawns>::idxToPos(idx_t idx) {
   return { idx.first + (idx.second >> 1), idx.second };
 }
 
 template <uint32_t NPawns>
-idx_t Game<NPawns>::posToIdx(HexPos pos) {
+constexpr idx_t Game<NPawns>::posToIdx(HexPos pos) {
   return { pos.x - (pos.y >> 1), pos.y };
 }
 
 template <uint32_t NPawns>
-bool Game<NPawns>::inBounds(idx_t idx) {
+constexpr bool Game<NPawns>::inBounds(idx_t idx) {
   auto [x, y] = idx;
   return x >= 0 && x < static_cast<int32_t>(getBoardLen()) && y >= 0 &&
          y < static_cast<int32_t>(getBoardLen());
