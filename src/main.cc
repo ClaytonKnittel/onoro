@@ -250,13 +250,13 @@ int main(int argc, char* argv[]) {
            onoro::GameHash<N>::printC2Hash(hash_val).c_str());*/
 
     printf("r1:      %s\n",
-           onoro::GameHash<N>::printK4Hash(onoro::GameHash<N>::k4_a(hash_val))
+           onoro::GameHash<N>::printK4Hash(onoro::hash_group::k4_a(hash_val))
                .c_str());
     printf("s0:      %s\n",
-           onoro::GameHash<N>::printK4Hash(onoro::GameHash<N>::k4_b(hash_val))
+           onoro::GameHash<N>::printK4Hash(onoro::hash_group::k4_b(hash_val))
                .c_str());
     printf("s1:      %s\n",
-           onoro::GameHash<N>::printK4Hash(onoro::GameHash<N>::k4_c(hash_val))
+           onoro::GameHash<N>::printK4Hash(onoro::hash_group::k4_c(hash_val))
                .c_str());
   }
 
