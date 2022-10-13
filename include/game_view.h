@@ -57,6 +57,7 @@ class GameView {
   // First 4 bits reserved for the symmetry operation, remaining bits reserved
   // for the pointer to the game object. Requires pointers to be aligned by 16
   // bytes.
+  // TODO account for color inversion too.
   const std::intptr_t game_op_;
 
   // The hash of the game with op() applied.
