@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -98,15 +99,15 @@ class Game {
    */
   static constexpr COMOffset boardSymmStateOpToCOMOffset[D6::order()] = {
     // r0
-    COMOffset::x0y1,
+    COMOffset::x0y0,
     // r1
-    COMOffset::x1y1,
+    COMOffset::x0y1,
     // r2
     COMOffset::x1y1,
     // r3
-    COMOffset::x1y0,
+    COMOffset::x1y1,
     // r4
-    COMOffset::x0y0,
+    COMOffset::x1y0,
     // r5
     COMOffset::x0y0,
     // s0
@@ -261,6 +262,7 @@ class Game {
   Game(const Game&, idx_t move, idx_t from);
 
   std::string Print() const;
+  std::string Print2() const;
 
   bool validate() const;
 
@@ -418,37 +420,37 @@ constexpr D6 Game<NPawns>::symmStateOp(uint32_t x, uint32_t y,
   if (c1) {
     if (c2) {
       if (c3a) {
-        return D6(D6::Action::ROT, 3);
+        return D6(D6::Action::REFL, 3);
       } else if (c3b) {
-        return D6(D6::Action::REFL, 1);
+        return D6(D6::Action::ROT, 0);
       } else {
-        return D6(D6::Action::ROT, 5);
+        return D6(D6::Action::REFL, 1);
       }
     } else {
       if (c3a) {
-        return D6(D6::Action::REFL, 3);
+        return D6(D6::Action::ROT, 4);
       } else if (c3b) {
-        return D6(D6::Action::ROT, 1);
-      } else {
         return D6(D6::Action::REFL, 5);
+      } else {
+        return D6(D6::Action::ROT, 2);
       }
     }
   } else {
     if (c2) {
       if (c3a) {
-        return D6(D6::Action::REFL, 0);
+        return D6(D6::Action::ROT, 1);
       } else if (c3b) {
-        return D6(D6::Action::ROT, 4);
-      } else {
         return D6(D6::Action::REFL, 2);
+      } else {
+        return D6(D6::Action::ROT, 5);
       }
     } else {
       if (c3a) {
-        return D6(D6::Action::ROT, 0);
+        return D6(D6::Action::REFL, 0);
       } else if (c3b) {
-        return D6(D6::Action::REFL, 4);
+        return D6(D6::Action::ROT, 3);
       } else {
-        return D6(D6::Action::ROT, 2);
+        return D6(D6::Action::REFL, 4);
       }
     }
   }
@@ -666,6 +668,45 @@ std::string Game<NPawns>::Print() const {
 }
 
 template <uint32_t NPawns>
+std::string Game<NPawns>::Print2() const {
+  static const char* tile_str[3] = {
+    P_256_BG_COLOR(7),
+    P_256_BG_COLOR(4),
+    P_256_BG_COLOR(1),
+  };
+
+  HexPos origin = originTile(calcSymmetryState());
+
+  std::ostringstream ostr;
+  for (uint32_t y = getBoardLen() - 1; y < getBoardLen(); y--) {
+    ostr << std::setw(2) << y << std::setw(2 * (y / 2)) << "";
+
+    for (uint32_t x = 0; x < getBoardLen(); x++) {
+      ostr << tile_str[static_cast<uint32_t>(getTile({ x, y }))];
+
+      HexPos tile = idxToPos((idx_t){ (int32_t) x, (int32_t) y });
+      if (tile == origin) {
+        ostr << "x";
+      } else if (y == 0) {
+        ostr << x % 10;
+      } else {
+        ostr << "_";
+      }
+      ostr << P_256_BG_DEFAULT;
+
+      if (x < getBoardLen() - 1) {
+        ostr << " ";
+      }
+    }
+
+    if (y > 0) {
+      ostr << "\n";
+    }
+  }
+  return ostr.str();
+}
+
+template <uint32_t NPawns>
 bool Game<NPawns>::validate() const {
   uint32_t n_b_pawns = 0;
   uint32_t n_w_pawns = 0;
@@ -775,21 +816,21 @@ void Game<NPawns>::printSymmStateTableSymms(uint32_t n_reps) {
  * defined above.
  *
  * +-------------------------------+
- * |`            /    s4     _ _ | |
- * |  `    r0   /       _ _    |   |
+ * |`            /    r3     _ _ | |
+ * |  `    s0   /       _ _    |   |
  * |    `      /   _ _       |     |
- * |  s0  `   / _          |       |
- * |     _ _`v     r2    |        /|
+ * |  r1  `   / _          |       |
+ * |     _ _`v     s4    |        /|
  * |  _     / `        |         / |
- * e       /    `    |     s5   /  |
- * |  r4  /       `e           /   |
- * |     /  s2   |  `         / r1 |
+ * e       /    `    |     r2   /  |
+ * |  s2  /       `e           /   |
+ * |     /  r5   |  `         / s5 |
  * |    /      |      `      /    -|
- * |   /     |    r5    `   /- -   |
- * |  /    |            - `v    s3 |
+ * |   /     |    s1    `   /- -   |
+ * |  /    |            - `v    r4 |
  * | /   |         - -    / `      |
  * |/  |      - -        /    `    |
- * | |   - -      s1    /  r3   `  |
+ * | |   - -      r0    /  s3   `  |
  * +-------------------e-----------+
  *
  * This image is composed of lines:

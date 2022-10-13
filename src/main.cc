@@ -150,7 +150,7 @@ static std::pair<int32_t, onoro::idx_t> findMove(const onoro::Game<NPawns>& g,
 static int playout() {
   struct timespec start, end;
   onoro::Game<n_pawns> g;
-  printf("%s\n", g.Print().c_str());
+  printf("%s\n", g.Print2().c_str());
 
   TranspositionTable m;
   uint32_t max_depth = 13;
@@ -173,7 +173,7 @@ static int playout() {
     printf("Move (%d, %d), score %d (%llu playouts)\n", move.first, move.second,
            score, g_n_moves);
     g = onoro::Game<n_pawns>(g, move);
-    printf("%s\n", g.Print().c_str());
+    printf("%s\n", g.Print2().c_str());
 
     if (g.isFinished()) {
       printf("%s won\n", g.blackWins() ? "black" : "white");
@@ -219,7 +219,7 @@ int main(int argc, char* argv[]) {
 
   // return benchmark();
   // return playout();
-  return test_symms();
+  // return test_symms();
   onoro::GameHash<N> h;
 
   onoro::Game<N>::printSymmStateTableOps();

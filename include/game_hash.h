@@ -221,13 +221,10 @@ constexpr game_hash_t GameHash<NPawns>::calcHash(
     const Game<NPawns>& game) const noexcept {
   typename Game<NPawns>::BoardSymmetryState symm_state =
       game.calcSymmetryState();
-  if (symm_state.op == D6(D6::Action::ROT, 0)) {
-    symm_state.op = D6(D6::Action::REFL, 0);
-  }
   HexPos origin = game.originTile(symm_state);
 
   printf("Origin: (%d, %d) (%u)\n", origin.x, origin.y, game.nPawnsInPlay());
-  printf("%s\n", game.Print().c_str());
+  printf("%s\n", game.Print2().c_str());
 
   const char* states[7] = {
     "C", "V", "E", "CV", "CE", "EV", "trivial",
