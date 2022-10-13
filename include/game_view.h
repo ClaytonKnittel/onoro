@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "game.h"
+#include "hash_group.h"
 
 namespace onoro {
 
@@ -32,6 +33,9 @@ class GameView {
   constexpr Group op() const;
 
   constexpr const Game<NPawns>& game() const;
+
+  template <class Group>
+  constexpr std::size_t hash() const;
 
  private:
   static constexpr std::intptr_t bundle(const Game<NPawns>* game,
@@ -74,14 +78,18 @@ constexpr GameView<NPawns>::GameView(const Game<NPawns>* game, Group view_op)
 template <uint32_t NPawns>
 template <class Group>
 constexpr Group GameView<NPawns>::op() const {
-  Group el(static_cast<uint32_t>(game_op_ & OP_MASK));
-
-  return el;
+  return Group(static_cast<uint32_t>(game_op_ & OP_MASK));
 }
 
 template <uint32_t NPawns>
 constexpr const Game<NPawns>& GameView<NPawns>::game() const {
   return *reinterpret_cast<const Game<NPawns>*>(game_op_ & ~OP_MASK);
+}
+
+template <uint32_t NPawns>
+template <class Group>
+constexpr std::size_t GameView<NPawns>::hash() const {
+  return hash_group::apply<Group>(op<Group>(), hash_);
 }
 
 template <uint32_t NPawns>
