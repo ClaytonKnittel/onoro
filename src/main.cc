@@ -237,13 +237,20 @@ int main(int argc, char* argv[]) {
   }
 
   onoro::Game<N> g1;
-  onoro::Game<N> g2;
+  g1.setTile((onoro::idx_t){ 8, 8 }, onoro::Game<N>::TileState::TILE_WHITE);
+  g1.sum_of_mass_ += (onoro::HexPos){ 12, 8 };
+  g1.state_.turn++;
+  g1.state_.blackTurn = 1;
 
+  onoro::Game<N> g2;
   g2.clearTile((onoro::idx_t){ 7, 7 });
   g2.clearTile((onoro::idx_t){ 7, 8 });
   g2.setTile((onoro::idx_t){ 7, 6 }, onoro::Game<N>::TileState::TILE_WHITE);
   g2.setTile((onoro::idx_t){ 7, 7 }, onoro::Game<N>::TileState::TILE_BLACK);
-  g2.sum_of_mass_ += (onoro::HexPos){ -1, -2 };
+  g2.setTile((onoro::idx_t){ 6, 6 }, onoro::Game<N>::TileState::TILE_WHITE);
+  g2.sum_of_mass_ += (onoro::HexPos){ 8, 4 };
+  g2.state_.turn++;
+  g2.state_.blackTurn = 1;
 
   if (!g1.validate() || !g2.validate()) {
     return -1;
@@ -254,18 +261,21 @@ int main(int argc, char* argv[]) {
   for (const auto& g : { g1, g2 }) {
     onoro::game_hash_t hash_val = h.calcHash(g);
     printf("Hash: %016llx\n", hash_val);
-    printf("D3 hash: %s\n", onoro::GameHash<N>::printD3Hash(hash_val).c_str());
+    printf("K4 hash: %s\n", onoro::GameHash<N>::printK4Hash(hash_val).c_str());
     /*printf("D6 hash: %s\nD3 hash: %s\nK4 hash: %s\nC2 hash: %s\n",
            onoro::GameHash<N>::printD6Hash(hash_val).c_str(),
            onoro::GameHash<N>::printD3Hash(hash_val).c_str(),
            onoro::GameHash<N>::printK4Hash(hash_val).c_str(),
            onoro::GameHash<N>::printC2Hash(hash_val).c_str());*/
 
-    printf("r2:      %s\n",
-           onoro::GameHash<N>::printD3Hash(onoro::GameHash<N>::d3_r1(hash_val))
+    printf("r1:      %s\n",
+           onoro::GameHash<N>::printK4Hash(onoro::GameHash<N>::k4_a(hash_val))
                .c_str());
-    printf("r4:      %s\n",
-           onoro::GameHash<N>::printD3Hash(onoro::GameHash<N>::d3_r2(hash_val))
+    printf("s0:      %s\n",
+           onoro::GameHash<N>::printK4Hash(onoro::GameHash<N>::k4_b(hash_val))
+               .c_str());
+    printf("s1:      %s\n",
+           onoro::GameHash<N>::printK4Hash(onoro::GameHash<N>::k4_c(hash_val))
                .c_str());
   }
 

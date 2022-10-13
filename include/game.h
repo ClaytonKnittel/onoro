@@ -712,7 +712,10 @@ bool Game<NPawns>::validate() const {
   uint32_t n_w_pawns = 0;
   HexPos sum_of_mass = { 0, 0 };
 
-  if (!forEachPawn([this, &n_b_pawns, &n_w_pawns, &sum_of_mass](idx_t idx) {
+  UnionFind<uint32_t> uf(getBoardNumTiles());
+
+  if (!forEachPawn([this, &n_b_pawns, &n_w_pawns, &sum_of_mass,
+                    &uf](idx_t idx) {
         sum_of_mass += idxToPos(idx);
 
         if (getTile(idx) == TileState::TILE_BLACK) {
@@ -723,6 +726,15 @@ bool Game<NPawns>::validate() const {
           printf("Unexpected empty tile at (%d, %d)\n", idx.first, idx.second);
           return false;
         }
+
+        // Union this pawn with its neigbors
+        forEachTopLeftNeighbor(idx, [&uf, idx, this](idx_t neighbor_idx) {
+          if (getTile(neighbor_idx) != TileState::TILE_EMPTY) {
+            uf.Union(fromIdx(idx), fromIdx(neighbor_idx));
+          }
+          return true;
+        });
+
         return true;
       })) {
     return false;
@@ -731,6 +743,12 @@ bool Game<NPawns>::validate() const {
   if (n_b_pawns + n_w_pawns != nPawnsInPlay()) {
     printf("Expected %u pawns in play, but found %u\n", nPawnsInPlay(),
            n_b_pawns + n_w_pawns);
+    return false;
+  }
+
+  if (state_.turn < NPawns - 1 && state_.blackTurn != (state_.turn & 1)) {
+    printf("Expected black turn to be %u, but was %u\n", (state_.turn & 1),
+           state_.blackTurn);
     return false;
   }
 
@@ -743,6 +761,14 @@ bool Game<NPawns>::validate() const {
   if (sum_of_mass != sum_of_mass_) {
     printf("Sum of mass not correct: expect (%d, %d), but have (%d, %d)\n",
            sum_of_mass.x, sum_of_mass.y, sum_of_mass_.x, sum_of_mass_.y);
+    return false;
+  }
+
+  uint32_t n_empty_tiles = getBoardNumTiles() - nPawnsInPlay();
+  uint32_t n_pawn_groups = uf.GetNumGroups() - n_empty_tiles;
+
+  if (n_pawn_groups != 1) {
+    printf("Expected 1 contiguous pawn group, but found %u\n", n_pawn_groups);
     return false;
   }
 
