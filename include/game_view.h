@@ -54,7 +54,8 @@ class GameView {
 
 template <uint32_t NPawns>
 constexpr GameView<NPawns>::GameView(const Game<NPawns>* game)
-    : game_op_(GameView<NPawns>::bundle(game, 0)), hash_(0) {
+    : game_op_(GameView<NPawns>::bundle(game, 0)),
+      hash_(GameHash<NPawns>::calcHash(*game)) {
   if ((reinterpret_cast<std::intptr_t>(game) & OP_MASK) != 0) {
     throw new std::runtime_error("Expected ptr to be aligned by 16 bytes");
   }
@@ -63,7 +64,8 @@ constexpr GameView<NPawns>::GameView(const Game<NPawns>* game)
 template <uint32_t NPawns>
 template <class Group>
 constexpr GameView<NPawns>::GameView(const Game<NPawns>* game, Group view_op)
-    : game_op_(GameView<NPawns>::bundle(game, view_op.ordinal())), hash_(0) {
+    : game_op_(GameView<NPawns>::bundle(game, view_op.ordinal())),
+      hash_(GameHash<NPawns>::calcHash(*game)) {
   if ((reinterpret_cast<std::intptr_t>(game) & OP_MASK) != 0) {
     throw new std::runtime_error("Expected ptr to be aligned by 16 bytes");
   }
@@ -72,7 +74,9 @@ constexpr GameView<NPawns>::GameView(const Game<NPawns>* game, Group view_op)
 template <uint32_t NPawns>
 template <class Group>
 constexpr Group GameView<NPawns>::op() const {
-  return Group(static_cast<uint32_t>(game_op_ & OP_MASK));
+  Group el(static_cast<uint32_t>(game_op_ & OP_MASK));
+
+  return el;
 }
 
 template <uint32_t NPawns>

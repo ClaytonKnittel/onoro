@@ -49,7 +49,7 @@ class GameHash {
 
   game_hash_t operator()(const GameView<NPawns>& view) const noexcept;
 
-  constexpr game_hash_t calcHash(const Game<NPawns>& game) const noexcept;
+  static constexpr game_hash_t calcHash(const Game<NPawns>& game) noexcept;
 
   bool validate() const;
 
@@ -235,7 +235,7 @@ game_hash_t GameHash<NPawns>::operator()(
 
 template <uint32_t NPawns>
 constexpr game_hash_t GameHash<NPawns>::calcHash(
-    const Game<NPawns>& game) const noexcept {
+    const Game<NPawns>& game) noexcept {
   typename Game<NPawns>::BoardSymmetryState symm_state =
       game.calcSymmetryState();
   HexPos origin = game.originTile(symm_state);
