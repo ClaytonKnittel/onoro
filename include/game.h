@@ -29,8 +29,10 @@ class Game;
 
 template <uint32_t NPawns>
 class Game {
-  friend class GameHash<NPawns>;
-  friend class GameEq<NPawns>;
+  template <uint32_t NPawns_>
+  friend class GameHash;
+  template <uint32_t NPawns_>
+  friend class GameEq;
 
  public:
   enum class TileState {
@@ -38,24 +40,6 @@ class Game {
     TILE_BLACK = 1,
     TILE_WHITE = 2,
   };
-
- public:  // TODO mark this private
-  struct GameState {
-    // You can play this game with a max of 8 pawns, and turn count stops
-    // incrementing after the end of phase 1
-    uint8_t turn       : 4;
-    uint8_t blackTurn  : 1;
-    uint8_t finished   : 1;
-    uint8_t __reserved : 2;
-  };
-
-  // bits per entry in the board
-  static constexpr uint32_t bits_per_entry = 64;
-  static constexpr uint32_t bits_per_tile = 2;
-  static constexpr uint64_t tile_bitmask = (1 << bits_per_tile) - 1;
-  static constexpr uint32_t max_pawns_per_player = 8;
-  static constexpr uint32_t min_neighbors_per_pawn = 2;
-  static constexpr uint32_t n_in_row_to_win = 4;
 
   enum class SymmetryClass {
     // Center of mass lies in the center of a hexagonal tile.
@@ -75,6 +59,47 @@ class Game {
     // Center of mass is none of the above.
     TRIVIAL,
   };
+
+  struct BoardSymmetryState {
+    /*
+     * The group operation to perform on the board before calculating the hash.
+     * This is used to align board states on all symmetry axes which the board
+     * isn't possibly symmetric about itself.
+     */
+    D6 op;
+
+    /*
+     * The symmetry class this board state belongs in, which depends on where
+     * the center of mass lies. If the location of the center of mass is
+     * symmetric to itself under some group operations, then those symmetries
+     * must be checked when looking up in the hash table.
+     */
+    SymmetryClass symm_class;
+
+    /*
+     * The offset to apply when calculating the integer-coordinate, symmetry
+     * invariant "center of mass"
+     */
+    HexPos center_offset;
+  };
+
+ private:
+  struct GameState {
+    // You can play this game with a max of 8 pawns, and turn count stops
+    // incrementing after the end of phase 1
+    uint8_t turn       : 4;
+    uint8_t blackTurn  : 1;
+    uint8_t finished   : 1;
+    uint8_t __reserved : 2;
+  };
+
+  // bits per entry in the board
+  static constexpr uint32_t bits_per_entry = 64;
+  static constexpr uint32_t bits_per_tile = 2;
+  static constexpr uint64_t tile_bitmask = (1 << bits_per_tile) - 1;
+  static constexpr uint32_t max_pawns_per_player = 8;
+  static constexpr uint32_t min_neighbors_per_pawn = 2;
+  static constexpr uint32_t n_in_row_to_win = 4;
 
   enum class COMOffset {
     // Offset by (0, 0)
@@ -122,29 +147,6 @@ class Game {
     COMOffset::x1y1,
     // s5
     COMOffset::x1y1,
-  };
-
-  struct BoardSymmetryState {
-    /*
-     * The group operation to perform on the board before calculating the hash.
-     * This is used to align board states on all symmetry axes which the board
-     * isn't possibly symmetric about itself.
-     */
-    D6 op;
-
-    /*
-     * The symmetry class this board state belongs in, which depends on where
-     * the center of mass lies. If the location of the center of mass is
-     * symmetric to itself under some group operations, then those symmetries
-     * must be checked when looking up in the hash table.
-     */
-    SymmetryClass symm_class;
-
-    /*
-     * The offset to apply when calculating the integer-coordinate, symmetry
-     * invariant "center of mass"
-     */
-    HexPos center_offset;
   };
 
   /*
@@ -269,7 +271,7 @@ class Game {
   static void printSymmStateTableOps(uint32_t n_reps = 1);
   static void printSymmStateTableSymms(uint32_t n_reps = 1);
 
- public:  // TODO make this private
+ public:  // TODO revert to private
   static constexpr std::array<BoardSymmStateData, getSymmStateTableSize()>
   genSymmStateTable();
 
@@ -348,7 +350,6 @@ class Game {
   template <class CallbackFnT>
   bool forEachMoveP2(CallbackFnT cb) const;
 
- private:
   BoardSymmetryState calcSymmetryState() const;
 
   /*
@@ -358,6 +359,7 @@ class Game {
    */
   constexpr HexPos originTile(const BoardSymmetryState& state) const;
 
+ private:
   /*
    * Iterates over all pawns on the board, calling cb with the idx_t of the pawn
    * as the only argument. If cb returns false, iteration halts and this method

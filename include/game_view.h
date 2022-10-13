@@ -28,6 +28,10 @@ class GameView {
 
   GameView(const GameView& view) = default;
 
+  // Applies the group operation to this view.
+  template <class Group>
+  constexpr void apply(Group op);
+
   // The op to apply to a canonicalized view of the game.
   template <class Group>
   constexpr Group op() const;
@@ -38,6 +42,9 @@ class GameView {
   constexpr std::size_t hash() const;
 
  private:
+  template <class Group>
+  void setOp(Group op);
+
   static constexpr std::intptr_t bundle(const Game<NPawns>* game,
                                         uint32_t ordinal);
   static constexpr std::intptr_t OP_MASK = 0xf;
@@ -77,6 +84,12 @@ constexpr GameView<NPawns>::GameView(const Game<NPawns>* game, Group view_op)
 
 template <uint32_t NPawns>
 template <class Group>
+constexpr void GameView<NPawns>::apply(Group op) {
+  setOp(op * this->op());
+}
+
+template <uint32_t NPawns>
+template <class Group>
 constexpr Group GameView<NPawns>::op() const {
   return Group(static_cast<uint32_t>(game_op_ & OP_MASK));
 }
@@ -90,6 +103,12 @@ template <uint32_t NPawns>
 template <class Group>
 constexpr std::size_t GameView<NPawns>::hash() const {
   return hash_group::apply<Group>(op<Group>(), hash_);
+}
+
+template <uint32_t NPawns>
+template <class Group>
+void GameView<NPawns>::setOp(Group op) {
+  game_op_ = bundle(game(), op.ordinal());
 }
 
 template <uint32_t NPawns>

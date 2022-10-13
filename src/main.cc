@@ -77,9 +77,9 @@ static int benchmark() {
   return 0;
 }
 
-typedef absl::flat_hash_map<onoro::GameView<n_pawns>, int32_t,
-                            onoro::GameHash<n_pawns>, onoro::GameEq<n_pawns>>
-    TranspositionTable;
+using TranspositionTable =
+    absl::flat_hash_map<onoro::GameView<n_pawns>, int32_t,
+                        onoro::GameHash<n_pawns>, onoro::GameEq<n_pawns>>;
 
 /*
  * Returns a chosen move along with the expected outcome, in terms of the

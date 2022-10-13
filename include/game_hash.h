@@ -54,7 +54,7 @@ class GameHash {
   static std::string printK4Hash(game_hash_t);
   static std::string printC2Hash(game_hash_t);
 
- public:  // TODO revert to private
+ private:
   struct HashEl {
     // hash to use for black pawn in this tile.
     game_hash_t black_hash_;
