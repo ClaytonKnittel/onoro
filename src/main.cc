@@ -241,9 +241,9 @@ int main(int argc, char* argv[]) {
 
   g2.clearTile((onoro::idx_t){ 7, 7 });
   g2.clearTile((onoro::idx_t){ 7, 8 });
-  g2.setTile((onoro::idx_t){ 8, 8 }, onoro::Game<N>::TileState::TILE_WHITE);
-  g2.setTile((onoro::idx_t){ 7, 8 }, onoro::Game<N>::TileState::TILE_BLACK);
-  g2.sum_of_mass_ += (onoro::HexPos){ 2, 1 };
+  g2.setTile((onoro::idx_t){ 7, 6 }, onoro::Game<N>::TileState::TILE_WHITE);
+  g2.setTile((onoro::idx_t){ 7, 7 }, onoro::Game<N>::TileState::TILE_BLACK);
+  g2.sum_of_mass_ += (onoro::HexPos){ -1, -2 };
 
   if (!g1.validate() || !g2.validate()) {
     return -1;

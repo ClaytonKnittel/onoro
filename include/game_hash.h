@@ -224,6 +224,7 @@ constexpr game_hash_t GameHash<NPawns>::calcHash(
   HexPos origin = game.originTile(symm_state);
 
   printf("Origin: (%d, %d) (%u)\n", origin.x, origin.y, game.nPawnsInPlay());
+  printf("%s\n", game.Print().c_str());
   printf("%s\n", game.Print2().c_str());
 
   const char* states[7] = {
@@ -249,6 +250,7 @@ constexpr game_hash_t GameHash<NPawns>::calcHash(
 
     printf("(%d, %d)\n", (pawn_pos - getCenter()).x,
            (pawn_pos - getCenter()).y);
+    printf("hash: %s\n", printD3Hash(hash_el.black_hash()).c_str());
 
     if (game.getTile(pawn_idx) == Game<NPawns>::TileState::TILE_BLACK) {
       h = h ^ hash_el.black_hash();
@@ -529,10 +531,10 @@ template <uint32_t NPawns>
 std::string GameHash<NPawns>::printD3Hash(game_hash_t h) {
   std::ostringstream ostr;
 
-  ostr << std::hex << "0x" << std::setfill('0') << std::setw(6)
-       << (h & 0x1fffff);
-  ostr << " 0x" << std::setfill('0') << std::setw(6) << ((h >> 21) & 0x1fffff);
-  ostr << " 0x" << std::setfill('0') << std::setw(6) << ((h >> 42) & 0x1fffff);
+  ostr << std::hex << "0x" << std::setfill('0') << std::setw(5)
+       << (h & 0xfffff);
+  ostr << " 0x" << std::setfill('0') << std::setw(5) << ((h >> 20) & 0xfffff);
+  ostr << " 0x" << std::setfill('0') << std::setw(5) << ((h >> 40) & 0xfffff);
 
   return ostr.str();
 }
@@ -1110,7 +1112,7 @@ game_hash_t GameHash<NPawns>::make_c2_a(game_hash_t h) {
 
 template <uint32_t NPawns>
 void GameHash<NPawns>::initSymmTables() {
-  seed_rand(1421040218, 0);
+  seed_rand(12932009, 0);
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
     HexPos p = Game<NPawns>::idxToPos(toIdx(i));
