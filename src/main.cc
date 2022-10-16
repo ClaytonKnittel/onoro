@@ -154,7 +154,7 @@ static int playout() {
   printf("%s\n", g.Print2().c_str());
 
   TranspositionTable m;
-  uint32_t max_depth = 13;
+  uint32_t max_depth = 12;
 
   for (uint32_t i = 0; i < n_pawns - 3; i++) {
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -199,7 +199,7 @@ int main(int argc, char* argv[]) {
   printf("Game size: %zu bytes\n", sizeof(onoro::Game<N>));
 
   // return benchmark();
-  // return playout();
+  return playout();
   onoro::GameHash<N> h;
 
   onoro::Game<N>::printSymmStateTableOps();

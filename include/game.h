@@ -86,6 +86,126 @@ class Game {
     HexPos center_offset;
   };
 
+  class pawn_iterator {
+    friend class Game<NPawns>;
+
+   public:
+    pawn_iterator& operator++() {
+      find_next();
+      return *this;
+    }
+
+    bool operator==(const pawn_iterator& other) const {
+      return board_idx_ == other.board_idx_ && next_idx_ == other.next_idx_ &&
+             board_bitmask_ == other.board_bitmask_;
+    }
+
+    bool operator!=(const pawn_iterator& other) const {
+      return !(*this == other);
+    }
+
+    idx_t operator*() const {
+      return toIdx(next_idx_);
+    }
+
+   private:
+    // Constructs the begin() iterator. Must call find_next after constructing
+    // it.
+    pawn_iterator(const Game<NPawns>& game) : game_(&game), board_idx_(0) {}
+
+    // default constructor is for the end() iterator
+    pawn_iterator()
+        : game_(nullptr),
+          board_idx_(getBoardSize()),
+          next_idx_(0),
+          board_bitmask_(0) {}
+
+    static constexpr pawn_iterator end() {
+      return pawn_iterator();
+    }
+
+    /*
+     * tries to find the next pawn. if no pawns are left, returns false,
+     * otherwise returns true.
+     */
+    bool find_next() {
+      while (board_bitmask_ == 0 && board_idx_ < getBoardSize()) {
+        board_bitmask_ = game_->board_[board_idx_];
+        board_idx_++;
+      }
+
+      if (board_bitmask_ == 0 && board_idx_ >= getBoardSize()) {
+        next_idx_ = 0;
+        return false;
+      }
+
+      uint32_t bitmask_idx_off =
+          (board_idx_ - 1) * (bits_per_entry / bits_per_tile);
+      uint32_t next_idx_off = __builtin_ctzl(board_bitmask_) / bits_per_tile;
+      next_idx_ = next_idx_off + bitmask_idx_off;
+
+      board_bitmask_ =
+          board_bitmask_ & ~(tile_bitmask << (bits_per_tile * next_idx_off));
+      return true;
+    }
+
+   protected:
+    const Game<NPawns>* game_;
+
+    // 1 + index into board_ which we are iterating over currenlty
+    uint32_t board_idx_;
+    // index of the next tile to look at
+    uint32_t next_idx_;
+    // bitmask of remaining pawns in the current board segment
+    uint64_t board_bitmask_;
+  };
+
+  class color_pawn_iterator : public pawn_iterator {
+    friend class Game<NPawns>;
+
+   public:
+    // Constructs the begin() iterator.
+    color_pawn_iterator(const Game<NPawns>& game, bool black)
+        : pawn_iterator(game),
+          turn_tile_(black ? TileState::TILE_BLACK : TileState::TILE_WHITE) {}
+
+    color_pawn_iterator& operator++() {
+      find_next();
+      return *this;
+    }
+
+   private:
+    // default constructor is for the end() iterator
+    color_pawn_iterator() : pawn_iterator() {}
+
+    static constexpr color_pawn_iterator end() {
+      return color_pawn_iterator();
+    }
+
+    /*
+     * tries to find the next pawn. if no pawns are left, returns false,
+     * otherwise returns true.
+     */
+    bool find_next() {
+      uint64_t turn_tile_mask;
+      uint64_t clr_mask;
+      do {
+        pawn_iterator::find_next();
+
+        uint32_t next_idx_off =
+            pawn_iterator::next_idx_ % (bits_per_entry / bits_per_tile);
+        turn_tile_mask = static_cast<uint64_t>(turn_tile_)
+                         << (bits_per_tile * next_idx_off);
+        clr_mask = tile_bitmask << (bits_per_tile * next_idx_off);
+      } while ((pawn_iterator::board_bitmask_ & clr_mask) != turn_tile_mask);
+
+      return true;
+    }
+
+   private:
+    TileState turn_tile_;
+  };
+
  private:
   struct GameState {
     // You can play this game with a max of 8 pawns, and turn count stops
@@ -362,7 +482,15 @@ class Game {
    */
   constexpr HexPos originTile(const BoardSymmetryState& state) const;
 
- private:
+  /*
+   * Iterators over the pawns.
+   */
+  pawn_iterator pawns_begin() const;
+  static constexpr pawn_iterator pawns_end();
+
+  color_pawn_iterator color_pawns_begin(bool black) const;
+  static constexpr color_pawn_iterator color_pawns_end();
+
   /*
    * Iterates over all pawns on the board, calling cb with the idx_t of the pawn
    * as the only argument. If cb returns false, iteration halts and this method
@@ -1444,25 +1572,38 @@ constexpr HexPos Game<NPawns>::originTile(
 }
 
 template <uint32_t NPawns>
+typename Game<NPawns>::pawn_iterator Game<NPawns>::pawns_begin() const {
+  typename Game<NPawns>::pawn_iterator it = pawn_iterator(*this);
+  it.find_next();
+  return it;
+}
+
+template <uint32_t NPawns>
+constexpr typename Game<NPawns>::pawn_iterator Game<NPawns>::pawns_end() {
+  return Game<NPawns>::pawn_iterator::end();
+}
+
+template <uint32_t NPawns>
+typename Game<NPawns>::color_pawn_iterator Game<NPawns>::color_pawns_begin(
+    bool black) const {
+  typename Game<NPawns>::color_pawn_iterator it =
+      color_pawn_iterator(*this, black);
+  it.find_next();
+  return it;
+}
+
+template <uint32_t NPawns>
+constexpr typename Game<NPawns>::color_pawn_iterator
+Game<NPawns>::color_pawns_end() {
+  return Game<NPawns>::color_pawn_iterator::end();
+}
+
+template <uint32_t NPawns>
 template <class CallbackFnT>
 bool Game<NPawns>::forEachPawn(CallbackFnT cb) const {
-  for (uint64_t i = 0; i < getBoardSize(); i++) {
-    uint64_t board_bitmask = board_[i];
-    uint64_t bitmask_idx_off = i * (bits_per_entry / bits_per_tile);
-
-    while (board_bitmask != 0) {
-      // a tile will have one of its bits set, so find any bit in its bit
-      // set, then divide by size (relying on remainder truncation) to find
-      // its index relative to the bitmask
-      uint32_t next_idx_off = __builtin_ctzl(board_bitmask) / bits_per_tile;
-      uint32_t next_idx = next_idx_off + bitmask_idx_off;
-
-      board_bitmask =
-          board_bitmask & ~(tile_bitmask << (bits_per_tile * next_idx_off));
-
-      if (!cb(toIdx(next_idx))) {
-        return false;
-      }
+  for (pawn_iterator it = pawns_begin(); it != pawns_end(); ++it) {
+    if (!cb(*it)) {
+      return false;
     }
   }
 
@@ -1472,33 +1613,10 @@ bool Game<NPawns>::forEachPawn(CallbackFnT cb) const {
 template <uint32_t NPawns>
 template <class CallbackFnT>
 bool Game<NPawns>::forEachPlayablePawn(CallbackFnT cb) const {
-  uint64_t turn_tile = static_cast<uint64_t>(
-      state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
-
-  for (uint64_t i = 0; i < getBoardSize(); i++) {
-    uint64_t board_bitmask = board_[i];
-    uint64_t bitmask_idx_off = i * (bits_per_entry / bits_per_tile);
-
-    while (board_bitmask != 0) {
-      // a tile will have one of its bits set, so find any bit in its bit
-      // set, then divide by size (relying on remainder truncation) to find
-      // its index relative to the bitmask
-      uint32_t next_idx_off = __builtin_ctzl(board_bitmask) / bits_per_tile;
-      uint32_t next_idx = next_idx_off + bitmask_idx_off;
-
-      // skip this tile if it isn't our piece
-      uint64_t turn_tile_mask = turn_tile << (bits_per_tile * next_idx_off);
-      uint64_t clr_mask = tile_bitmask << (bits_per_tile * next_idx_off);
-      if ((board_bitmask & clr_mask) != turn_tile_mask) {
-        board_bitmask = board_bitmask & ~clr_mask;
-        continue;
-      }
-
-      board_bitmask = board_bitmask & ~clr_mask;
-
-      if (!cb(toIdx(next_idx))) {
-        return false;
-      }
+  for (color_pawn_iterator it = color_pawns_begin(state_.blackTurn);
+       it != color_pawns_end(); ++it) {
+    if (!cb(*it)) {
+      return false;
     }
   }
 
