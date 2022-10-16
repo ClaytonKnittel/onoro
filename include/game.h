@@ -7,11 +7,14 @@
 #include <string>
 #include <utility>
 
+#include "hash_group.h"
 #include "hex_pos.h"
 #include "union_find.h"
 #include "utils/fun/print_colors.h"
 
 namespace onoro {
+
+using namespace hash_group;
 
 // (x, y) coordinates as an index.
 typedef std::pair<int32_t, int32_t> idx_t;

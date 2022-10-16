@@ -1,15 +1,10 @@
 #pragma once
 
-#include <utils/math/group/cyclic.h>
-#include <utils/math/group/dihedral.h>
-#include <utils/math/group/direct_product.h>
+#include "hash_group.h"
 
 namespace onoro {
 
-typedef util::math::group::Dihedral<6> D6;
-typedef util::math::group::Dihedral<3> D3;
-typedef util::math::group::Cyclic<2> C2;
-typedef util::math::group::DirectProduct<C2, C2> K4;
+using namespace hash_group;
 
 /*
  * HexPos is a class for the coordinates of a hexagonal grid, with +x being at a

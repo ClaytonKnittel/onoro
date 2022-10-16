@@ -1,5 +1,9 @@
 #pragma once
 
+#include <utils/math/group/cyclic.h>
+#include <utils/math/group/dihedral.h>
+#include <utils/math/group/direct_product.h>
+
 namespace onoro {
 
 namespace hash_group {

@@ -9,15 +9,7 @@
 
 namespace onoro {
 
-namespace {
-using namespace util::math::group;
-
-typedef Dihedral<6> D6;
-typedef Dihedral<3> D3;
-typedef DirectProduct<Cyclic<2>, Cyclic<2>> K4;
-typedef Cyclic<2> C2;
-
-}  // namespace
+using namespace hash_group;
 
 template <uint32_t NPawns>
 class GameView {
