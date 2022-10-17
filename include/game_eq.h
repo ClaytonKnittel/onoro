@@ -34,8 +34,26 @@ bool GameEq<NPawns>::operator()(const GameView<NPawns>& view1,
   }
 
   switch (s1.symm_class) {
-    case SymmState::C: {
+    case SymmetryClass::C: {
       return compareViews<D6COp>(view1, view2, s1, s2);
+    }
+    case SymmetryClass::V: {
+      return compareViews<D3VOp>(view1, view2, s1, s2);
+    }
+    case SymmetryClass::E: {
+      return compareViews<K4EOp>(view1, view2, s1, s2);
+    }
+    case SymmetryClass::CV: {
+      return compareViews<C2CVOp>(view1, view2, s1, s2);
+    }
+    case SymmetryClass::CE: {
+      return compareViews<C2CEOp>(view1, view2, s1, s2);
+    }
+    case SymmetryClass::EV: {
+      return compareViews<C2EVOp>(view1, view2, s1, s2);
+    }
+    case SymmetryClass::TRIVIAL: {
+      return compareViews<TrivialOp>(view1, view2, s1, s2);
     }
   }
 }
@@ -46,29 +64,22 @@ bool GameEq<NPawns>::compareViews(
     const GameView<NPawns>& view1, const GameView<NPawns>& view2,
     typename Game<NPawns>::BoardSymmetryState s1,
     typename Game<NPawns>::BoardSymmetryState s2) {
-  using Group = typename SymmetryClassOp::group;
+  typedef typename SymmetryClassOp::Group Group;
 
   const Game<NPawns>& g1 = view1.game();
   const Game<NPawns>& g2 = view2.game();
 
-  bool same_color = !(view1.invertColors() ^ view2.invertColors());
+  bool same_color = !(view1.areColorsInverted() ^ view2.areColorsInverted());
 
   if (s1.symm_class != s2.symm_class) {
     return false;
   }
 
-  // TODO compare positions of pawns
-  // need to write iterator over board tiles which applies view.op() (D6, about
-  // origin()) and s1.op() (type derived from symm_class, about origin()) to
-  // each position, and then checks if each is a pawn in the other view (need to
-  // invert s2.op() and view2.op() and getTile(), accounting for color
-  // symmetries).
-
   if (g1.nPawnsInPlay() != g2.nPawnsInPlay()) {
     return false;
   }
 
-  if (g1.blackTurn() ^ g2.blackTurn() ^ same_color) {
+  if (!(g1.blackTurn() ^ g2.blackTurn() ^ same_color)) {
     return false;
   }
 
@@ -78,16 +89,35 @@ bool GameEq<NPawns>::compareViews(
   // Group operation to translate a point in view 2 to a point in view 1.
   Group to_view1 = view_op1 * view_op2.inverse();
 
-  return g1.forEachPawn([&g1, &g2, same_color, to_view1](idx_t idx) {
-    HexPos p2 = Game<NPawns>::idxToPos(idx);
+  HexPos origin1 = g1.originTile(s1);
+  HexPos origin2 = g2.originTile(s2);
+
+  // Canonicalizing/decanonicalizing group ops to apply to points before
+  // transforming them according to the symmetry matching op.
+  D6 canon1 = s1.op;
+  D6 decanon2 = s2.op.inverse();
+
+  return g1.forEachPawn([&g1, &g2, same_color, to_view1, origin1, origin2,
+                         canon1, decanon2](idx_t idx) {
+    HexPos p2 = (Game<NPawns>::idxToPos(idx) - origin1).apply_d6_c(canon1);
+    // printf("p2 from (%d, %d) to ", p2.x, p2.y);
     p2 = SymmetryClassOp::apply_fn(p2, to_view1);
-    idx_t idx2 = Game<NPawns>::posToIdx(p2);
+    // printf("(%d, %d) after applying %s\n", p2.x, p2.y,
+    //        to_view1.toString().c_str());
+    idx_t idx2 = Game<NPawns>::posToIdx(p2.apply_d6_c(decanon2) + origin2);
+
+    // printf("Pos (%d, %d) translated to (%d, %d)\n", idx.first, idx.second,
+    //        idx2.first, idx2.second);
 
     if (g2.getTile(idx2) == Game<NPawns>::TileState::TILE_EMPTY) {
       return false;
     }
 
-    return (g1.getTile(idx) != g2.getTile(idx2)) ^ same_color;
+    printf("Colors same? %s\n", same_color ? "true" : "False");
+    printf("Tile 1: %d\n", g1.getTile(idx));
+    printf("Tile 2: %d\n", g2.getTile(idx2));
+
+    return bool((g1.getTile(idx) != g2.getTile(idx2)) ^ same_color);
   });
 }
 

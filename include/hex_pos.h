@@ -85,69 +85,93 @@ struct HexPos {
   constexpr HexPos e_s3() const;
 };
 
-template <SymmetryClass symm_class, class Group>
-class SymmetryClassOp {
- private:
-  static constexpr std::function<HexPos(HexPos, Group)> apply_fn() {
-    switch (symm_class) {
-      case SymmetryClass::C: {
-        return [](HexPos pos, Group op) {
-          pos.apply_d6_c(op);
-          return pos;
-        };
-      }
-      case SymmetryClass::V: {
-        return [](HexPos pos, Group op) {
-          pos.apply_d3_v(op);
-          return pos;
-        };
-      }
-      case SymmetryClass::E: {
-        return [](HexPos pos, Group op) {
-          pos.apply_k4_e(op);
-          return pos;
-        };
-      }
-      case SymmetryClass::CV: {
-        return [](HexPos pos, Group op) {
-          pos.apply_c2_cv(op);
-          return pos;
-        };
-      }
-      case SymmetryClass::CE: {
-        return [](HexPos pos, Group op) {
-          pos.apply_c2_ce(op);
-          return pos;
-        };
-      }
-      case SymmetryClass::EV: {
-        return [](HexPos pos, Group op) {
-          pos.apply_c2_ev(op);
-          return pos;
-        };
-      }
-      case SymmetryClass::TRIVIAL: {
-        return [](HexPos pos, Group op) {
-          return pos;
-        };
-      }
-    }
-  }
+template <SymmetryClass symm_class>
+class SymmetryClassOp {};
 
+template <>
+class SymmetryClassOp<SymmetryClass::C> {
  public:
-  typedef Group group;
+  typedef D6 Group;
+  typedef HexPos (*apply_fn_t)(HexPos, Group);
 
-  Group op;
-  static constexpr std::function<HexPos(HexPos, Group)> apply_op = apply_fn();
+  static constexpr apply_fn_t apply_fn = [](HexPos pos, Group op) {
+    return pos.apply_d6_c(op);
+  };
 };
 
-typedef SymmetryClassOp<SymmetryClass::C, D6> D6COp;
-typedef SymmetryClassOp<SymmetryClass::V, D3> D3VOp;
-typedef SymmetryClassOp<SymmetryClass::E, K4> K4EOp;
-typedef SymmetryClassOp<SymmetryClass::CV, C2> C2CVOp;
-typedef SymmetryClassOp<SymmetryClass::CE, C2> C2CEOp;
-typedef SymmetryClassOp<SymmetryClass::EV, C2> C2EVOp;
-typedef SymmetryClassOp<SymmetryClass::TRIVIAL, Trivial> TrivialOp;
+template <>
+class SymmetryClassOp<SymmetryClass::V> {
+ public:
+  typedef D3 Group;
+  typedef HexPos (*apply_fn_t)(HexPos, Group);
+
+  static constexpr apply_fn_t apply_fn = [](HexPos pos, Group op) {
+    return pos.apply_d3_v(op);
+  };
+};
+
+template <>
+class SymmetryClassOp<SymmetryClass::E> {
+ public:
+  typedef K4 Group;
+  typedef HexPos (*apply_fn_t)(HexPos, Group);
+
+  static constexpr apply_fn_t apply_fn = [](HexPos pos, Group op) {
+    return pos.apply_k4_e(op);
+  };
+};
+
+template <>
+class SymmetryClassOp<SymmetryClass::CV> {
+ public:
+  typedef C2 Group;
+  typedef HexPos (*apply_fn_t)(HexPos, Group);
+
+  static constexpr apply_fn_t apply_fn = [](HexPos pos, Group op) {
+    return pos.apply_c2_cv(op);
+  };
+};
+
+template <>
+class SymmetryClassOp<SymmetryClass::CE> {
+ public:
+  typedef C2 Group;
+  typedef HexPos (*apply_fn_t)(HexPos, Group);
+
+  static constexpr apply_fn_t apply_fn = [](HexPos pos, Group op) {
+    return pos.apply_c2_ce(op);
+  };
+};
+
+template <>
+class SymmetryClassOp<SymmetryClass::EV> {
+ public:
+  typedef C2 Group;
+  typedef HexPos (*apply_fn_t)(HexPos, Group);
+
+  static constexpr apply_fn_t apply_fn = [](HexPos pos, Group op) {
+    return pos.apply_c2_ev(op);
+  };
+};
+
+template <>
+class SymmetryClassOp<SymmetryClass::TRIVIAL> {
+ public:
+  typedef Trivial Group;
+  typedef HexPos (*apply_fn_t)(HexPos, Group);
+
+  static constexpr apply_fn_t apply_fn = [](HexPos pos, Group op) {
+    return pos;
+  };
+};
+
+typedef SymmetryClassOp<SymmetryClass::C> D6COp;
+typedef SymmetryClassOp<SymmetryClass::V> D3VOp;
+typedef SymmetryClassOp<SymmetryClass::E> K4EOp;
+typedef SymmetryClassOp<SymmetryClass::CV> C2CVOp;
+typedef SymmetryClassOp<SymmetryClass::CE> C2CEOp;
+typedef SymmetryClassOp<SymmetryClass::EV> C2EVOp;
+typedef SymmetryClassOp<SymmetryClass::TRIVIAL> TrivialOp;
 
 constexpr bool operator==(const HexPos& a, const HexPos& b) {
   return a.x == b.x && a.y == b.y;

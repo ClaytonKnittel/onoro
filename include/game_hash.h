@@ -168,6 +168,7 @@ constexpr game_hash_t GameHash<NPawns>::calcHash(
       game.calcSymmetryState();
   HexPos origin = game.originTile(symm_state);
 
+  /*
   printf("Origin: (%d, %d) (%u)\n", origin.x, origin.y, game.nPawnsInPlay());
   printf("%s\n", game.Print().c_str());
   printf("%s\n", game.Print2().c_str());
@@ -180,6 +181,7 @@ constexpr game_hash_t GameHash<NPawns>::calcHash(
   printf("op: %s\n", symm_state.op.toString().c_str());
   printf("trans: (%d, %d)\n", symm_state.center_offset.x,
          symm_state.center_offset.y);
+  */
 
   const SymmTable& hash_table = getHashTable(symm_state.symm_class);
 
@@ -187,15 +189,18 @@ constexpr game_hash_t GameHash<NPawns>::calcHash(
   game.forEachPawn([&game, &h, symm_state, origin, hash_table](idx_t pawn_idx) {
     HexPos pawn_pos = Game<NPawns>::idxToPos(pawn_idx);
 
-    printf("Trans (%d, %d) -> ", (pawn_pos - origin).x, (pawn_pos - origin).y);
+    // printf("Trans (%d, %d) -> ", (pawn_pos - origin).x, (pawn_pos -
+    // origin).y);
 
     // transform pawn_pos according to symm_state.op
     pawn_pos = (pawn_pos - origin).apply_d6_c(symm_state.op) + getCenter();
     HashEl hash_el = hashLookup(hash_table, pawn_pos);
 
+    /*
     printf("(%d, %d)\n", (pawn_pos - getCenter()).x,
            (pawn_pos - getCenter()).y);
     printf("hash: %s\n", printD3Hash(hash_el.black_hash()).c_str());
+    */
 
     if (game.getTile(pawn_idx) == Game<NPawns>::TileState::TILE_BLACK) {
       h = h ^ hash_el.black_hash();

@@ -205,6 +205,7 @@ int main(int argc, char* argv[]) {
   // return playout();
   onoro::GameHash<N> h;
 
+  /*
   onoro::Game<N>::printSymmStateTableOps();
   printf("\n");
   onoro::Game<N>::printSymmStateTableSymms();
@@ -212,9 +213,11 @@ int main(int argc, char* argv[]) {
   onoro::Game<3>::printSymmStateTableOps();
   printf("\n");
   onoro::Game<3>::printSymmStateTableSymms();
+  */
 
   if (!h.validate()) {
     printf("Invalid\n");
+    return -1;
   } else {
     printf("Valid!\n");
   }
@@ -241,17 +244,21 @@ int main(int argc, char* argv[]) {
     printf("Valid states\n");
   }
 
+  /*
   for (const auto& g : { g1, g2 }) {
     onoro::GameView<N> view(&g);
-    onoro::game_hash_t hash_val = h(view);
+    std::size_t hash_val = view.template hash<K4>();
     printf("Hash: %016llx\n", hash_val);
     printf("K4 hash: %s\n", onoro::GameHash<N>::printK4Hash(hash_val).c_str());
-    /*printf("D6 hash: %s\nD3 hash: %s\nK4 hash: %s\nC2 hash: %s\n",
-           onoro::GameHash<N>::printD6Hash(hash_val).c_str(),
-           onoro::GameHash<N>::printD3Hash(hash_val).c_str(),
-           onoro::GameHash<N>::printK4Hash(hash_val).c_str(),
-           onoro::GameHash<N>::printC2Hash(hash_val).c_str());*/
+    //printf("D6 hash: %s\nD3 hash: %s\nK4 hash: %s\nC2 hash: %s\n",
+    //       onoro::GameHash<N>::printD6Hash(hash_val).c_str(),
+    //       onoro::GameHash<N>::printD3Hash(hash_val).c_str(),
+    //       onoro::GameHash<N>::printK4Hash(hash_val).c_str(),
+    //       onoro::GameHash<N>::printC2Hash(hash_val).c_str());
 
+    printf("color inv:      %s\n", onoro::GameHash<N>::printK4Hash(
+                                       onoro::hash_group::color_swap(hash_val))
+                                       .c_str());
     printf("r1:      %s\n",
            onoro::GameHash<N>::printK4Hash(onoro::hash_group::k4_a(hash_val))
                .c_str());
@@ -262,18 +269,23 @@ int main(int argc, char* argv[]) {
            onoro::GameHash<N>::printK4Hash(onoro::hash_group::k4_c(hash_val))
                .c_str());
   }
+  */
 
-  /*
   onoro::GameView<N> v1(&g1);
-  onoro::GameView<N> v2(&g2, K4(C2(1), C2(1)), false);
+  onoro::GameView<N> v2(&g2, K4(C2(0), C2(0)), true);
 
   printf("%s\n", v1.game().Print().c_str());
+  printf("%s\n", v1.game().Print2().c_str());
+  printf("%s\n", v2.game().Print().c_str());
+  printf("%s\n", v2.game().Print2().c_str());
   printf("Hash 1: %s\n",
          onoro::GameHash<N>::printK4Hash(v1.template hash<K4>()).c_str());
-  printf("%s\n", v2.game().Print().c_str());
   printf("Hash 2: %s\n",
          onoro::GameHash<N>::printK4Hash(v2.template hash<K4>()).c_str());
-  */
+
+  GameEq<N> eq;
+  printf("Are equal? %s\n", eq(v1, v2) ? "true" : "false");
+  printf("Are equal? %s\n", eq(v2, v1) ? "true" : "false");
 
   return 0;
 }

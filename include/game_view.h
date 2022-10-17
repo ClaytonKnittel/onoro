@@ -31,7 +31,7 @@ class GameView {
   template <class Group>
   constexpr Group op() const;
 
-  constexpr bool colorInvert() const;
+  constexpr bool areColorsInverted() const;
 
   constexpr const Game<NPawns>& game() const;
 
@@ -98,7 +98,7 @@ constexpr Group GameView<NPawns>::op() const {
 }
 
 template <uint32_t NPawns>
-constexpr bool GameView<NPawns>::colorInvert() const {
+constexpr bool GameView<NPawns>::areColorsInverted() const {
   return color_invert_;
 }
 
@@ -111,7 +111,7 @@ template <uint32_t NPawns>
 template <class Group>
 constexpr std::size_t GameView<NPawns>::hash() const {
   std::size_t h = hash_group::apply<Group>(op<Group>(), hash_);
-  if (colorInvert()) {
+  if (areColorsInverted()) {
     h = color_swap(h);
   }
   return h;
