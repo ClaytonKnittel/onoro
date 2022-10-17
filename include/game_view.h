@@ -110,7 +110,11 @@ constexpr const Game<NPawns>& GameView<NPawns>::game() const {
 template <uint32_t NPawns>
 template <class Group>
 constexpr std::size_t GameView<NPawns>::hash() const {
-  return hash_group::apply<Group>(op<Group>(), hash_);
+  std::size_t h = hash_group::apply<Group>(op<Group>(), hash_);
+  if (colorInvert()) {
+    h = color_swap(h);
+  }
+  return h;
 }
 
 template <uint32_t NPawns>

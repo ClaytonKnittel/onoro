@@ -11,6 +11,9 @@
 static constexpr uint32_t n_pawns = 16;
 static uint64_t g_n_moves = 0;
 
+using namespace onoro;
+using namespace onoro::hash_group;
+
 void TestUnionFind();
 
 static double timespec_diff(struct timespec* start, struct timespec* end) {
@@ -199,7 +202,7 @@ int main(int argc, char* argv[]) {
   printf("Game size: %zu bytes\n", sizeof(onoro::Game<N>));
 
   // return benchmark();
-  return playout();
+  // return playout();
   onoro::GameHash<N> h;
 
   onoro::Game<N>::printSymmStateTableOps();
@@ -259,6 +262,18 @@ int main(int argc, char* argv[]) {
            onoro::GameHash<N>::printK4Hash(onoro::hash_group::k4_c(hash_val))
                .c_str());
   }
+
+  /*
+  onoro::GameView<N> v1(&g1);
+  onoro::GameView<N> v2(&g2, K4(C2(1), C2(1)), false);
+
+  printf("%s\n", v1.game().Print().c_str());
+  printf("Hash 1: %s\n",
+         onoro::GameHash<N>::printK4Hash(v1.template hash<K4>()).c_str());
+  printf("%s\n", v2.game().Print().c_str());
+  printf("Hash 2: %s\n",
+         onoro::GameHash<N>::printK4Hash(v2.template hash<K4>()).c_str());
+  */
 
   return 0;
 }
