@@ -44,25 +44,6 @@ class Game {
     TILE_WHITE = 2,
   };
 
-  enum class SymmetryClass {
-    // Center of mass lies in the center of a hexagonal tile.
-    C,
-    // Center of mass lies on a vertex of a hexagonal tile.
-    V,
-    // Center of mass lies on the midpoint of an edge of a hexagonal tile.
-    E,
-    // Center of mass lies on a line connecting the center of a hexagonal tile
-    // to one of its vertices.
-    CV,
-    // Center of mass lies on a line connecting the center of a hexagonal tile
-    // to the midpoint of one if its edges.
-    CE,
-    // Center of mass lies on the edge of a hexagonal tile.
-    EV,
-    // Center of mass is none of the above.
-    TRIVIAL,
-  };
-
   struct BoardSymmetryState {
     /*
      * The group operation to perform on the board before calculating the hash.
@@ -439,6 +420,8 @@ class Game {
 
   uint32_t nPawnsInPlay() const;
 
+  bool blackTurn() const;
+
   bool inPhase2() const;
 
   TileState getTile(uint32_t i) const;
@@ -590,8 +573,8 @@ constexpr D6 Game<NPawns>::symmStateOp(uint32_t x, uint32_t y,
 }
 
 template <uint32_t NPawns>
-constexpr typename Game<NPawns>::SymmetryClass Game<NPawns>::symmStateClass(
-    uint32_t x, uint32_t y, uint32_t n_pawns) {
+constexpr SymmetryClass Game<NPawns>::symmStateClass(uint32_t x, uint32_t y,
+                                                     uint32_t n_pawns) {
   // (x2, y2) is (x, y) folded across the line y = x
   uint32_t x2 = std::max(x, y);
   uint32_t y2 = std::min(x, y);
@@ -1096,6 +1079,11 @@ constexpr bool Game<NPawns>::inBounds(idx_t idx) {
 template <uint32_t NPawns>
 uint32_t Game<NPawns>::nPawnsInPlay() const {
   return state_.turn + 1;
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::blackTurn() const {
+  return state_.blackTurn;
 }
 
 template <uint32_t NPawns>

@@ -89,8 +89,7 @@ class GameHash {
   /*
    * Returns the hash table associated with the given symmetry class.
    */
-  static constexpr const SymmTable& getHashTable(
-      typename Game<NPawns>::SymmetryClass symm_class);
+  static constexpr const SymmTable& getHashTable(SymmetryClass symm_class);
 
   static constexpr HashEl hashLookup(const SymmTable& table, HexPos pos);
 
@@ -544,10 +543,7 @@ constexpr bool GameHash<NPawns>::inBounds(idx_t idx) {
 
 template <uint32_t NPawns>
 constexpr const typename GameHash<NPawns>::SymmTable&
-GameHash<NPawns>::getHashTable(
-    typename Game<NPawns>::SymmetryClass symm_class) {
-  typedef typename Game<NPawns>::SymmetryClass SymmetryClass;
-
+GameHash<NPawns>::getHashTable(SymmetryClass symm_class) {
   switch (symm_class) {
     case SymmetryClass::C: {
       return d6_table_;

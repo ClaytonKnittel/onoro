@@ -1,19 +1,37 @@
 #pragma once
 
-#include <utils/math/group/cyclic.h>
-#include <utils/math/group/dihedral.h>
-#include <utils/math/group/direct_product.h>
+#include <utils/math/group/group.h>
 
 namespace onoro {
-
-namespace hash_group {
-
-typedef std::size_t game_hash_t;
 
 typedef util::math::group::Dihedral<6> D6;
 typedef util::math::group::Dihedral<3> D3;
 typedef util::math::group::Cyclic<2> C2;
 typedef util::math::group::DirectProduct<C2, C2> K4;
+using util::math::group::Trivial;
+
+enum class SymmetryClass {
+  // Center of mass lies in the center of a hexagonal tile.
+  C,
+  // Center of mass lies on a vertex of a hexagonal tile.
+  V,
+  // Center of mass lies on the midpoint of an edge of a hexagonal tile.
+  E,
+  // Center of mass lies on a line connecting the center of a hexagonal tile
+  // to one of its vertices.
+  CV,
+  // Center of mass lies on a line connecting the center of a hexagonal tile
+  // to the midpoint of one if its edges.
+  CE,
+  // Center of mass lies on the edge of a hexagonal tile.
+  EV,
+  // Center of mass is none of the above.
+  TRIVIAL,
+};
+
+namespace hash_group {
+
+typedef std::size_t game_hash_t;
 
 static constexpr game_hash_t apply_d6(D6 op, game_hash_t h);
 static constexpr game_hash_t apply_d3(D3 op, game_hash_t h);
