@@ -593,6 +593,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
   SymmTable table{ { { 0 } } };
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
+    bool found_hash = false;
     HexPos p = Game<NPawns>::idxToPos(toIdx(i));
 
     // Normalize coordinates to the center.
@@ -618,8 +619,13 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
         const HashEl& el =
             table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
         table[i] = { apply_d6(op, el.black_hash()) };
-        continue;
+        found_hash = true;
+        break;
       }
+    }
+
+    if (found_hash) {
+      continue;
     }
 
     // Try the 6 reflected symmetries
@@ -629,14 +635,16 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
       if (s == p) {
         // This tile is symmetric to itself under some reflection
         table[i] = { make_invariant_d6(op, d6b) };
-        continue;
+        found_hash = true;
+        break;
       }
 
       if (symmTableShouldReuseTile(i, s)) {
         const HashEl& el =
             table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
         table[i] = { apply_d6(op, el.black_hash()) };
-        continue;
+        found_hash = true;
+        break;
       }
 
       s = s.c_r1();
@@ -645,7 +653,9 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
     }
 
     // Otherwise, create a new hash value
-    table[i] = { d6b };
+    if (!found_hash) {
+      table[i] = { d6b };
+    }
   }
 
   return table;
@@ -658,6 +668,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
   SymmTable table{ { { 0 } } };
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
+    bool found_hash = false;
     HexPos p = Game<NPawns>::idxToPos(toIdx(i));
 
     // Normalize coordinates to the center.
@@ -676,8 +687,13 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
         const HashEl& el =
             table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
         table[i] = { apply_d3(op, el.black_hash()) };
-        continue;
+        found_hash = true;
+        break;
       }
+    }
+
+    if (found_hash) {
+      continue;
     }
 
     // Try the 3 reflected symmetries
@@ -687,14 +703,16 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
       if (s == p) {
         // This tile is symmetric to itself under some reflection
         table[i] = { make_invariant_d3(op, d3b) };
-        continue;
+        found_hash = true;
+        break;
       }
 
       if (symmTableShouldReuseTile(i, s)) {
         const HashEl& el =
             table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
         table[i] = { apply_d3(op, el.black_hash()) };
-        continue;
+        found_hash = true;
+        break;
       }
 
       s = s.v_r2();
@@ -702,7 +720,9 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
     }
 
     // Otherwise, create a new hash value
-    table[i] = { d3b };
+    if (!found_hash) {
+      table[i] = { d3b };
+    }
   }
 
   return table;
@@ -715,6 +735,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initK4Table() {
   SymmTable table{ { { 0 } } };
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
+    bool found_hash = false;
     HexPos p = Game<NPawns>::idxToPos(toIdx(i));
 
     // Normalize coordinates to the center.
@@ -730,8 +751,13 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initK4Table() {
         const HashEl& el =
             table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
         table[i] = { apply_k4(op, el.black_hash()) };
-        continue;
+        found_hash = true;
+        break;
       }
+    }
+
+    if (found_hash) {
+      continue;
     }
 
     // Check the symmetries for self-mapping.
@@ -740,12 +766,15 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initK4Table() {
 
       if (s == p) {
         table[i] = { make_invariant_k4(op, k4b) };
-        continue;
+        found_hash = true;
+        break;
       }
     }
 
     // Otherwise, create a new hash value
-    table[i] = { k4b };
+    if (!found_hash) {
+      table[i] = { k4b };
+    }
   }
 
   return table;

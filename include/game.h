@@ -894,7 +894,7 @@ bool Game<NPawns>::validate() const {
 template <uint32_t NPawns>
 void Game<NPawns>::printSymmStateTableOps(uint32_t n_reps) {
   static constexpr const uint32_t id[D6::order()] = {
-    1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13,
+    1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14,
   };
 
   constexpr uint32_t N = getSymmStateTableWidth();
