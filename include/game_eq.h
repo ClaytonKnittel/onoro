@@ -113,9 +113,9 @@ bool GameEq<NPawns>::compareViews(
       return false;
     }
 
-    printf("Colors same? %s\n", same_color ? "true" : "False");
-    printf("Tile 1: %d\n", g1.getTile(idx));
-    printf("Tile 2: %d\n", g2.getTile(idx2));
+    // printf("Colors same? %s\n", same_color ? "true" : "False");
+    // printf("Tile 1: %d\n", g1.getTile(idx));
+    // printf("Tile 2: %d\n", g2.getTile(idx2));
 
     return bool((g1.getTile(idx) != g2.getTile(idx2)) ^ same_color);
   });

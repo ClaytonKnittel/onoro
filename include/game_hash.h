@@ -158,7 +158,7 @@ game_hash_t GameHash<NPawns>::operator()(
     const GameView<NPawns>& view) const noexcept {
   // TODO remove when not debugging
   assert(view.op<D6>().ordinal() == 0);
-  return calcHash(view.game());
+  return view.template hash<Trivial>();
 }
 
 template <uint32_t NPawns>

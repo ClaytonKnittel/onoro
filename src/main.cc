@@ -80,9 +80,26 @@ static int benchmark() {
   return 0;
 }
 
-using TranspositionTable =
-    absl::flat_hash_map<onoro::GameView<n_pawns>, int32_t,
-                        onoro::GameHash<n_pawns>, onoro::GameEq<n_pawns>>;
+class TranspositionTable {
+  using TableT =
+      absl::flat_hash_map<onoro::GameView<n_pawns>, int32_t,
+                          onoro::GameHash<n_pawns>, onoro::GameEq<n_pawns>>;
+
+ public:
+  TranspositionTable() {}
+
+  std::pair<TableT::iterator, bool> insert(onoro::Game<n_pawns>&& game) {
+    // TODO: Try all symmetries of this game when looking up, if can't find,
+    // then insert
+  }
+
+  const TableT& table() const {
+    return table_;
+  }
+
+ private:
+  TableT table_;
+};
 
 /*
  * Returns a chosen move along with the expected outcome, in terms of the
@@ -120,16 +137,15 @@ static std::pair<int32_t, onoro::idx_t> findMove(const onoro::Game<NPawns>& g,
           score = 1;
         } else {
           if (depth > 0) {
-            /*auto [it, inserted] = m.insert(std::make_pair(std::move(g2), 0));
+            auto [it, inserted] = m.insert(std::move(g2));
             if (!inserted) {
               score = it->second;
-            } else {*/
-            auto [_score, _] = findMove(g2, m, depth - 1, -beta, -alpha);
-            score = std::min(-_score, 1);
+            } else {
+              auto [_score, _] = findMove(g2, m, depth - 1, -beta, -alpha);
+              score = std::min(-_score, 1);
 
-            /*
               it->second = score;
-            }*/
+            }
           } else {
             score = 0;
           }
@@ -154,10 +170,10 @@ static std::pair<int32_t, onoro::idx_t> findMove(const onoro::Game<NPawns>& g,
 static int playout() {
   struct timespec start, end;
   onoro::Game<n_pawns> g;
-  printf("%s\n", g.Print2().c_str());
+  printf("%s\n", g.Print().c_str());
 
   TranspositionTable m;
-  uint32_t max_depth = 12;
+  uint32_t max_depth = 2;
 
   for (uint32_t i = 0; i < n_pawns - 3; i++) {
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -177,32 +193,31 @@ static int playout() {
     printf("Move (%d, %d), score %d (%llu playouts)\n", move.first, move.second,
            score, g_n_moves);
     g = onoro::Game<n_pawns>(g, move);
-    printf("%s\n", g.Print2().c_str());
+    printf("%s\n", g.Print().c_str());
 
     if (g.isFinished()) {
       printf("%s won\n", g.blackWins() ? "black" : "white");
       break;
     }
+
+    break;
   }
 
-  /*
   printf("Printing table contents:\n");
-  for (auto it = m.cbegin(); it != m.cend(); it++) {
-    printf("score: %d\n%s\n", it->second, it->first.Print().c_str());
+  for (auto it = m.table().cbegin(); it != m.table().cend(); it++) {
+    printf("score: %d\n%s\n", it->second, it->first.game().Print().c_str());
   }
-  */
 
   return 0;
 }
 
 int main(int argc, char* argv[]) {
-  srand(0);
   static constexpr const uint32_t N = 16;
 
   printf("Game size: %zu bytes\n", sizeof(onoro::Game<N>));
 
   // return benchmark();
-  // return playout();
+  return playout();
   onoro::GameHash<N> h;
 
   /*
@@ -243,33 +258,6 @@ int main(int argc, char* argv[]) {
   } else {
     printf("Valid states\n");
   }
-
-  /*
-  for (const auto& g : { g1, g2 }) {
-    onoro::GameView<N> view(&g);
-    std::size_t hash_val = view.template hash<K4>();
-    printf("Hash: %016llx\n", hash_val);
-    printf("K4 hash: %s\n", onoro::GameHash<N>::printK4Hash(hash_val).c_str());
-    //printf("D6 hash: %s\nD3 hash: %s\nK4 hash: %s\nC2 hash: %s\n",
-    //       onoro::GameHash<N>::printD6Hash(hash_val).c_str(),
-    //       onoro::GameHash<N>::printD3Hash(hash_val).c_str(),
-    //       onoro::GameHash<N>::printK4Hash(hash_val).c_str(),
-    //       onoro::GameHash<N>::printC2Hash(hash_val).c_str());
-
-    printf("color inv:      %s\n", onoro::GameHash<N>::printK4Hash(
-                                       onoro::hash_group::color_swap(hash_val))
-                                       .c_str());
-    printf("r1:      %s\n",
-           onoro::GameHash<N>::printK4Hash(onoro::hash_group::k4_a(hash_val))
-               .c_str());
-    printf("s0:      %s\n",
-           onoro::GameHash<N>::printK4Hash(onoro::hash_group::k4_b(hash_val))
-               .c_str());
-    printf("s1:      %s\n",
-           onoro::GameHash<N>::printK4Hash(onoro::hash_group::k4_c(hash_val))
-               .c_str());
-  }
-  */
 
   onoro::GameView<N> v1(&g1);
   onoro::GameView<N> v2(&g2, K4(C2(0), C2(0)), true);
