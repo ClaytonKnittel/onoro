@@ -10,6 +10,8 @@
 
 static constexpr uint32_t n_pawns = 16;
 static uint64_t g_n_moves = 0;
+static uint64_t g_n_misses = 0;
+static uint64_t g_n_hits = 0;
 
 using namespace onoro;
 using namespace onoro::hash_group;
@@ -190,8 +192,12 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
         auto it = m.find(view);
 
         if (it != m.end()) {
+          g_n_hits++;
+
           score = it->second * (view.areColorsInverted() ? -1 : 1);
         } else {
+          g_n_misses++;
+
           int32_t _score;
           if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
             _score =
@@ -233,7 +239,7 @@ static int playout() {
   printf("%s\n", g.Print().c_str());
 
   TranspositionTable m;
-  uint32_t max_depth = 13;
+  uint32_t max_depth = 16;
 
   // for (uint32_t i = 0; i < n_pawns - 3; i++) {
   for (uint32_t i = 0; i < 1; i++) {
@@ -251,8 +257,12 @@ static int playout() {
       break;
     }
 
-    printf("Move (%d, %d), score %d (%llu playouts)\n", move.loc.first,
-           move.loc.second, score, g_n_moves);
+    printf("Move (%d, %d), score %d (%llu playouts, %f%% hits)\n",
+           move.loc.first, move.loc.second, score, g_n_moves,
+           100. * g_n_hits / (double) (g_n_misses + g_n_hits));
+    g_n_misses = 0;
+    g_n_hits = 0;
+
     g = onoro::Game<n_pawns>(g, move);
     printf("%s\n", g.Print().c_str());
 
