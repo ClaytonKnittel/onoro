@@ -30,6 +30,28 @@ class GameEq;
 template <uint32_t NPawns>
 class Game;
 
+struct P1Move {
+  template <uint32_t NPawns, class CallbackFn>
+  static constexpr bool forEachMoveFn(const Game<NPawns>& g, CallbackFn cb) {
+    return g.forEachMove(cb);
+  }
+
+  // Position to play pawn at.
+  idx_t loc;
+};
+
+struct P2Move {
+  template <uint32_t NPawns, class CallbackFn>
+  static constexpr bool forEachMoveFn(const Game<NPawns>& g, CallbackFn cb) {
+    return g.forEachMoveP2(cb);
+  }
+
+  // Position to move pawn from.
+  idx_t from;
+  // Position to move pawn to.
+  idx_t to;
+};
+
 template <uint32_t NPawns>
 class Game {
   template <uint32_t NPawns_>
@@ -92,7 +114,8 @@ class Game {
    private:
     // Constructs the begin() iterator. Must call find_next after constructing
     // it.
-    pawn_iterator(const Game<NPawns>& game) : game_(&game), board_idx_(0) {}
+    pawn_iterator(const Game<NPawns>& game)
+        : game_(&game), board_idx_(0), next_idx_(0), board_bitmask_(0) {}
 
     // default constructor is for the end() iterator
     pawn_iterator()
@@ -363,9 +386,9 @@ class Game {
 
   // Make a move
   // Phase 1: place a pawn
-  Game(const Game&, idx_t move);
+  Game(const Game&, P1Move move);
   // Phase 2: move a pawn from somewhere to somewhere else
-  Game(const Game&, idx_t move, idx_t from);
+  Game(const Game&, P2Move move);
 
   std::string Print() const;
   std::string Print2() const;
@@ -721,38 +744,38 @@ Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
 }
 
 template <uint32_t NPawns>
-Game<NPawns>::Game(const Game<NPawns>& g, idx_t move)
+Game<NPawns>::Game(const Game<NPawns>& g, P1Move move)
     : state_({ static_cast<uint8_t>(g.state_.turn + 1), !g.state_.blackTurn, 0,
                0 }) {
-  auto [shift, offset] = calcMoveShiftAndOffset(g, move);
+  auto [shift, offset] = calcMoveShiftAndOffset(g, move.loc);
   copyAndShift(reinterpret_cast<uint64_t*>(board_),
                reinterpret_cast<const uint64_t*>(g.board_), getBoardSize(),
                shift * bits_per_tile);
 
-  sum_of_mass_ = g.sum_of_mass_ + idxToPos(move) + nPawnsInPlay() * offset;
+  sum_of_mass_ = g.sum_of_mass_ + idxToPos(move.loc) + nPawnsInPlay() * offset;
 
-  setTile(posToIdx(idxToPos(move) + offset),
+  setTile(posToIdx(idxToPos(move.loc) + offset),
           g.state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
 
-  state_.finished = checkWin(move);
+  state_.finished = checkWin(move.loc);
 }
 
 template <uint32_t NPawns>
-Game<NPawns>::Game(const Game& g, idx_t move, idx_t from)
+Game<NPawns>::Game(const Game& g, P2Move move)
     : state_({ g.state_.turn, !g.state_.blackTurn, 0, 0 }) {
-  auto [shift, offset] = calcMoveShiftAndOffset(g, move);
+  auto [shift, offset] = calcMoveShiftAndOffset(g, move.to);
   copyAndShift(reinterpret_cast<uint64_t*>(board_),
                reinterpret_cast<const uint64_t*>(g.board_), getBoardSize(),
                shift * bits_per_tile);
 
-  sum_of_mass_ =
-      g.sum_of_mass_ + idxToPos(move) - idxToPos(from) + NPawns * offset;
+  sum_of_mass_ = g.sum_of_mass_ + idxToPos(move.to) - idxToPos(move.from) +
+                 NPawns * offset;
 
-  setTile(posToIdx(idxToPos(move) + offset),
+  setTile(posToIdx(idxToPos(move.to) + offset),
           g.state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
-  clearTile(posToIdx(idxToPos(from) + offset));
+  clearTile(posToIdx(idxToPos(move.from) + offset));
 
-  state_.finished = checkWin(move);
+  state_.finished = checkWin(move.to);
 }
 
 template <uint32_t NPawns>
@@ -764,7 +787,7 @@ std::string Game<NPawns>::Print() const {
   };
 
   std::ostringstream ostr;
-  for (uint32_t y = 0; y < getBoardLen(); y++) {
+  for (uint32_t y = getBoardLen() - 1; y < getBoardLen(); y--) {
     if (y % 2 == 0) {
       ostr << " ";
     }
@@ -776,7 +799,7 @@ std::string Game<NPawns>::Print() const {
       }
     }
 
-    if (y < getBoardLen() - 1) {
+    if (y > 0) {
       ostr << "\n";
     }
   }
@@ -1313,6 +1336,7 @@ bool Game<NPawns>::forEachTopLeftNeighbor(idx_t idx, CallbackFnT cb) const {
 template <uint32_t NPawns>
 template <class CallbackFnT>
 bool Game<NPawns>::forEachMove(CallbackFnT cb) const {
+  assert(!inPhase2());
   static constexpr uint32_t tmp_board_tile_bits = 2;
   static constexpr uint64_t tmp_board_tile_mask =
       (uint64_t(1) << tmp_board_tile_bits) - 1;
@@ -1342,7 +1366,7 @@ bool Game<NPawns>::forEachMove(CallbackFnT cb) const {
               tmp_board[idx / (bits_per_entry / tmp_board_tile_bits)] = tbb;
 
               if ((tbb & mask) == full_mask) {
-                if (!cb(neighbor_idx)) {
+                if (!cb((P1Move){ neighbor_idx })) {
                   return false;
                 }
               }
@@ -1359,6 +1383,7 @@ bool Game<NPawns>::forEachMove(CallbackFnT cb) const {
 template <uint32_t NPawns>
 template <class CallbackFnT>
 bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
+  assert(inPhase2());
   static constexpr uint32_t tmp_board_tile_bits = 2;
   static constexpr uint64_t tmp_board_tile_mask =
       (uint64_t(1) << tmp_board_tile_bits) - 1;
@@ -1500,7 +1525,7 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
         });
 
         if (n_satisfied == n_to_satisfy && groups_touching == n_pawn_groups) {
-          if (!cb(toIdx(tmp_next_idx), next_idx)) {
+          if (!cb((P2Move){ toIdx(tmp_next_idx), next_idx })) {
             return false;
           }
         }

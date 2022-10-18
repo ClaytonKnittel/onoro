@@ -156,9 +156,7 @@ GameHash<NPawns>::GameHash() {}
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::operator()(
     const GameView<NPawns>& view) const noexcept {
-  // TODO remove when not debugging
-  assert(view.op<D6>().ordinal() == 0);
-  return view.template hash<Trivial>();
+  return view.hash();
 }
 
 template <uint32_t NPawns>

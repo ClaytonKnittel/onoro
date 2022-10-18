@@ -33,29 +33,8 @@ bool GameEq<NPawns>::operator()(const GameView<NPawns>& view1,
     return false;
   }
 
-  switch (s1.symm_class) {
-    case SymmetryClass::C: {
-      return compareViews<D6COp>(view1, view2, s1, s2);
-    }
-    case SymmetryClass::V: {
-      return compareViews<D3VOp>(view1, view2, s1, s2);
-    }
-    case SymmetryClass::E: {
-      return compareViews<K4EOp>(view1, view2, s1, s2);
-    }
-    case SymmetryClass::CV: {
-      return compareViews<C2CVOp>(view1, view2, s1, s2);
-    }
-    case SymmetryClass::CE: {
-      return compareViews<C2CEOp>(view1, view2, s1, s2);
-    }
-    case SymmetryClass::EV: {
-      return compareViews<C2EVOp>(view1, view2, s1, s2);
-    }
-    case SymmetryClass::TRIVIAL: {
-      return compareViews<TrivialOp>(view1, view2, s1, s2);
-    }
-  }
+  SymmetryClassOpApplyAndReturn(s1.symm_class, compareViews, view1, view2, s1,
+                                s2);
 }
 
 template <uint32_t NPawns>
@@ -71,15 +50,23 @@ bool GameEq<NPawns>::compareViews(
 
   bool same_color = !(view1.areColorsInverted() ^ view2.areColorsInverted());
 
+  if (view1.hash() != view2.hash()) {
+    return false;
+  }
+
   if (s1.symm_class != s2.symm_class) {
+    // printf("DIFF SYMM CLASSES!\n");
     return false;
   }
 
   if (g1.nPawnsInPlay() != g2.nPawnsInPlay()) {
+    // printf("DIF N PAWNS IN PLAY!!!!! %u vs %u\n", g1.nPawnsInPlay(),
+    //        g2.nPawnsInPlay());
     return false;
   }
 
   if (!(g1.blackTurn() ^ g2.blackTurn() ^ same_color)) {
+    // printf("NOT SAME PLAYERS TURN NOEW!!!!!!!\n");
     return false;
   }
 
@@ -110,12 +97,16 @@ bool GameEq<NPawns>::compareViews(
     //        idx2.first, idx2.second);
 
     if (g2.getTile(idx2) == Game<NPawns>::TileState::TILE_EMPTY) {
+      // printf("EMPTY TILE!!!\n");
       return false;
     }
 
     // printf("Colors same? %s\n", same_color ? "true" : "False");
     // printf("Tile 1: %d\n", g1.getTile(idx));
     // printf("Tile 2: %d\n", g2.getTile(idx2));
+    // if (!bool((g1.getTile(idx) != g2.getTile(idx2)) ^ same_color)) {
+    // printf("UNEQUAL TILES!!!!\n");
+    // }
 
     return bool((g1.getTile(idx) != g2.getTile(idx2)) ^ same_color);
   });

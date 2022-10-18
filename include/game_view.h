@@ -31,11 +31,13 @@ class GameView {
   template <class Group>
   constexpr Group op() const;
 
+  template <class Group>
+  void setOp(Group op);
+
   constexpr bool areColorsInverted() const;
 
   constexpr const Game<NPawns>& game() const;
 
-  template <class Group>
   constexpr std::size_t hash() const;
 
   class PawnIterator {
@@ -46,9 +48,6 @@ class GameView {
   };
 
  private:
-  template <class Group>
-  void setOp(Group op);
-
   const Game<NPawns>* game_;
 
   // Ordinal of the view operation to apply to the game.
@@ -61,7 +60,7 @@ class GameView {
   static_assert(C2::order() <= UINT8_MAX);
 
   // The hash of the game with op() applied.
-  const std::size_t hash_;
+  std::size_t hash_;
 };
 
 template <uint32_t NPawns>
@@ -78,16 +77,19 @@ constexpr GameView<NPawns>::GameView(const Game<NPawns>* game, Group view_op,
     : game_(game),
       view_op_ordinal_(view_op.ordinal()),
       color_invert_(color_invert),
-      hash_(GameHash<NPawns>::calcHash(*game)) {}
+      hash_(hash_group::apply<Group>(view_op,
+                                     GameHash<NPawns>::calcHash(*game))) {}
 
 template <uint32_t NPawns>
 template <class Group>
 constexpr void GameView<NPawns>::apply(Group op) {
-  setOp(op * this->op());
+  hash_ = hash_group::apply<Group>(op, hash_);
+  this->view_op_ordinal_ = (op * this->op()).ordinal();
 }
 
 template <uint32_t NPawns>
 constexpr void GameView<NPawns>::invertColors() {
+  hash_ = color_swap(hash_);
   color_invert_ = !color_invert_;
 }
 
@@ -95,6 +97,13 @@ template <uint32_t NPawns>
 template <class Group>
 constexpr Group GameView<NPawns>::op() const {
   return Group(view_op_ordinal_);
+}
+
+template <uint32_t NPawns>
+template <class Group>
+void GameView<NPawns>::setOp(Group op) {
+  hash_ = hash_group::apply<Group>(this->op<Group>().inverse() * op, hash_);
+  view_op_ordinal_ = op.ordinal();
 }
 
 template <uint32_t NPawns>
@@ -108,19 +117,8 @@ constexpr const Game<NPawns>& GameView<NPawns>::game() const {
 }
 
 template <uint32_t NPawns>
-template <class Group>
 constexpr std::size_t GameView<NPawns>::hash() const {
-  std::size_t h = hash_group::apply<Group>(op<Group>(), hash_);
-  if (areColorsInverted()) {
-    h = color_swap(h);
-  }
-  return h;
-}
-
-template <uint32_t NPawns>
-template <class Group>
-void GameView<NPawns>::setOp(Group op) {
-  view_op_ordinal_ = op.ordinal();
+  return hash_;
 }
 
 }  // namespace onoro

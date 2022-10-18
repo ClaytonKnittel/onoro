@@ -173,6 +173,39 @@ typedef SymmetryClassOp<SymmetryClass::CE> C2CEOp;
 typedef SymmetryClassOp<SymmetryClass::EV> C2EVOp;
 typedef SymmetryClassOp<SymmetryClass::TRIVIAL> TrivialOp;
 
+/*
+ * Calls fn templated with the corresponding symmetry class op based on
+ * symm_class, forwarding all arguments following the first two arguments to the
+ * macro. Returns the result of the corresponding call.
+ */
+#define SymmetryClassOpApplyAndReturn(symm_class, fn, ...) \
+  switch (symm_class) {                                    \
+    case SymmetryClass::C: {                               \
+      return fn<D6COp>(__VA_ARGS__);                       \
+    }                                                      \
+    case SymmetryClass::V: {                               \
+      return fn<D3VOp>(__VA_ARGS__);                       \
+    }                                                      \
+    case SymmetryClass::E: {                               \
+      return fn<K4EOp>(__VA_ARGS__);                       \
+    }                                                      \
+    case SymmetryClass::CV: {                              \
+      return fn<C2CVOp>(__VA_ARGS__);                      \
+    }                                                      \
+    case SymmetryClass::CE: {                              \
+      return fn<C2CEOp>(__VA_ARGS__);                      \
+    }                                                      \
+    case SymmetryClass::EV: {                              \
+      return fn<C2EVOp>(__VA_ARGS__);                      \
+    }                                                      \
+    case SymmetryClass::TRIVIAL: {                         \
+      return fn<TrivialOp>(__VA_ARGS__);                   \
+    }                                                      \
+    default: {                                             \
+      __builtin_unreachable();                             \
+    }                                                      \
+  }
+
 constexpr bool operator==(const HexPos& a, const HexPos& b) {
   return a.x == b.x && a.y == b.y;
 }

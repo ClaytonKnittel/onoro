@@ -227,6 +227,11 @@ constexpr game_hash_t apply<C2>(C2 op, game_hash_t h) {
   return apply_c2(op, h);
 }
 
+template <>
+constexpr game_hash_t apply<Trivial>(Trivial op, game_hash_t h) {
+  return h;
+}
+
 constexpr game_hash_t make_invariant_d6(D6 op, game_hash_t h) {
   switch (op.ordinal()) {
     case D6(D6::Action::ROT, 1).ordinal(): {
