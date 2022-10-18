@@ -760,6 +760,7 @@ Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
     sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next) +
                    idxToPos(w_next) + idxToPos(b_next2) + idxToPos(w_next2);
     state_.turn = 5;
+    state_.blackTurn = 1;
   }
 }
 
