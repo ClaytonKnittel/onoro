@@ -46,10 +46,10 @@ struct P2Move {
     return g.forEachMoveP2(cb);
   }
 
-  // Position to move pawn from.
-  idx_t from;
   // Position to move pawn to.
   idx_t to;
+  // Position to move pawn from.
+  idx_t from;
 };
 
 template <uint32_t NPawns>
@@ -194,19 +194,39 @@ class Game {
       uint64_t turn_tile_mask;
       uint64_t clr_mask;
       do {
-        pawn_iterator::find_next();
+        while (board_bitmask_ == 0 && board_idx_ < getBoardSize()) {
+          board_bitmask_ = game_->board_[board_idx_];
+          board_idx_++;
+        }
 
-        uint32_t next_idx_off =
-            pawn_iterator::next_idx_ % (bits_per_entry / bits_per_tile);
+        if (board_bitmask_ == 0 && board_idx_ >= getBoardSize()) {
+          next_idx_ = 0;
+          return false;
+        }
+
+        uint32_t bitmask_idx_off =
+            (board_idx_ - 1) * (bits_per_entry / bits_per_tile);
+        uint32_t next_idx_off = __builtin_ctzl(board_bitmask_) / bits_per_tile;
+        next_idx_ = next_idx_off + bitmask_idx_off;
+
         turn_tile_mask = static_cast<uint64_t>(turn_tile_)
                          << (bits_per_tile * next_idx_off);
         clr_mask = tile_bitmask << (bits_per_tile * next_idx_off);
-      } while ((pawn_iterator::board_bitmask_ & clr_mask) != turn_tile_mask);
+        clr_mask = board_bitmask_ & clr_mask;
+
+        board_bitmask_ =
+            board_bitmask_ & ~(tile_bitmask << (bits_per_tile * next_idx_off));
+      } while (clr_mask != turn_tile_mask);
 
       return true;
     }
 
    private:
+    using pawn_iterator::board_bitmask_;
+    using pawn_iterator::board_idx_;
+    using pawn_iterator::game_;
+    using pawn_iterator::next_idx_;
+
     TileState turn_tile_;
   };
 

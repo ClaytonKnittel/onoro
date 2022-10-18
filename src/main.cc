@@ -24,9 +24,9 @@ static double timespec_diff(struct timespec* start, struct timespec* end) {
 static int benchmark() {
   onoro::Game<n_pawns> g;
 
-  static constexpr uint32_t n_moves = 6000000;
+  static constexpr uint32_t n_moves = 600000;
 
-  for (uint32_t i = 0; i < n_pawns * 2 - 3; i++) {
+  for (uint32_t i = 0; i < n_pawns - 3; i++) {
     uint32_t move_cnt = 0;
     g.forEachMove([&move_cnt](onoro::P1Move move) {
       move_cnt++;
@@ -178,9 +178,6 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
                                beta](MoveClass move) {
     onoro::Game<NPawns> g2(g, move);
     g_n_moves++;
-    if (g_n_moves % 100000 == 0) {
-      printf("%llu\n", g_n_moves);
-    }
     int32_t score;
 
     // If this move finished the game, it means playing it made us win.
@@ -210,10 +207,6 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
           m.insert(std::move(view), score);
         }
       } else {
-        static uint64_t cnt = 0;
-        if (cnt++ < 10) {
-          printf("Score!\n");
-        }
         score = 0;
       }
     }
@@ -289,7 +282,7 @@ static int playout() {
 }
 
 int main(int argc, char* argv[]) {
-  static constexpr const uint32_t N = 16;
+  static constexpr const uint32_t N = 8;
 
   printf("Game size: %zu bytes\n", sizeof(onoro::Game<N>));
 
