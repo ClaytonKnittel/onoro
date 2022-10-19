@@ -194,7 +194,10 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
         if (it != m.end()) {
           g_n_hits++;
 
-          score = it->second * (view.areColorsInverted() ? -1 : 1);
+          score =
+              it->second *
+              ((it->first.areColorsInverted() ^ view.areColorsInverted()) ? -1
+                                                                          : 1);
         } else {
           g_n_misses++;
 
@@ -239,7 +242,7 @@ static int playout() {
   printf("%s\n", g.Print().c_str());
 
   TranspositionTable m;
-  uint32_t max_depth = 16;
+  uint32_t max_depth = 20;
 
   // for (uint32_t i = 0; i < n_pawns - 3; i++) {
   for (uint32_t i = 0; i < 1; i++) {
