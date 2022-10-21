@@ -96,8 +96,12 @@ class TranspositionTable {
     SymmetryClassOpApplyAndReturn(s.symm_class, tryFindSymmetries, view, s);
   }
 
-  void insert(onoro::GameView<n_pawns>&& view, int32_t score) {
-    table_.emplace(view, score);
+  void insert(const onoro::GameView<n_pawns>& view, int32_t score) {
+    table_.insert({ view, score });
+  }
+
+  void insert_or_assign(const onoro::GameView<n_pawns>& view, int32_t score) {
+    table_.insert_or_assign(view, score);
   }
 
   const TableT& table() const {
@@ -200,6 +204,7 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
                                                                           : 1);
         } else {
           g_n_misses++;
+          m.insert(view, 0);
 
           int32_t _score;
           if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
@@ -213,7 +218,7 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
           }
           score = std::min(-_score, 1);
 
-          m.insert(std::move(view), score);
+          m.insert_or_assign(std::move(view), score);
         }
       } else {
         score = 0;
