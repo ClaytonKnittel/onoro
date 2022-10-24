@@ -1,7 +1,5 @@
 #pragma once
 
-#include <immintrin.h>
-
 #include <algorithm>
 #include <cstdint>
 #include <iomanip>
@@ -19,10 +17,7 @@ namespace onoro {
 using namespace hash_group;
 
 // (x, y) coordinates as an index.
-// TODO: idx_t to behave like HexPos, on a real coordinate system.
-typedef std::pair<uint8_t, uint8_t> idx_t;
-
-static constexpr const uint32_t MAX_IDX = 255;
+typedef std::pair<int32_t, int32_t> idx_t;
 
 // Forward declare GameHash
 template <uint32_t NPawns>
@@ -99,12 +94,13 @@ class Game {
 
    public:
     pawn_iterator& operator++() {
-      idx_++;
+      find_next();
       return *this;
     }
 
     bool operator==(const pawn_iterator& other) const {
-      return idx_ == other.idx_;
+      return board_idx_ == other.board_idx_ && next_idx_ == other.next_idx_ &&
+             board_bitmask_ == other.board_bitmask_;
     }
 
     bool operator!=(const pawn_iterator& other) const {
@@ -112,32 +108,60 @@ class Game {
     }
 
     idx_t operator*() const {
-      return game_->pawn_poses_[idx_];
+      return toIdx(next_idx_);
     }
 
-    bool isBlack() const {
-      return !(idx_ & 1);
+   private:
+    // Constructs the begin() iterator. Must call find_next after constructing
+    // it.
+    pawn_iterator(const Game<NPawns>& game)
+        : game_(&game), board_idx_(0), next_idx_(0), board_bitmask_(0) {}
+
+    // default constructor is for the end() iterator
+    pawn_iterator()
+        : game_(nullptr),
+          board_idx_(getBoardSize()),
+          next_idx_(0),
+          board_bitmask_(0) {}
+
+    static constexpr pawn_iterator end() {
+      return pawn_iterator();
     }
 
-   protected:
-    explicit pawn_iterator(const Game<NPawns>& game) : game_(&game), idx_(0) {}
-    pawn_iterator(const Game<NPawns>& game, uint32_t idx)
-        : game_(&game), idx_(idx) {}
+    /*
+     * tries to find the next pawn. if no pawns are left, returns false,
+     * otherwise returns true.
+     */
+    bool find_next() {
+      while (board_bitmask_ == 0 && board_idx_ < getBoardSize()) {
+        board_bitmask_ = game_->board_[board_idx_];
+        board_idx_++;
+      }
 
-    pawn_iterator() {}
+      if (board_bitmask_ == 0 && board_idx_ >= getBoardSize()) {
+        next_idx_ = 0;
+        return false;
+      }
 
-    static constexpr pawn_iterator end(const Game<NPawns>& game) {
-      pawn_iterator it;
-      it.game_ = nullptr;
-      it.idx_ = game.nPawnsInPlay();
-      return it;
+      uint32_t bitmask_idx_off =
+          (board_idx_ - 1) * (bits_per_entry / bits_per_tile);
+      uint32_t next_idx_off = __builtin_ctzl(board_bitmask_) / bits_per_tile;
+      next_idx_ = next_idx_off + bitmask_idx_off;
+
+      board_bitmask_ =
+          board_bitmask_ & ~(tile_bitmask << (bits_per_tile * next_idx_off));
+      return true;
     }
 
    protected:
     const Game<NPawns>* game_;
 
-    // index of the current pawn
-    uint32_t idx_;
+    // 1 + index into board_ which we are iterating over currenlty
+    uint32_t board_idx_;
+    // index of the next tile to look at
+    uint32_t next_idx_;
+    // bitmask of remaining pawns in the current board segment
+    uint64_t board_bitmask_;
   };
 
   class color_pawn_iterator : public pawn_iterator {
@@ -146,25 +170,55 @@ class Game {
    public:
     // Constructs the begin() iterator.
     color_pawn_iterator(const Game<NPawns>& game, bool black)
-        : pawn_iterator(game, black ? 0 : 1) {}
+        : pawn_iterator(game),
+          turn_tile_(black ? TileState::TILE_BLACK : TileState::TILE_WHITE) {}
 
     color_pawn_iterator& operator++() {
-      this->idx_ += 2;
+      find_next();
       return *this;
     }
 
    private:
     // default constructor is for the end() iterator
-    color_pawn_iterator() {}
+    color_pawn_iterator() : pawn_iterator() {}
 
-    static constexpr color_pawn_iterator end(const Game<NPawns>& game,
-                                             bool black) {
-      uint32_t n_pawns = game.nPawnsInPlay();
-      color_pawn_iterator it;
-      it.game_ = nullptr;
+    static constexpr color_pawn_iterator end() {
+      return color_pawn_iterator();
+    }
 
-      // Calculate the index the iterator will land on knowing it jumps by two.
-      it.idx_ = n_pawns + ((static_cast<uint32_t>(!black) ^ n_pawns) & 1);
+    /*
+     * tries to find the next pawn. if no pawns are left, returns false,
+     * otherwise returns true.
+     */
+    bool find_next() {
+      uint64_t turn_tile_mask;
+      uint64_t clr_mask;
+      do {
+        while (board_bitmask_ == 0 && board_idx_ < getBoardSize()) {
+          board_bitmask_ = game_->board_[board_idx_];
+          board_idx_++;
+        }
+
+        if (board_bitmask_ == 0 && board_idx_ >= getBoardSize()) {
+          next_idx_ = 0;
+          return false;
+        }
+
+        uint32_t bitmask_idx_off =
+            (board_idx_ - 1) * (bits_per_entry / bits_per_tile);
+        uint32_t next_idx_off = __builtin_ctzl(board_bitmask_) / bits_per_tile;
+        next_idx_ = next_idx_off + bitmask_idx_off;
+
+        turn_tile_mask = static_cast<uint64_t>(turn_tile_)
+                         << (bits_per_tile * next_idx_off);
+        clr_mask = tile_bitmask << (bits_per_tile * next_idx_off);
+        clr_mask = board_bitmask_ & clr_mask;
+
+        board_bitmask_ =
+            board_bitmask_ & ~(tile_bitmask << (bits_per_tile * next_idx_off));
+      } while (clr_mask != turn_tile_mask);
+
+      return true;
     }
 
    private:
@@ -292,6 +346,21 @@ class Game {
     uint8_t data_;
   };
 
+  /*
+   * Calculates the required size of board for a game with n_pawns pawns.
+   */
+  static constexpr uint32_t getBoardLen();
+
+  /*
+   * Calculates the number of tiles in the board.
+   */
+  static constexpr uint32_t getBoardNumTiles();
+
+  /*
+   * Calculates the size of the board in terms of uint64_t's.
+   */
+  static constexpr uint32_t getBoardSize();
+
   static constexpr uint32_t getSymmStateTableWidth();
 
   // Returns the size of the symm state table, in terms of number of elements.
@@ -318,7 +387,15 @@ class Game {
   static constexpr SymmetryClass symmStateClass(uint32_t x, uint32_t y,
                                                 uint32_t n_pawns);
 
-  static constexpr HexPos calcMoveShift(idx_t move);
+  // copies src into dst, shifting the bits in
+  // src left by "bit_offset" (with overflow propagated)
+  // bit_offset may be negative and any size (so long as its absolute value is <
+  // 64 * n_8bytes)
+  static void copyAndShift(uint64_t* __restrict__ dst,
+                           const uint64_t* __restrict__ src, size_t n_8bytes,
+                           int32_t bit_offset);
+
+  static std::pair<int, HexPos> calcMoveShiftAndOffset(const Game&, idx_t move);
 
  public:
   Game();
@@ -345,19 +422,6 @@ class Game {
   static constexpr std::array<BoardSymmStateData, getSymmStateTableSize()>
   genSymmStateTable();
 
-  void appendTile(idx_t pos);
-
-  // Changes the value of a tile at location "i" in the pawn_poses_ array
-  void moveTile(idx_t, uint32_t i);
-
-  /*
-   * Returns true if the last move made (passed in as last_move) caused a win.
-   */
-  bool checkWin(idx_t last_move) const;
-
-  // Shifts all pawns of game by the given offset
-  constexpr void shiftTiles(HexPos offset);
-
   /*
    * The board symmetry state data table is a cache of the BoardSymmStateData
    * values for points (x % NPawns, y % NPawns). Since the unit square
@@ -373,12 +437,7 @@ class Game {
   static constexpr std::array<BoardSymmStateData, getSymmStateTableSize()>
       symm_state_table = genSymmStateTable();
 
-  /*
-   * Array of indexes of pawn positions. Odd entries (even index) are black
-   * pawns, the others are white. Filled from lowest to highest index as the
-   * first phase proceeds.
-   */
-  idx_t pawn_poses_[NPawns];
+  uint64_t board_[getBoardSize()];
 
   GameState state_;
 
@@ -386,9 +445,21 @@ class Game {
   HexPos sum_of_mass_;
 
  public:
+  /*
+   * Converts an absolute index to an idx_t.
+   */
+  static constexpr idx_t toIdx(uint32_t i);
+
+  /*
+   * Converts an idx_t to an absolute index.
+   */
+  static constexpr uint32_t fromIdx(idx_t idx);
+
   static constexpr HexPos idxToPos(idx_t idx);
 
   static constexpr idx_t posToIdx(HexPos pos);
+
+  static constexpr bool inBounds(idx_t idx);
 
   uint32_t nPawnsInPlay() const;
 
@@ -396,12 +467,23 @@ class Game {
 
   bool inPhase2() const;
 
+  TileState getTile(uint32_t i) const;
   TileState getTile(idx_t idx) const;
+
+  void setTile(uint32_t i, TileState);
+  void setTile(idx_t idx, TileState);
+
+  void clearTile(idx_t idx);
+
+  bool isFinished() const;
 
   // returns true if black won, given isFinished() == true
   bool blackWins() const;
 
-  bool isFinished() const;
+  /*
+   * Returns true if the last move made (passed in as last_move) caused a win.
+   */
+  bool checkWin(idx_t last_move) const;
 
   template <class CallbackFnT>
   bool forEachNeighbor(idx_t idx, CallbackFnT cb) const;
@@ -433,7 +515,7 @@ class Game {
   static constexpr pawn_iterator pawns_end();
 
   color_pawn_iterator color_pawns_begin(bool black) const;
-  static constexpr color_pawn_iterator color_pawns_end(bool black);
+  static constexpr color_pawn_iterator color_pawns_end();
 
   /*
    * Iterates over all pawns on the board, calling cb with the idx_t of the pawn
@@ -451,6 +533,22 @@ class Game {
   template <class CallbackFnT>
   bool forEachPlayablePawn(CallbackFnT cb) const;
 };
+
+template <uint32_t NPawns>
+constexpr uint32_t Game<NPawns>::getBoardLen() {
+  return NPawns - 1;
+}
+
+template <uint32_t NPawns>
+constexpr uint32_t Game<NPawns>::getBoardNumTiles() {
+  return getBoardLen() * getBoardLen();
+}
+
+template <uint32_t NPawns>
+constexpr uint32_t Game<NPawns>::getBoardSize() {
+  return (getBoardNumTiles() * bits_per_tile + bits_per_entry - 1) /
+         bits_per_entry;
+}
 
 template <uint32_t NPawns>
 constexpr uint32_t Game<NPawns>::getSymmStateTableWidth() {
@@ -548,21 +646,63 @@ constexpr SymmetryClass Game<NPawns>::symmStateClass(uint32_t x, uint32_t y,
 }
 
 template <uint32_t NPawns>
-HexPos Game<NPawns>::calcMoveShift(idx_t move) {
+void Game<NPawns>::copyAndShift(uint64_t* __restrict__ dst,
+                                const uint64_t* __restrict__ src,
+                                size_t n_8bytes, int32_t bit_offset) {
+  int32_t offset = bit_offset >> 6;
+  uint32_t shift = bit_offset & 0x3f;
+  uint32_t rshift = shift == 0 ? 0 : 64 - shift;
+
+  uint64_t r;
+
+  if (shift == 0) {
+    if (offset >= 0) {
+      memset(dst, 0, offset * sizeof(uint64_t));
+      memcpy(dst + offset, src, (n_8bytes - offset) * sizeof(uint64_t));
+    } else {
+      memcpy(dst, src - offset, (n_8bytes + offset) * sizeof(uint64_t));
+      memset(dst + (n_8bytes + offset), 0, -offset * sizeof(uint64_t));
+    }
+  } else if (offset >= 0) {
+    memset(dst, 0, offset * sizeof(uint64_t));
+
+    r = 0;
+    for (size_t i = 0; i < n_8bytes - offset; i++) {
+      uint64_t b = src[i];
+      dst[i + offset] = r | (b << shift);
+      r = b >> rshift;
+    }
+  } else {
+    r = src[-(offset + 1)] >> rshift;
+    for (size_t i = 0; i < n_8bytes + offset; i++) {
+      uint64_t b = src[i - offset];
+      dst[i] = r | (b << shift);
+      r = b >> rshift;
+    }
+    dst[n_8bytes + offset] = r;
+    memset(dst + (n_8bytes + offset + 1), 0, -(offset + 1) * sizeof(uint64_t));
+  }
+}
+
+template <uint32_t NPawns>
+std::pair<int, HexPos> Game<NPawns>::calcMoveShiftAndOffset(const Game& g,
+                                                            idx_t move) {
+  int shift = 0;
   HexPos offset = { 0, 0 };
-  // TODO: make these jumps much larger
-  if (move.second < n_in_row_to_win - 1) {
+  if (move.second < 0) {
+    shift = getBoardLen() * 2;
     offset.x = 1;
     offset.y = 2;
-  } else if (move.second >
-             static_cast<int32_t>(MAX_IDX - (n_in_row_to_win - 1))) {
+  } else if (move.second > static_cast<int32_t>(getBoardLen() - 1)) {
+    shift = -static_cast<int>(getBoardLen() * 2);
     offset.x = -1;
     offset.y = -2;
   }
   if (move.first < 0) {
+    shift++;
     offset.x++;
-  } else if (move.first >
-             static_cast<int32_t>(MAX_IDX - (n_in_row_to_win - 1))) {
+  } else if (move.first > static_cast<int32_t>(getBoardLen() - 1)) {
+    shift--;
     offset.x--;
   }
 
@@ -588,7 +728,9 @@ template <uint32_t NPawns>
 Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
   static_assert(NPawns <= 2 * max_pawns_per_player);
 
-  int32_t mid_idx = (MAX_IDX - 1) / 2;
+  memset(this->board_, 0, getBoardSize() * sizeof(uint64_t));
+
+  int32_t mid_idx = (getBoardLen() - 1) / 2;
 
   if (true) {
     idx_t b_start = { mid_idx, mid_idx };
@@ -952,22 +1094,107 @@ Game<NPawns>::genSymmStateTable() {
 }
 
 template <uint32_t NPawns>
-__m256 Game<NPawns>::_loadPawnPoses() const {
-  return *reinterpret_cast<const __m256*>(pawn_poses_);
+constexpr idx_t Game<NPawns>::toIdx(uint32_t i) {
+  return { i % getBoardLen(), i / getBoardLen() };
 }
 
 template <uint32_t NPawns>
-void Game<NPawns>::appendTile(idx_t pos) {
-  pawn_poses_[state_.turn] = pos;
-  state_.turn++;
-  state_.blackTurn = !state_.blackTurn;
+constexpr uint32_t Game<NPawns>::fromIdx(idx_t idx) {
+  return static_cast<uint32_t>(idx.first + idx.second * getBoardLen());
 }
 
-template <uint8_t NPawns>
-void Game<NPawns>::moveTile(idx_t pos, uint32_t i) {
-  pawn_poses_[i] = pos;
-  state_.turn++;
-  state_.blackTurn = !state_.blackTurn;
+template <uint32_t NPawns>
+constexpr HexPos Game<NPawns>::idxToPos(idx_t idx) {
+  return { idx.first + (idx.second >> 1), idx.second };
+}
+
+template <uint32_t NPawns>
+constexpr idx_t Game<NPawns>::posToIdx(HexPos pos) {
+  return { pos.x - (pos.y >> 1), pos.y };
+}
+
+template <uint32_t NPawns>
+constexpr bool Game<NPawns>::inBounds(idx_t idx) {
+  auto [x, y] = idx;
+  return x >= 0 && x < static_cast<int32_t>(getBoardLen()) && y >= 0 &&
+         y < static_cast<int32_t>(getBoardLen());
+}
+
+template <uint32_t NPawns>
+uint32_t Game<NPawns>::nPawnsInPlay() const {
+  return state_.turn + 1;
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::blackTurn() const {
+  return state_.blackTurn;
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::inPhase2() const {
+  return state_.turn == NPawns - 1;
+}
+
+template <uint32_t NPawns>
+typename Game<NPawns>::TileState Game<NPawns>::getTile(uint32_t i) const {
+  uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
+  uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
+
+  return TileState((tile_bitv >> (bits_per_tile * bitv_idx)) & tile_bitmask);
+}
+
+template <uint32_t NPawns>
+typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
+  auto [x, y] = idx;
+  uint32_t i = static_cast<uint32_t>(x + y * getBoardLen());
+
+  uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
+  uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
+
+  return TileState((tile_bitv >> (bits_per_tile * bitv_idx)) & tile_bitmask);
+}
+
+template <uint32_t NPawns>
+void Game<NPawns>::setTile(uint32_t i, TileState piece) {
+  uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
+  uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
+  uint64_t bitv_mask =
+      (static_cast<uint64_t>(piece) << (bits_per_tile * bitv_idx));
+
+  board_[i * bits_per_tile / bits_per_entry] = tile_bitv | bitv_mask;
+}
+
+template <uint32_t NPawns>
+void Game<NPawns>::setTile(idx_t idx, TileState piece) {
+  uint32_t i = fromIdx(idx);
+
+  uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
+  uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
+  uint64_t bitv_mask =
+      (static_cast<uint64_t>(piece) << (bits_per_tile * bitv_idx));
+
+  board_[i * bits_per_tile / bits_per_entry] = tile_bitv | bitv_mask;
+}
+
+template <uint32_t NPawns>
+void Game<NPawns>::clearTile(idx_t idx) {
+  uint32_t i = fromIdx(idx);
+
+  uint64_t tile_bitv = board_[i * bits_per_tile / bits_per_entry];
+  uint32_t bitv_idx = i % (bits_per_entry / bits_per_tile);
+  uint64_t bitv_mask = ~(tile_bitmask << (bits_per_tile * bitv_idx));
+
+  board_[i * bits_per_tile / bits_per_entry] = tile_bitv & bitv_mask;
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::isFinished() const {
+  return state_.finished;
+}
+
+template <uint32_t NPawns>
+bool Game<NPawns>::blackWins() const {
+  return !state_.blackTurn;
 }
 
 template <uint32_t NPawns>
@@ -984,6 +1211,10 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
     for (HexPos i = last_move_pos - (HexPos){ n_in_row_to_win, 0 };
          i != last_pos; i += (HexPos){ 1, 0 }) {
       idx_t idx = posToIdx(i);
+      if (!inBounds(idx)) {
+        continue;
+      }
+
       if (getTile(idx) == move_color) {
         n_in_row++;
       } else {
@@ -1004,6 +1235,10 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
              last_move_pos - (HexPos){ n_in_row_to_win, n_in_row_to_win };
          i != last_pos; i += (HexPos){ 1, 1 }) {
       idx_t idx = posToIdx(i);
+      if (!inBounds(idx)) {
+        continue;
+      }
+
       if (getTile(idx) == move_color) {
         n_in_row++;
       } else {
@@ -1022,6 +1257,10 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
     for (HexPos i = last_move_pos - (HexPos){ 0, n_in_row_to_win };
          i != last_pos; i += (HexPos){ 0, 1 }) {
       idx_t idx = posToIdx(i);
+      if (!inBounds(idx)) {
+        continue;
+      }
+
       if (getTile(idx) == move_color) {
         n_in_row++;
       } else {
@@ -1038,79 +1277,6 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
 }
 
 template <uint32_t NPawns>
-void Game<NPawns>::shiftTiles(HexPos offset) {}
-
-template <uint32_t NPawns>
-constexpr HexPos Game<NPawns>::idxToPos(idx_t idx) {
-  return { static_cast<int32_t>(idx.first) +
-               (static_cast<int32_t>(idx.second) >> 1),
-           static_cast<int32_t>(idx.second) };
-}
-
-template <uint32_t NPawns>
-constexpr idx_t Game<NPawns>::posToIdx(HexPos pos) {
-  return { static_cast<uint8_t>(pos.x - (pos.y >> 1)),
-           static_cast<uint8_t>(pos.y) };
-}
-
-template <uint32_t NPawns>
-uint32_t Game<NPawns>::nPawnsInPlay() const {
-  return state_.turn + 1;
-}
-
-template <uint32_t NPawns>
-bool Game<NPawns>::blackTurn() const {
-  return state_.blackTurn;
-}
-
-template <uint32_t NPawns>
-bool Game<NPawns>::inPhase2() const {
-  return state_.turn == NPawns - 1;
-}
-
-template <uint32_t NPawns>
-typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
-  uint64_t i;
-  uint64_t* pawn_poses = reinterpret_cast<const uint64_t*>(pawn_poses_);
-
-  uint16_t _idx = reinterpret_cast<uint16_t>(idx);
-  uint64_t mask = static_cast<uint64_t>(_idx) << 16;
-  mask = mask << 32;
-
-  for (i = 0; i < NPawns / 4; i++) {
-    uint64_t xor_search = mask ^ pawn_poses[i];
-
-    uint64_t zero_mask = (xor_search - UINT64_C(0x0001000100010001)) &
-                         ~xor_search & UINT64_C(0x8000800080008000);
-    if (zero_mask != 0) {
-      uint32_t set_bit_idx = __builtin_ctzl(zero_mask);
-      // Black has the even indices, white has the odd.
-      return ((set_bit_idx / 16) & 0x1) ? TileState::TILE_WHITE
-                                        : TileState::TILE_BLACK;
-    }
-  }
-
-  // only necessary if NPawns not a multiple of four
-  for (i = 4 * i; i < NPawns; i++) {
-    if (pawn_poses[i] == idx) {
-      return (i & 0x1) ? TileState::TILE_WHITE : TileState::TILE_BLACK;
-    }
-  }
-
-  return TileState::TILE_EMPTY;
-}
-
-template <uint32_t NPawns>
-bool Game<NPawns>::blackWins() const {
-  return !state_.blackTurn;
-}
-
-template <uint32_t NPawns>
-bool Game<NPawns>::isFinished() const {
-  return state_.finished;
-}
-
-template <uint32_t NPawns>
 template <class CallbackFnT>
 bool Game<NPawns>::forEachNeighbor(idx_t idx, CallbackFnT cb) const {
   auto [x, y] = idx;
@@ -1121,12 +1287,38 @@ bool Game<NPawns>::forEachNeighbor(idx_t idx, CallbackFnT cb) const {
       return false;
   // clang-format on
 
-  CB_OR_RET({ x - 1, y - 1 });
-  CB_OR_RET({ x, y - 1 });
-  CB_OR_RET({ x - 1, y });
-  CB_OR_RET({ x + 1, y });
-  CB_OR_RET({ x, y + 1 });
-  CB_OR_RET({ x + 1, y + 1 });
+  if (y > 0) {
+    CB_OR_RET({ x, y - 1 });
+
+    if ((y & 1) == 0) {
+      if (x < static_cast<int32_t>(getBoardLen() - 1)) {
+        CB_OR_RET({ x + 1, y - 1 });
+      }
+    } else {
+      if (x > 0) {
+        CB_OR_RET({ x - 1, y - 1 });
+      }
+    }
+  }
+  if (x > 0) {
+    CB_OR_RET({ x - 1, y });
+  }
+  if (x < static_cast<int32_t>(getBoardLen() - 1)) {
+    CB_OR_RET({ x + 1, y });
+  }
+  if (y < static_cast<int32_t>(getBoardLen() - 1)) {
+    CB_OR_RET({ x, y + 1 });
+
+    if ((y & 1) == 0) {
+      if (x < static_cast<int32_t>(getBoardLen() - 1)) {
+        CB_OR_RET({ x + 1, y + 1 });
+      }
+    } else {
+      if (x > 0) {
+        CB_OR_RET({ x - 1, y + 1 });
+      }
+    }
+  }
 
   return true;
 }
@@ -1142,9 +1334,22 @@ bool Game<NPawns>::forEachTopLeftNeighbor(idx_t idx, CallbackFnT cb) const {
       return false;
   // clang-format on
 
-  CB_OR_RET({ x - 1, y - 1 });
-  CB_OR_RET({ x, y - 1 });
-  CB_OR_RET({ x - 1, y });
+  if (y > 0) {
+    CB_OR_RET({ x, y - 1 });
+
+    if ((y & 1) == 0) {
+      if (x < static_cast<int32_t>(getBoardLen() - 1)) {
+        CB_OR_RET({ x + 1, y - 1 });
+      }
+    } else {
+      if (x > 0) {
+        CB_OR_RET({ x - 1, y - 1 });
+      }
+    }
+  }
+  if (x > 0) {
+    CB_OR_RET({ x - 1, y });
+  }
 
   return true;
 }
@@ -1403,6 +1608,7 @@ constexpr HexPos Game<NPawns>::originTile(
 template <uint32_t NPawns>
 typename Game<NPawns>::pawn_iterator Game<NPawns>::pawns_begin() const {
   typename Game<NPawns>::pawn_iterator it = pawn_iterator(*this);
+  it.find_next();
   return it;
 }
 
@@ -1416,13 +1622,14 @@ typename Game<NPawns>::color_pawn_iterator Game<NPawns>::color_pawns_begin(
     bool black) const {
   typename Game<NPawns>::color_pawn_iterator it =
       color_pawn_iterator(*this, black);
+  it.find_next();
   return it;
 }
 
 template <uint32_t NPawns>
 constexpr typename Game<NPawns>::color_pawn_iterator
-Game<NPawns>::color_pawns_end(bool black) {
-  return Game<NPawns>::color_pawn_iterator::end(*this, black);
+Game<NPawns>::color_pawns_end() {
+  return Game<NPawns>::color_pawn_iterator::end();
 }
 
 template <uint32_t NPawns>
@@ -1440,9 +1647,8 @@ bool Game<NPawns>::forEachPawn(CallbackFnT cb) const {
 template <uint32_t NPawns>
 template <class CallbackFnT>
 bool Game<NPawns>::forEachPlayablePawn(CallbackFnT cb) const {
-  const color_pawn_iterator end = color_pawns_end(state_.blackTurn);
-  for (color_pawn_iterator it = color_pawns_begin(state_.blackTurn); it != end;
-       ++it) {
+  for (color_pawn_iterator it = color_pawns_begin(state_.blackTurn);
+       it != color_pawns_end(); ++it) {
     if (!cb(*it)) {
       return false;
     }
