@@ -46,7 +46,6 @@ static int benchmark() {
       if (which == 0) {
         onoro::Game<n_pawns> g2(g, move);
         g = std::move(g2);
-        printf("Move (%u, %u)\n", move.loc.x(), move.loc.y());
         return false;
       } else {
         which--;
@@ -64,8 +63,8 @@ static int benchmark() {
   clock_gettime(CLOCK_MONOTONIC, &start);
 
   for (uint32_t i = 0; i < n_moves; i++) {
-    /*int move_cnt = 0;
-    g.forEachMoveP2([&move_cnt](onoro::idx_t to, onoro::idx_t from) {
+    int move_cnt = 0;
+    g.forEachMoveP2([&move_cnt](onoro::P2Move move) {
       move_cnt++;
       return true;
     });
@@ -73,13 +72,23 @@ static int benchmark() {
     if (move_cnt == 0) {
       printf("Player won by no legal moves\n");
       return -1;
-    }*/
+    }
 
-    int which = 0;  // rand() % move_cnt;
-    g.forEachMoveP2([&g, &which](onoro::P2Move move) {
+    int which = rand() % move_cnt;
+    g.forEachMoveP2([&g, &which, i](onoro::P2Move move) {
       if (which == 0) {
         onoro::Game<n_pawns> g2(g, move);
         g = std::move(g2);
+
+        std::ostringstream ostr;
+        if (i != 0) {
+          ostr << CSI_CHA(0);
+          for (uint32_t j = 0; j < n_pawns; j++) {
+            ostr << CSI_CUU(1) CSI_EL(CSI_CURSOR_ALL);
+          }
+        }
+        printf("%s%s\n", ostr.str().c_str(), g.Print().c_str());
+        usleep(1000);
         return false;
       } else {
         which--;
