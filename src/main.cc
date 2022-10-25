@@ -62,7 +62,8 @@ static int benchmark() {
   struct timespec start, end;
   clock_gettime(CLOCK_MONOTONIC, &start);
 
-  for (uint32_t i = 0; i < n_moves; i++) {
+  uint32_t i;
+  for (i = 0; i < n_moves; i++) {
     int move_cnt = 0;
     g.forEachMoveP2([&move_cnt](onoro::P2Move move) {
       move_cnt++;
@@ -70,9 +71,9 @@ static int benchmark() {
     });
 
     if (move_cnt == 0) {
-      printf("%s\n", g.Print().c_str());
       printf("Player won by no legal moves\n");
-      return -1;
+      printf("%s\n", g.Print().c_str());
+      break;
     }
 
     int which = rand() % move_cnt;
@@ -101,7 +102,8 @@ static int benchmark() {
   }
   clock_gettime(CLOCK_MONOTONIC, &end);
 
-  printf("Did %u moves in %f s\n", n_moves, timespec_diff(&start, &end));
+  printf("Did %u moves in %f s\n", i, timespec_diff(&start, &end));
+  printf("%f moves/sec\n", i / timespec_diff(&start, &end));
 
   return 0;
 }
