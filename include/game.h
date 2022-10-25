@@ -18,11 +18,74 @@ namespace onoro {
 
 using namespace hash_group;
 
-// (x, y) coordinates as an index.
-// TODO: idx_t to behave like HexPos, on a real coordinate system.
-typedef std::pair<uint8_t, uint8_t> idx_t;
+/*
+ * (x, y) coordinates as an index.
+ *
+ * The game played on a hexagonal grid, but is internally represented as a 2D
+ * cartesian grid, indexed as shown:
+ *
+ *  (0,0)  (1,0)  (2,0)  (3,0) ...
+ *
+ *     (0,1)  (1,1)  (2,1)  (3,1) ...
+ *
+ *         (0,2)  (1,2)  (2,2)  (3,2) ...
+ *
+ *              ...
+ *
+ * The x and y coordinates can range from 0 to num_pawns - 1.
+ */
+struct idx_t {
+  uint8_t _bytes;
 
-static constexpr const uint32_t MAX_IDX = 255;
+ private:
+  explicit idx_t(uint8_t bytes) : _bytes(bytes) {}
+
+ public:
+  idx_t(uint32_t x, uint32_t y) : _bytes(x | (y << 4)) {}
+
+  idx_t operator+(idx_t other) const {
+    // Assume no overflow
+    return idx_t(_bytes + other.bytes);
+  }
+
+  idx_t operator+=(idx_t other) {
+    *this = (*this + other);
+    return *this;
+  }
+
+  // Constructs an idx_t that will increase/decrease the value of the x
+  // coordinate of an idx_t by "i" when added to it.
+  static constexpr idx_t add_x(int32_t i) {
+    // For negative i, let the bits above 0-3 overflow into the y "slot", so
+    // that upon subtraction the y slot will remain unchanged (so long as x is
+    // not smaller than abs(i)).
+    return idx_t(static_cast<uint8_t>(i));
+  }
+
+  // Constructs an idx_t that will increase/decrease the value of the y
+  // coordinate of an idx_t by "i" when added to it.
+  static constexpr idx_t add_y(int32_t i) {
+    return idx_t(static_cast<uint8_t>(i << 4));
+  }
+
+  uint32_t x() const {
+    return _bytes & 0x0fu;
+  }
+
+  void set_x(uint32_t x) {
+    _bytes = static_cast<uint8_t>((_bytes & 0xf0u) | x);
+  }
+
+  uint32_t y() const {
+    return (_bytes & 0xf0u) >> 4;
+  }
+
+  void set_y(uint32_t y) {
+    _bytes = static_cast<uint8_t>((_bytes & 0x0fu) | (y << 4));
+  }
+};
+
+static constexpr const uint32_t MAX_IDX = 15;
 
 // Forward declare GameHash
 template <uint32_t NPawns>
@@ -53,8 +116,8 @@ struct P2Move {
 
   // Position to move pawn to.
   idx_t to;
-  // Position to move pawn from.
-  idx_t from;
+  // Position in pawn_poses array to move pawn from.
+  uint8_t from_idx;
 };
 
 template <uint32_t NPawns>
@@ -136,7 +199,7 @@ class Game {
    protected:
     const Game<NPawns>* game_;
 
-    // index of the current pawn
+    // index of the current pawn in the list of pawn_poses_
     uint32_t idx_;
   };
 
@@ -149,7 +212,7 @@ class Game {
         : pawn_iterator(game, black ? 0 : 1) {}
 
     color_pawn_iterator& operator++() {
-      this->idx_ += 2;
+      this->pawn_iterator::idx_ += 2;
       return *this;
     }
 
@@ -161,19 +224,12 @@ class Game {
                                              bool black) {
       uint32_t n_pawns = game.nPawnsInPlay();
       color_pawn_iterator it;
-      it.game_ = nullptr;
+      it.pawn_iterator::game_ = nullptr;
 
       // Calculate the index the iterator will land on knowing it jumps by two.
-      it.idx_ = n_pawns + ((static_cast<uint32_t>(!black) ^ n_pawns) & 1);
+      it.pawn_iterator::idx_ =
+          n_pawns + ((static_cast<uint32_t>(!black) ^ n_pawns) & 1);
     }
-
-   private:
-    using pawn_iterator::board_bitmask_;
-    using pawn_iterator::board_idx_;
-    using pawn_iterator::game_;
-    using pawn_iterator::next_idx_;
-
-    TileState turn_tile_;
   };
 
  private:
@@ -318,7 +374,7 @@ class Game {
   static constexpr SymmetryClass symmStateClass(uint32_t x, uint32_t y,
                                                 uint32_t n_pawns);
 
-  static constexpr HexPos calcMoveShift(idx_t move);
+  static constexpr std::pair<idx_t, HexPos> calcMoveShift(idx_t move);
 
  public:
   Game();
@@ -356,7 +412,7 @@ class Game {
   bool checkWin(idx_t last_move) const;
 
   // Shifts all pawns of game by the given offset
-  constexpr void shiftTiles(HexPos offset);
+  constexpr void shiftTiles(idx_t offset);
 
   /*
    * The board symmetry state data table is a cache of the BoardSymmStateData
@@ -548,113 +604,86 @@ constexpr SymmetryClass Game<NPawns>::symmStateClass(uint32_t x, uint32_t y,
 }
 
 template <uint32_t NPawns>
-HexPos Game<NPawns>::calcMoveShift(idx_t move) {
-  HexPos offset = { 0, 0 };
-  // TODO: make these jumps much larger
-  if (move.second < n_in_row_to_win - 1) {
-    offset.x = 1;
-    offset.y = 2;
-  } else if (move.second >
-             static_cast<int32_t>(MAX_IDX - (n_in_row_to_win - 1))) {
-    offset.x = -1;
-    offset.y = -2;
+idx_t Game<NPawns>::calcMoveShift(idx_t move) {
+  idx_t offset(0, 0);
+  HexPos hex_offset{ 0, 0 };
+
+  if (move.y() == 0) {
+    offset = idx_t::add_y(1);
+    hex_offset = HexPos{ 0, 1 };
+  } else if (move.y() == MAX_IDX) {
+    offset = idx_t::add_y(-1);
+    hex_offset = HexPos{ 0, -1 };
   }
-  if (move.first < 0) {
-    offset.x++;
-  } else if (move.first >
-             static_cast<int32_t>(MAX_IDX - (n_in_row_to_win - 1))) {
-    offset.x--;
+  if (move.x() < 0) {
+    offset += idx_t::add_x(1);
+    hex_offset += HexPos{ 1, 0 };
+  } else if (move.x() == MAX_IDX) {
+    offset += idx_t::add_x(-1);
+    hex_offset == HexPos{ -1, 0 };
   }
 
-  return { shift, offset };
+  return { offset, hex_offset };
 }
-
-/*
- * The game played on a hexagonal grid, but is internally represented as a 2D
- * cartesian grid, indexed as shown:
- *
- *     0     1     2     3     4   ...
- *
- *  n    n+1   n+2   n+3   n+4     ...
- *
- *     2n  2n+1   2n+2  2n+3  2n+4 ...
- *
- *  3n  3n+1   3n+2  3n+3  3n+4    ...
- */
 
 // Black goes first, but since black has 2 forced moves and white only has 1,
 // white is effectively first to make a choice.
 template <uint32_t NPawns>
-Game<NPawns>::Game() : state_({ 2, 0, 0, 0 }) {
+Game<NPawns>::Game() : state_({ -1u, 1, 0, 0 }), sum_of_mass_(0, 0) {
   static_assert(NPawns <= 2 * max_pawns_per_player);
 
   int32_t mid_idx = (MAX_IDX - 1) / 2;
 
   if (true) {
-    idx_t b_start = { mid_idx, mid_idx };
-    idx_t w_start = { mid_idx + !(mid_idx & 1), mid_idx + 1 };
-    idx_t b_next = { mid_idx + 1, mid_idx };
+    idx_t b_start(mid_idx, mid_idx);
+    idx_t w_start(mid_idx + !(mid_idx & 1), mid_idx + 1);
+    idx_t b_next(mid_idx + 1, mid_idx);
 
-    setTile(b_start, TileState::TILE_BLACK);
-    setTile(w_start, TileState::TILE_WHITE);
-    setTile(b_next, TileState::TILE_BLACK);
-
-    sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next);
+    appendTile(b_start, TileState::TILE_BLACK);
+    appendTile(w_start, TileState::TILE_WHITE);
+    appendTile(b_next, TileState::TILE_BLACK);
   } else {
-    idx_t b_start = { mid_idx + !(mid_idx & 1), mid_idx - 1 };
-    idx_t w_start = { mid_idx + !(mid_idx & 1), mid_idx + 1 };
-    idx_t b_next = { mid_idx + 1, mid_idx };
-    idx_t w_next = { mid_idx - (mid_idx & 1), mid_idx + 1 };
-    idx_t b_next2 = { mid_idx - 1, mid_idx };
-    idx_t w_next2 = { mid_idx - (mid_idx & 1), mid_idx - 1 };
+    idx_t b_start(mid_idx + !(mid_idx & 1), mid_idx - 1);
+    idx_t w_start(mid_idx + !(mid_idx & 1), mid_idx + 1);
+    idx_t b_next(mid_idx + 1, mid_idx);
+    idx_t w_next(mid_idx - (mid_idx & 1), mid_idx + 1);
+    idx_t b_next2(mid_idx - 1, mid_idx);
+    idx_t w_next2(mid_idx - (mid_idx & 1), mid_idx - 1);
 
-    setTile(b_start, TileState::TILE_BLACK);
-    setTile(w_start, TileState::TILE_BLACK);
-    setTile(b_next, TileState::TILE_WHITE);
-    setTile(w_next, TileState::TILE_WHITE);
-    setTile(b_next2, TileState::TILE_BLACK);
-    setTile(w_next2, TileState::TILE_WHITE);
-
-    sum_of_mass_ = idxToPos(b_start) + idxToPos(w_start) + idxToPos(b_next) +
-                   idxToPos(w_next) + idxToPos(b_next2) + idxToPos(w_next2);
-    state_.turn = 5;
-    state_.blackTurn = 1;
+    appendTile(b_start, TileState::TILE_BLACK);
+    appendTile(w_start, TileState::TILE_BLACK);
+    appendTile(b_next, TileState::TILE_WHITE);
+    appendTile(w_next, TileState::TILE_WHITE);
+    appendTile(b_next2, TileState::TILE_BLACK);
+    appendTile(w_next2, TileState::TILE_WHITE);
   }
 }
 
 template <uint32_t NPawns>
 Game<NPawns>::Game(const Game<NPawns>& g, P1Move move)
     : state_({ static_cast<uint8_t>(g.state_.turn + 1), !g.state_.blackTurn, 0,
-               0 }) {
-  auto [shift, offset] = calcMoveShiftAndOffset(g, move.loc);
-  copyAndShift(reinterpret_cast<uint64_t*>(board_),
-               reinterpret_cast<const uint64_t*>(g.board_), getBoardSize(),
-               shift * bits_per_tile);
+               0 }),
+      sum_of_mass_(g.sum_of_mass_) {
+  appendTile(move.loc);
 
-  sum_of_mass_ = g.sum_of_mass_ + idxToPos(move.loc) + nPawnsInPlay() * offset;
+  auto [offset, hex_offset] = calcMoveShift(move.loc);
+  shiftTiles(offset);
+  sum_of_mass_ += nPawnsInPlay() * hex_offset;
 
-  setTile(posToIdx(idxToPos(move.loc) + offset),
-          g.state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
-
-  state_.finished = checkWin(move.loc);
+  state_.finished = checkWin(move.loc + offset);
 }
 
 template <uint32_t NPawns>
 Game<NPawns>::Game(const Game& g, P2Move move)
-    : state_({ g.state_.turn, !g.state_.blackTurn, 0, 0 }) {
-  auto [shift, offset] = calcMoveShiftAndOffset(g, move.to);
-  copyAndShift(reinterpret_cast<uint64_t*>(board_),
-               reinterpret_cast<const uint64_t*>(g.board_), getBoardSize(),
-               shift * bits_per_tile);
+    : state_({ g.state_.turn, !g.state_.blackTurn, 0, 0 }),
+      sum_of_mass_(g.sum_of_mass_) {
+  moveTile(move.to, move.from_idx);
 
-  sum_of_mass_ = g.sum_of_mass_ + idxToPos(move.to) - idxToPos(move.from) +
-                 NPawns * offset;
+  auto [offset, hex_offset] = calcMoveShift(move.to);
+  shiftTiles(offset);
+  sum_of_mass_ += NPawns * hex_offset;
 
-  setTile(posToIdx(idxToPos(move.to) + offset),
-          g.state_.blackTurn ? TileState::TILE_BLACK : TileState::TILE_WHITE);
-  clearTile(posToIdx(idxToPos(move.from) + offset));
-
-  state_.finished = checkWin(move.to);
+  state_.finished = checkWin(move.to + offset);
 }
 
 template <uint32_t NPawns>
@@ -666,14 +695,12 @@ std::string Game<NPawns>::Print() const {
   };
 
   std::ostringstream ostr;
-  for (uint32_t y = getBoardLen() - 1; y < getBoardLen(); y--) {
-    if (y % 2 == 0) {
-      ostr << " ";
-    }
+  for (uint32_t y = NPawns - 1; y < NPawns; y--) {
+    ostr << std::setw(NPawns - 1 - y) << "";
 
-    for (uint32_t x = 0; x < getBoardLen(); x++) {
-      ostr << tile_str[static_cast<int>(getTile({ x, y }))];
-      if (x < getBoardLen() - 1) {
+    for (uint32_t x = 0; x < NPawns; x++) {
+      ostr << tile_str[static_cast<int>(getTile(idx_t(x, y)))];
+      if (x < NPawns - 1) {
         ostr << " ";
       }
     }
@@ -696,13 +723,13 @@ std::string Game<NPawns>::Print2() const {
   HexPos origin = originTile(calcSymmetryState());
 
   std::ostringstream ostr;
-  for (uint32_t y = getBoardLen() - 1; y < getBoardLen(); y--) {
+  for (uint32_t y = NPawns - 1; y < NPawns; y--) {
     ostr << std::setw(2) << y << std::setw(2 * (y / 2)) << "";
 
-    for (uint32_t x = 0; x < getBoardLen(); x++) {
-      ostr << tile_str[static_cast<uint32_t>(getTile({ x, y }))];
+    for (uint32_t x = 0; x < NPawns; x++) {
+      ostr << tile_str[static_cast<uint32_t>(getTile(idx_t(x, y)))];
 
-      HexPos tile = idxToPos((idx_t){ (int32_t) x, (int32_t) y });
+      HexPos tile = idxToPos(idx_t(x, y));
       if (tile == origin) {
         ostr << "x";
       } else if (y == 0) {
@@ -712,7 +739,7 @@ std::string Game<NPawns>::Print2() const {
       }
       ostr << P_256_BG_DEFAULT;
 
-      if (x < getBoardLen() - 1) {
+      if (x < NPawns - 1) {
         ostr << " ";
       }
     }
@@ -730,31 +757,34 @@ bool Game<NPawns>::validate() const {
   uint32_t n_w_pawns = 0;
   HexPos sum_of_mass = { 0, 0 };
 
-  UnionFind<uint32_t> uf(getBoardNumTiles());
+  UnionFind<uint32_t> uf(NPawns * NPawns);
 
-  if (!forEachPawn([this, &n_b_pawns, &n_w_pawns, &sum_of_mass,
-                    &uf](idx_t idx) {
-        sum_of_mass += idxToPos(idx);
+  if (!forEachPawn(
+          [this, &n_b_pawns, &n_w_pawns, &sum_of_mass, &uf](idx_t idx) {
+            sum_of_mass += idxToPos(idx);
 
-        if (getTile(idx) == TileState::TILE_BLACK) {
-          n_b_pawns++;
-        } else if (getTile(idx) == TileState::TILE_WHITE) {
-          n_w_pawns++;
-        } else {
-          printf("Unexpected empty tile at (%d, %d)\n", idx.first, idx.second);
-          return false;
-        }
+            if (getTile(idx) == TileState::TILE_BLACK) {
+              n_b_pawns++;
+            } else if (getTile(idx) == TileState::TILE_WHITE) {
+              n_w_pawns++;
+            } else {
+              printf("Unexpected empty tile at (%d, %d)\n", idx.x(), idx.y());
+              return false;
+            }
 
-        // Union this pawn with its neigbors
-        forEachTopLeftNeighbor(idx, [&uf, idx, this](idx_t neighbor_idx) {
-          if (getTile(neighbor_idx) != TileState::TILE_EMPTY) {
-            uf.Union(fromIdx(idx), fromIdx(neighbor_idx));
-          }
-          return true;
-        });
+            // Union this pawn with its neigbors
+            forEachTopLeftNeighbor(idx, [&uf, idx, this](idx_t neighbor_idx) {
+              if (getTile(neighbor_idx) != TileState::TILE_EMPTY) {
+                uint32_t ord = idx.x() + idx.y() * NPawns;
+                uint32_t neighbor_ord =
+                    neighbor_idx.x() + neighbor_idx.y() * NPawns;
+                uf.Union(ord, neighbor_ord);
+              }
+              return true;
+            });
 
-        return true;
-      })) {
+            return true;
+          })) {
     return false;
   }
 
@@ -958,16 +988,21 @@ __m256 Game<NPawns>::_loadPawnPoses() const {
 
 template <uint32_t NPawns>
 void Game<NPawns>::appendTile(idx_t pos) {
-  pawn_poses_[state_.turn] = pos;
   state_.turn++;
+  pawn_poses_[state_.turn] = pos;
+
   state_.blackTurn = !state_.blackTurn;
+  sum_of_mass_ += idxToPos(pos);
 }
 
 template <uint8_t NPawns>
 void Game<NPawns>::moveTile(idx_t pos, uint32_t i) {
+  idx_t old_idx = pawn_poses_[i];
   pawn_poses_[i] = pos;
+
   state_.turn++;
   state_.blackTurn = !state_.blackTurn;
+  sum_of_mass_ += idxToPos(pos) - idxToPos(old_idx);
 }
 
 template <uint32_t NPawns>
