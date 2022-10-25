@@ -16,6 +16,8 @@ namespace onoro {
 
 using namespace hash_group;
 
+typedef std::pair<int32_t, int32_t> hash_idx_t;
+
 /*
  * GameHash has one of five forms, depending on the board group structure:
  * - D6 (12 symmetries):
@@ -80,11 +82,15 @@ class GameHash {
   static constexpr HexPos getCenter();
 
   // Translates from an absolute index to an index object.
-  static constexpr idx_t toIdx(uint32_t i);
+  static constexpr hash_idx_t toIdx(uint32_t i);
 
-  static constexpr uint32_t fromIdx(idx_t idx);
+  static constexpr uint32_t fromIdx(hash_idx_t idx);
 
-  static constexpr bool inBounds(idx_t idx);
+  static constexpr HexPos idxToPos(hash_idx_t idx);
+
+  static constexpr hash_idx_t posToIdx(HexPos pos);
+
+  static constexpr bool inBounds(hash_idx_t idx);
 
   /*
    * Returns the hash table associated with the given symmetry class.
@@ -214,7 +220,7 @@ constexpr game_hash_t GameHash<NPawns>::calcHash(
 template <uint32_t NPawns>
 bool GameHash<NPawns>::validate() const {
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+    HexPos p = idxToPos(toIdx(i));
 
     p -= getCenter();
 
@@ -226,10 +232,9 @@ bool GameHash<NPawns>::validate() const {
       s = s.c_r1();
       op = D6(D6::Action::ROT, 1) * op;
 
-      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      hash_idx_t idx = posToIdx(s + getCenter());
       if (inBounds(idx)) {
-        const HashEl& hs =
-            d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& hs = d6_table_[fromIdx(posToIdx(s + getCenter()))];
         if (apply_d6(op, h.black_hash()) != hs.black_hash() ||
             apply_d6(op, h.white_hash()) != hs.white_hash()) {
           printf(
@@ -249,10 +254,9 @@ bool GameHash<NPawns>::validate() const {
     s = p.c_s0();
     op = D6(D6::Action::REFL, 0);
     for (uint32_t _i = 0; _i < 6; _i++) {
-      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      hash_idx_t idx = posToIdx(s + getCenter());
       if (inBounds(idx)) {
-        const HashEl& hs =
-            d6_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& hs = d6_table_[fromIdx(posToIdx(s + getCenter()))];
         if (apply_d6(op, h.black_hash()) != hs.black_hash() ||
             apply_d6(op, h.white_hash()) != hs.white_hash()) {
           printf(
@@ -275,7 +279,7 @@ bool GameHash<NPawns>::validate() const {
 
   // Check D3 table
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+    HexPos p = idxToPos(toIdx(i));
 
     p -= getCenter();
 
@@ -287,10 +291,9 @@ bool GameHash<NPawns>::validate() const {
       s = s.v_r2();
       op = D3(D3::Action::ROT, 1) * op;
 
-      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      hash_idx_t idx = posToIdx(s + getCenter());
       if (inBounds(idx)) {
-        const HashEl& hs =
-            d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& hs = d3_table_[fromIdx(posToIdx(s + getCenter()))];
         if (apply_d3(op, h.black_hash()) != hs.black_hash() ||
             apply_d3(op, h.white_hash()) != hs.white_hash()) {
           printf(
@@ -310,10 +313,9 @@ bool GameHash<NPawns>::validate() const {
     s = p.v_s1();
     op = D3(D3::Action::REFL, 0);
     for (uint32_t _i = 0; _i < 3; _i++) {
-      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      hash_idx_t idx = posToIdx(s + getCenter());
       if (inBounds(idx)) {
-        const HashEl& hs =
-            d3_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& hs = d3_table_[fromIdx(posToIdx(s + getCenter()))];
         if (apply_d3(op, h.black_hash()) != hs.black_hash() ||
             apply_d3(op, h.white_hash()) != hs.white_hash()) {
           printf(
@@ -335,7 +337,7 @@ bool GameHash<NPawns>::validate() const {
 
     // Check K4 table
     for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-      HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+      HexPos p = idxToPos(toIdx(i));
 
       p -= getCenter();
 
@@ -344,10 +346,9 @@ bool GameHash<NPawns>::validate() const {
       for (K4 op : { K4(C2(1), C2(0)), K4(C2(0), C2(1)), K4(C2(1), C2(1)) }) {
         HexPos s = p.apply_k4_e(op);
 
-        idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+        hash_idx_t idx = posToIdx(s + getCenter());
         if (inBounds(idx)) {
-          const HashEl& hs =
-              k4_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+          const HashEl& hs = k4_table_[fromIdx(posToIdx(s + getCenter()))];
           if (apply_k4(op, h.black_hash()) != hs.black_hash() ||
               apply_k4(op, h.white_hash()) != hs.white_hash()) {
             printf(
@@ -367,7 +368,7 @@ bool GameHash<NPawns>::validate() const {
 
     // Check C2_cv table
     for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-      HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+      HexPos p = idxToPos(toIdx(i));
 
       p -= getCenter();
 
@@ -376,10 +377,9 @@ bool GameHash<NPawns>::validate() const {
       C2 op = C2(1);
       HexPos s = p.apply_c2_cv(op);
 
-      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      hash_idx_t idx = posToIdx(s + getCenter());
       if (inBounds(idx)) {
-        const HashEl& hs =
-            c2_cv_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& hs = c2_cv_table_[fromIdx(posToIdx(s + getCenter()))];
         if (apply_c2(op, h.black_hash()) != hs.black_hash() ||
             apply_c2(op, h.white_hash()) != hs.white_hash()) {
           printf(
@@ -398,7 +398,7 @@ bool GameHash<NPawns>::validate() const {
 
     // Check C2_ce table
     for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-      HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+      HexPos p = idxToPos(toIdx(i));
 
       p -= getCenter();
 
@@ -407,10 +407,9 @@ bool GameHash<NPawns>::validate() const {
       C2 op = C2(1);
       HexPos s = p.apply_c2_ce(op);
 
-      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      hash_idx_t idx = posToIdx(s + getCenter());
       if (inBounds(idx)) {
-        const HashEl& hs =
-            c2_ce_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& hs = c2_ce_table_[fromIdx(posToIdx(s + getCenter()))];
         if (apply_c2(op, h.black_hash()) != hs.black_hash() ||
             apply_c2(op, h.white_hash()) != hs.white_hash()) {
           printf(
@@ -429,7 +428,7 @@ bool GameHash<NPawns>::validate() const {
 
     // Check C2_ev table
     for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-      HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+      HexPos p = idxToPos(toIdx(i));
 
       p -= getCenter();
 
@@ -438,10 +437,9 @@ bool GameHash<NPawns>::validate() const {
       C2 op = C2(1);
       HexPos s = p.apply_c2_ev(op);
 
-      idx_t idx = Game<NPawns>::posToIdx(s + getCenter());
+      hash_idx_t idx = posToIdx(s + getCenter());
       if (inBounds(idx)) {
-        const HashEl& hs =
-            c2_ev_table_[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& hs = c2_ev_table_[fromIdx(posToIdx(s + getCenter()))];
         if (apply_c2(op, h.black_hash()) != hs.black_hash() ||
             apply_c2(op, h.white_hash()) != hs.white_hash()) {
           printf(
@@ -528,17 +526,27 @@ constexpr HexPos GameHash<NPawns>::getCenter() {
 }
 
 template <uint32_t NPawns>
-constexpr idx_t GameHash<NPawns>::toIdx(uint32_t i) {
+constexpr hash_idx_t GameHash<NPawns>::toIdx(uint32_t i) {
   return { i % getSymmTableLen(), i / getSymmTableLen() };
 }
 
 template <uint32_t NPawns>
-constexpr uint32_t GameHash<NPawns>::fromIdx(idx_t idx) {
+constexpr uint32_t GameHash<NPawns>::fromIdx(hash_idx_t idx) {
   return idx.first + idx.second * getSymmTableLen();
 }
 
 template <uint32_t NPawns>
-constexpr bool GameHash<NPawns>::inBounds(idx_t idx) {
+constexpr HexPos GameHash<NPawns>::idxToPos(hash_idx_t idx) {
+  return HexPos{ idx.first + (idx.second >> 1), idx.second };
+}
+
+template <uint32_t NPawns>
+constexpr hash_idx_t GameHash<NPawns>::posToIdx(HexPos pos) {
+  return hash_idx_t{ pos.x - (pos.y >> 1), pos.y };
+}
+
+template <uint32_t NPawns>
+constexpr bool GameHash<NPawns>::inBounds(hash_idx_t idx) {
   return idx.first >= 0 && idx.second >= 0 &&
          idx.first < static_cast<int32_t>(getSymmTableLen()) &&
          idx.second < static_cast<int32_t>(getSymmTableLen());
@@ -578,13 +586,13 @@ GameHash<NPawns>::getHashTable(SymmetryClass symm_class) {
 template <uint32_t NPawns>
 constexpr typename GameHash<NPawns>::HashEl GameHash<NPawns>::hashLookup(
     const SymmTable& table, HexPos pos) {
-  return table[fromIdx(Game<NPawns>::posToIdx(pos))];
+  return table[fromIdx(posToIdx(pos))];
 }
 
 template <uint32_t NPawns>
 constexpr bool GameHash<NPawns>::symmTableShouldReuseTile(uint32_t p_idx,
                                                           HexPos symm) {
-  idx_t idx = Game<NPawns>::posToIdx(symm + getCenter());
+  hash_idx_t idx = posToIdx(symm + getCenter());
   uint32_t i = fromIdx(idx);
   return i < p_idx && inBounds(idx);
 }
@@ -597,7 +605,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
     bool found_hash = false;
-    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+    HexPos p = idxToPos(toIdx(i));
 
     // Normalize coordinates to the center.
     p -= getCenter();
@@ -619,8 +627,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
       op = op * D6(D6::Action::ROT, 5);
 
       if (symmTableShouldReuseTile(i, s)) {
-        const HashEl& el =
-            table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
         table[i] = { apply_d6(op, el.black_hash()) };
         found_hash = true;
         break;
@@ -643,8 +650,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
       }
 
       if (symmTableShouldReuseTile(i, s)) {
-        const HashEl& el =
-            table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
         table[i] = { apply_d6(op, el.black_hash()) };
         found_hash = true;
         break;
@@ -672,7 +678,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
     bool found_hash = false;
-    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+    HexPos p = idxToPos(toIdx(i));
 
     // Normalize coordinates to the center.
     p -= getCenter();
@@ -687,8 +693,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
       op = op * D3(D3::Action::ROT, 2);
 
       if (symmTableShouldReuseTile(i, s)) {
-        const HashEl& el =
-            table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
         table[i] = { apply_d3(op, el.black_hash()) };
         found_hash = true;
         break;
@@ -711,8 +716,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
       }
 
       if (symmTableShouldReuseTile(i, s)) {
-        const HashEl& el =
-            table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
         table[i] = { apply_d3(op, el.black_hash()) };
         found_hash = true;
         break;
@@ -739,7 +743,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initK4Table() {
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
     bool found_hash = false;
-    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+    HexPos p = idxToPos(toIdx(i));
 
     // Normalize coordinates to the center.
     p -= getCenter();
@@ -751,8 +755,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initK4Table() {
       HexPos s = p.apply_k4_e(op);
 
       if (symmTableShouldReuseTile(i, s)) {
-        const HashEl& el =
-            table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+        const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
         table[i] = { apply_k4(op, el.black_hash()) };
         found_hash = true;
         break;
@@ -791,7 +794,7 @@ GameHash<NPawns>::initC2CVTable() {
   SymmTable table{ { { 0 } } };
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+    HexPos p = idxToPos(toIdx(i));
 
     // Normalize coordinates to the center.
     p -= getCenter();
@@ -803,8 +806,7 @@ GameHash<NPawns>::initC2CVTable() {
     if (s == p) {
       table[i] = { make_invariant_c2(C2(1), c2cvb) };
     } else if (symmTableShouldReuseTile(i, s)) {
-      const HashEl& el =
-          table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+      const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
       table[i] = { apply_c2(C2(1), el.black_hash()) };
     } else {
       table[i] = { c2cvb };
@@ -822,7 +824,7 @@ GameHash<NPawns>::initC2CETable() {
   SymmTable table{ { { 0 } } };
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+    HexPos p = idxToPos(toIdx(i));
 
     // Normalize coordinates to the center.
     p -= getCenter();
@@ -834,8 +836,7 @@ GameHash<NPawns>::initC2CETable() {
     if (s == p) {
       table[i] = { make_invariant_c2(C2(1), c2ceb) };
     } else if (symmTableShouldReuseTile(i, s)) {
-      const HashEl& el =
-          table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+      const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
       table[i] = { apply_c2(C2(1), el.black_hash()) };
     } else {
       table[i] = { c2ceb };
@@ -853,7 +854,7 @@ GameHash<NPawns>::initC2EVTable() {
   SymmTable table{ { { 0 } } };
 
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
-    HexPos p = Game<NPawns>::idxToPos(toIdx(i));
+    HexPos p = idxToPos(toIdx(i));
 
     // Normalize coordinates to the center.
     p -= getCenter();
@@ -865,8 +866,7 @@ GameHash<NPawns>::initC2EVTable() {
     if (s == p) {
       table[i] = { make_invariant_c2(C2(1), c2evb) };
     } else if (symmTableShouldReuseTile(i, s)) {
-      const HashEl& el =
-          table[fromIdx(Game<NPawns>::posToIdx(s + getCenter()))];
+      const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
       table[i] = { apply_c2(C2(1), el.black_hash()) };
     } else {
       table[i] = { c2evb };

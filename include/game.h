@@ -39,6 +39,7 @@ class idx_t {
   constexpr explicit idx_t(uint8_t bytes) : _bytes(bytes) {}
 
  public:
+  constexpr idx_t() : _bytes(0) {}
   constexpr idx_t(uint32_t x, uint32_t y) : _bytes(x | (y << 4)) {}
 
   idx_t operator+(idx_t other) const {
@@ -49,6 +50,14 @@ class idx_t {
   idx_t operator+=(idx_t other) {
     *this = (*this + other);
     return *this;
+  }
+
+  bool operator==(idx_t other) const {
+    return _bytes == other._bytes;
+  }
+
+  bool operator!=(idx_t other) const {
+    return !(*this == other);
   }
 
   // Constructs an idx_t that will increase/decrease the value of the x
@@ -508,10 +517,10 @@ class Game {
    * Iterators over the pawns.
    */
   pawn_iterator pawns_begin() const;
-  static constexpr pawn_iterator pawns_end();
+  constexpr pawn_iterator pawns_end() const;
 
   color_pawn_iterator color_pawns_begin(bool black) const;
-  static constexpr color_pawn_iterator color_pawns_end(bool black);
+  constexpr color_pawn_iterator color_pawns_end(bool black) const;
 
   /*
    * Iterates over all pawns on the board, calling cb with the idx_t of the pawn
@@ -661,7 +670,7 @@ constexpr std::pair<idx_t, HexPos> Game<NPawns>::calcMoveShift(idx_t move) {
 // Black goes first, but since black has 2 forced moves and white only has 1,
 // white is effectively first to make a choice.
 template <uint32_t NPawns>
-Game<NPawns>::Game() : state_({ -1u, 1, 0, 0 }), sum_of_mass_{ 0, 0 } {
+Game<NPawns>::Game() : state_({ 0xfu, 1, 0, 0 }), sum_of_mass_{ 0, 0 } {
   static_assert(NPawns <= 2 * max_pawns_per_player);
 
   int32_t mid_idx = (MAX_IDX - 1) / 2;
@@ -671,23 +680,23 @@ Game<NPawns>::Game() : state_({ -1u, 1, 0, 0 }), sum_of_mass_{ 0, 0 } {
     idx_t w_start(mid_idx + !(mid_idx & 1), mid_idx + 1);
     idx_t b_next(mid_idx + 1, mid_idx);
 
-    appendTile(b_start, TileState::TILE_BLACK);
-    appendTile(w_start, TileState::TILE_WHITE);
-    appendTile(b_next, TileState::TILE_BLACK);
+    appendTile(b_start);
+    appendTile(w_start);
+    appendTile(b_next);
   } else {
     idx_t b_start(mid_idx + !(mid_idx & 1), mid_idx - 1);
-    idx_t w_start(mid_idx + !(mid_idx & 1), mid_idx + 1);
-    idx_t b_next(mid_idx + 1, mid_idx);
+    idx_t w_start(mid_idx + 1, mid_idx);
+    idx_t b_next(mid_idx + !(mid_idx & 1), mid_idx + 1);
     idx_t w_next(mid_idx - (mid_idx & 1), mid_idx + 1);
     idx_t b_next2(mid_idx - 1, mid_idx);
     idx_t w_next2(mid_idx - (mid_idx & 1), mid_idx - 1);
 
-    appendTile(b_start, TileState::TILE_BLACK);
-    appendTile(w_start, TileState::TILE_BLACK);
-    appendTile(b_next, TileState::TILE_WHITE);
-    appendTile(w_next, TileState::TILE_WHITE);
-    appendTile(b_next2, TileState::TILE_BLACK);
-    appendTile(w_next2, TileState::TILE_WHITE);
+    appendTile(b_start);
+    appendTile(w_start);
+    appendTile(b_next);
+    appendTile(w_next);
+    appendTile(b_next2);
+    appendTile(w_next2);
   }
 }
 
@@ -1042,7 +1051,8 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
     HexPos last_pos = last_move_pos + (HexPos){ n_in_row_to_win + 1, 0 };
     for (HexPos i = last_move_pos - (HexPos){ n_in_row_to_win, 0 };
          i != last_pos; i += (HexPos){ 1, 0 }) {
-      if (i.x < 0 || i.x >= NPawns || i.y < 0 || i.y >= NPawns) {
+      if (i.x < 0 || i.x >= static_cast<int32_t>(NPawns) || i.y < 0 ||
+          i.y >= static_cast<int32_t>(NPawns)) {
         continue;
       }
 
@@ -1066,7 +1076,8 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
     for (HexPos i =
              last_move_pos - (HexPos){ n_in_row_to_win, n_in_row_to_win };
          i != last_pos; i += (HexPos){ 1, 1 }) {
-      if (i.x < 0 || i.x >= NPawns || i.y < 0 || i.y >= NPawns) {
+      if (i.x < 0 || i.x >= static_cast<int32_t>(NPawns) || i.y < 0 ||
+          i.y >= static_cast<int32_t>(NPawns)) {
         continue;
       }
 
@@ -1088,7 +1099,8 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
     HexPos last_pos = last_move_pos + (HexPos){ 0, n_in_row_to_win + 1 };
     for (HexPos i = last_move_pos - (HexPos){ 0, n_in_row_to_win };
          i != last_pos; i += (HexPos){ 0, 1 }) {
-      if (i.x < 0 || i.x >= NPawns || i.y < 0 || i.y >= NPawns) {
+      if (i.x < 0 || i.x >= static_cast<int32_t>(NPawns) || i.y < 0 ||
+          i.y >= static_cast<int32_t>(NPawns)) {
         continue;
       }
 
@@ -1304,7 +1316,7 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
   });
 
   // Another pass to enumerate all moves
-  for (pawn_iterator it = pawns_begin(); it != pawns_end(); it++) {
+  for (pawn_iterator it = pawns_begin(); it != pawns_end(); ++it) {
     UnionFind<uint32_t> uf(getBoardSize());
 
     idx_t next_idx = *it;
@@ -1338,21 +1350,22 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
     // number of neighbors with 1 neighbor after removing this piece
     uint32_t n_to_satisfy = 0;
     // decrease neighbor count of all neighbors
-    forEachNeighbor(
-        next_idx, [&tmp_board, &n_to_satisfy, this](idx_t neighbor_idx) {
-          uint32_t idx = idxOrd(neighbor_idx);
-          uint32_t tb_idx = idx / (bits_per_uint64 / tmp_board_tile_bits);
-          uint32_t tb_shift = tmp_board_tile_bits *
-                              (idx % (bits_per_uint64 / tmp_board_tile_bits));
+    forEachNeighbor(next_idx, [&tmp_board, &n_to_satisfy,
+                               this](idx_t neighbor_idx) {
+      uint32_t neighbor_ord = idxOrd(neighbor_idx);
+      uint32_t tb_idx = neighbor_ord / (bits_per_uint64 / tmp_board_tile_bits);
+      uint32_t tb_shift =
+          tmp_board_tile_bits *
+          (neighbor_ord % (bits_per_uint64 / tmp_board_tile_bits));
 
-          tmp_board[tb_idx] -= uint64_t(1) << tb_shift;
-          if (((tmp_board[tb_idx] >> tb_shift) & tmp_board_tile_mask) == 1 &&
-              getTile(neighbor_idx) != TileState::TILE_EMPTY) {
-            n_to_satisfy++;
-          }
+      tmp_board[tb_idx] -= uint64_t(1) << tb_shift;
+      if (((tmp_board[tb_idx] >> tb_shift) & tmp_board_tile_mask) == 1 &&
+          getTile(neighbor_idx) != TileState::TILE_EMPTY) {
+        n_to_satisfy++;
+      }
 
-          return true;
-        });
+      return true;
+    });
 
     // try all possible new locations for piece
     for (uint64_t j = 0; j < tmp_board_len; j++) {
@@ -1369,7 +1382,7 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
 
         // skip this tile if it isn't empty (this will also skip the piece's
         // old location since we haven't removed it, which we want)
-        if (getTile(next_idx_ord) != TileState::TILE_EMPTY ||
+        if (getTile(ordToIdx(next_idx_ord)) != TileState::TILE_EMPTY ||
             ((tmp_board_bitmask >> tb_shift) & tmp_board_tile_mask) <= 1) {
           tmp_board_bitmask = tmp_board_bitmask & ~clr_mask;
           continue;
@@ -1385,21 +1398,23 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
                                                  &n_satisfied, &uf, &g1, &g2,
                                                  &groups_touching,
                                                  this](idx_t neighbor_idx) {
-          uint32_t idx = fromIdx(neighbor_idx);
-          if (getTile(idx) == TileState::TILE_EMPTY) {
+          uint32_t neighbor_ord = idxOrd(neighbor_idx);
+          if (getTile(neighbor_idx) == TileState::TILE_EMPTY) {
             return true;
           }
 
-          uint32_t tb_idx = idx / (bits_per_uint64 / tmp_board_tile_bits);
-          uint32_t tb_shift = tmp_board_tile_bits *
-                              (idx % (bits_per_uint64 / tmp_board_tile_bits));
+          uint32_t tb_idx =
+              neighbor_ord / (bits_per_uint64 / tmp_board_tile_bits);
+          uint32_t tb_shift =
+              tmp_board_tile_bits *
+              (neighbor_ord % (bits_per_uint64 / tmp_board_tile_bits));
 
           if (((tmp_board[tb_idx] >> tb_shift) & tmp_board_tile_mask) == 1) {
             n_satisfied++;
           }
 
           if (neighbor_idx != next_idx) {
-            uint32_t group_id = uf.GetRoot(idx);
+            uint32_t group_id = uf.GetRoot(neighbor_ord);
             if (group_id != g1) {
               if (g1 == -1u) {
                 g1 = group_id;
@@ -1414,7 +1429,8 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
         });
 
         if (n_satisfied == n_to_satisfy && groups_touching == n_pawn_groups) {
-          if (!cb((P2Move){ ordToIdx(next_idx_ord), it.pawnIdx() })) {
+          if (!cb((P2Move){ ordToIdx(next_idx_ord),
+                            static_cast<uint8_t>(it.pawnIdx()) })) {
             return false;
           }
         }
@@ -1423,17 +1439,18 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
 
     // increase neighbor count of all neighbors
     forEachNeighbor(next_idx, [&tmp_board](idx_t neighbor_idx) {
-      uint32_t idx = fromIdx(neighbor_idx);
-      uint32_t tb_idx = idx / (bits_per_uint64 / tmp_board_tile_bits);
+      uint32_t neighbor_ord = idxOrd(neighbor_idx);
+      uint32_t tb_idx = neighbor_ord / (bits_per_uint64 / tmp_board_tile_bits);
       uint32_t tb_shift =
-          tmp_board_tile_bits * (idx % (bits_per_uint64 / tmp_board_tile_bits));
+          tmp_board_tile_bits *
+          (neighbor_ord % (bits_per_uint64 / tmp_board_tile_bits));
 
       tmp_board[tb_idx] += (uint64_t(1) << tb_shift);
       return true;
     });
+  }
 
-    return true;
-  });
+  return false;
 }
 
 template <uint32_t NPawns>
@@ -1480,8 +1497,8 @@ typename Game<NPawns>::pawn_iterator Game<NPawns>::pawns_begin() const {
 }
 
 template <uint32_t NPawns>
-constexpr typename Game<NPawns>::pawn_iterator Game<NPawns>::pawns_end() {
-  return Game<NPawns>::pawn_iterator::end();
+constexpr typename Game<NPawns>::pawn_iterator Game<NPawns>::pawns_end() const {
+  return Game<NPawns>::pawn_iterator::end(*this);
 }
 
 template <uint32_t NPawns>
@@ -1494,7 +1511,7 @@ typename Game<NPawns>::color_pawn_iterator Game<NPawns>::color_pawns_begin(
 
 template <uint32_t NPawns>
 constexpr typename Game<NPawns>::color_pawn_iterator
-Game<NPawns>::color_pawns_end(bool black) {
+Game<NPawns>::color_pawns_end(bool black) const {
   return Game<NPawns>::color_pawn_iterator::end(*this, black);
 }
 

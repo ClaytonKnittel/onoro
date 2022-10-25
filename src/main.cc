@@ -265,8 +265,8 @@ static int playout() {
       break;
     }
 
-    printf("Move (%d, %d), score %d (%llu playouts, %f%% hits)\n",
-           move.loc.first, move.loc.second, score, g_n_moves,
+    printf("Move (%d, %d), score %d (%llu playouts, %f%% hits)\n", move.loc.x(),
+           move.loc.y(), score, g_n_moves,
            100. * g_n_hits / (double) (g_n_misses + g_n_hits));
     g_n_misses = 0;
     g_n_hits = 0;
@@ -326,20 +326,20 @@ int main(int argc, char* argv[]) {
   }
 
   onoro::Game<N> g1;
-  g1.setTile((onoro::idx_t){ 8, 8 }, onoro::Game<N>::TileState::TILE_WHITE);
+  /*g1.setTile(onoro::idx_t(8, 8), onoro::Game<N>::TileState::TILE_WHITE);
   g1.sum_of_mass_ += (onoro::HexPos){ 12, 8 };
   g1.state_.turn++;
-  g1.state_.blackTurn = 1;
+  g1.state_.blackTurn = 1;*/
 
   onoro::Game<N> g2;
-  g2.clearTile((onoro::idx_t){ 7, 7 });
-  g2.clearTile((onoro::idx_t){ 7, 8 });
-  g2.setTile((onoro::idx_t){ 7, 6 }, onoro::Game<N>::TileState::TILE_WHITE);
-  g2.setTile((onoro::idx_t){ 7, 7 }, onoro::Game<N>::TileState::TILE_BLACK);
-  g2.setTile((onoro::idx_t){ 6, 6 }, onoro::Game<N>::TileState::TILE_WHITE);
+  /*g2.clearTile(onoro::idx_t(7, 7));
+  g2.clearTile(onoro::idx_t(7, 8));
+  g2.setTile(onoro::idx_t(7, 6), onoro::Game<N>::TileState::TILE_WHITE);
+  g2.setTile(onoro::idx_t(7, 7), onoro::Game<N>::TileState::TILE_BLACK);
+  g2.setTile(onoro::idx_t(6, 6), onoro::Game<N>::TileState::TILE_WHITE);
   g2.sum_of_mass_ += (onoro::HexPos){ 8, 4 };
   g2.state_.turn++;
-  g2.state_.blackTurn = 1;
+  g2.state_.blackTurn = 1;*/
 
   if (!g1.validate() || !g2.validate()) {
     return -1;
