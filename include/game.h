@@ -42,22 +42,26 @@ class idx_t {
   constexpr idx_t() : _bytes(0) {}
   constexpr idx_t(uint32_t x, uint32_t y) : _bytes(x | (y << 4)) {}
 
-  idx_t operator+(idx_t other) const {
+  constexpr idx_t operator+(idx_t other) const {
     // Assume no overflow
     return idx_t(_bytes + other._bytes);
   }
 
-  idx_t operator+=(idx_t other) {
+  constexpr idx_t operator+=(idx_t other) {
     *this = (*this + other);
     return *this;
   }
 
-  bool operator==(idx_t other) const {
+  constexpr bool operator==(idx_t other) const {
     return _bytes == other._bytes;
   }
 
-  bool operator!=(idx_t other) const {
+  constexpr bool operator!=(idx_t other) const {
     return !(*this == other);
+  }
+
+  static constexpr idx_t null_idx() {
+    return idx_t(0x0fu);
   }
 
   // Constructs an idx_t that will increase/decrease the value of the x
@@ -75,23 +79,23 @@ class idx_t {
     return idx_t(static_cast<uint8_t>(i << 4));
   }
 
-  uint32_t x() const {
+  constexpr uint32_t x() const {
     return _bytes & 0x0fu;
   }
 
-  void set_x(uint32_t x) {
+  constexpr void set_x(uint32_t x) {
     _bytes = static_cast<uint8_t>((_bytes & 0xf0u) | x);
   }
 
-  uint32_t y() const {
+  constexpr uint32_t y() const {
     return (_bytes & 0xf0u) >> 4;
   }
 
-  void set_y(uint32_t y) {
+  constexpr void set_y(uint32_t y) {
     _bytes = static_cast<uint8_t>((_bytes & 0x0fu) | (y << 4));
   }
 
-  uint8_t get_bytes() const {
+  constexpr uint8_t get_bytes() const {
     return _bytes;
   }
 };
@@ -458,7 +462,7 @@ class Game {
    * pawns, the others are white. Filled from lowest to highest index as the
    * first phase proceeds.
    */
-  idx_t pawn_poses_[NPawns];
+  std::array<idx_t, NPawns> pawn_poses_;
 
   GameState state_;
 
@@ -652,14 +656,14 @@ constexpr std::pair<idx_t, HexPos> Game<NPawns>::calcMoveShift(idx_t move) {
   if (move.y() == 0) {
     offset = idx_t::add_y(1);
     hex_offset = HexPos{ 0, 1 };
-  } else if (move.y() == MAX_IDX) {
+  } else if (move.y() == getBoardWidth()) {
     offset = idx_t::add_y(-1);
     hex_offset = HexPos{ 0, -1 };
   }
   if (move.x() < 0) {
     offset += idx_t::add_x(1);
     hex_offset += HexPos{ 1, 0 };
-  } else if (move.x() == MAX_IDX) {
+  } else if (move.x() == getBoardWidth()) {
     offset += idx_t::add_x(-1);
     hex_offset = HexPos{ -1, 0 };
   }
@@ -673,23 +677,27 @@ template <uint32_t NPawns>
 Game<NPawns>::Game() : state_({ 0xfu, 1, 0, 0 }), sum_of_mass_{ 0, 0 } {
   static_assert(NPawns <= 2 * max_pawns_per_player);
 
-  int32_t mid_idx = (MAX_IDX - 1) / 2;
+  for (uint32_t i = 0; i < NPawns; i++) {
+    pawn_poses_[i] = idx_t::null_idx();
+  }
+
+  int32_t mid_idx = (getBoardWidth() - 1) / 2;
 
   if (true) {
     idx_t b_start(mid_idx, mid_idx);
-    idx_t w_start(mid_idx + !(mid_idx & 1), mid_idx + 1);
+    idx_t w_start(mid_idx + 1, mid_idx + 1);
     idx_t b_next(mid_idx + 1, mid_idx);
 
     appendTile(b_start);
     appendTile(w_start);
     appendTile(b_next);
   } else {
-    idx_t b_start(mid_idx + !(mid_idx & 1), mid_idx - 1);
+    idx_t b_start(mid_idx + 1, mid_idx - 1);
     idx_t w_start(mid_idx + 1, mid_idx);
-    idx_t b_next(mid_idx + !(mid_idx & 1), mid_idx + 1);
-    idx_t w_next(mid_idx - (mid_idx & 1), mid_idx + 1);
+    idx_t b_next(mid_idx + 1, mid_idx + 1);
+    idx_t w_next(mid_idx, mid_idx + 1);
     idx_t b_next2(mid_idx - 1, mid_idx);
-    idx_t w_next2(mid_idx - (mid_idx & 1), mid_idx - 1);
+    idx_t w_next2(mid_idx, mid_idx - 1);
 
     appendTile(b_start);
     appendTile(w_start);
@@ -702,8 +710,8 @@ Game<NPawns>::Game() : state_({ 0xfu, 1, 0, 0 }), sum_of_mass_{ 0, 0 } {
 
 template <uint32_t NPawns>
 Game<NPawns>::Game(const Game<NPawns>& g, P1Move move)
-    : state_({ static_cast<uint8_t>(g.state_.turn + 1), !g.state_.blackTurn, 0,
-               0 }),
+    : pawn_poses_(g.pawn_poses_),
+      state_(g.state_),
       sum_of_mass_(g.sum_of_mass_) {
   appendTile(move.loc);
 
@@ -716,7 +724,8 @@ Game<NPawns>::Game(const Game<NPawns>& g, P1Move move)
 
 template <uint32_t NPawns>
 Game<NPawns>::Game(const Game& g, P2Move move)
-    : state_({ g.state_.turn, !g.state_.blackTurn, 0, 0 }),
+    : pawn_poses_(g.pawn_poses_),
+      state_(g.state_),
       sum_of_mass_(g.sum_of_mass_) {
   moveTile(move.to, move.from_idx);
 
@@ -765,7 +774,8 @@ std::string Game<NPawns>::Print2() const {
 
   std::ostringstream ostr;
   for (uint32_t y = getBoardWidth() - 1; y < getBoardWidth(); y--) {
-    ostr << std::setw(2) << y << std::setw(2 * (y / 2)) << "";
+    ostr << std::setw(2) << y << std::setw(getBoardWidth() - 2 * (y / 2) - 1)
+         << "";
 
     for (uint32_t x = 0; x < getBoardWidth(); x++) {
       ostr << tile_str[static_cast<uint32_t>(getTile(idx_t(x, y)))];
@@ -1033,7 +1043,6 @@ void Game<NPawns>::moveTile(idx_t pos, uint32_t i) {
   idx_t old_idx = pawn_poses_[i];
   pawn_poses_[i] = pos;
 
-  state_.turn++;
   state_.blackTurn = !state_.blackTurn;
   sum_of_mass_ += idxToPos(pos) - idxToPos(old_idx);
 }
@@ -1163,12 +1172,17 @@ bool Game<NPawns>::inPhase2() const {
 template <uint32_t NPawns>
 typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
   uint64_t i;
-  const uint64_t* pawn_poses = reinterpret_cast<const uint64_t*>(pawn_poses_);
+  const uint64_t* pawn_poses =
+      reinterpret_cast<const uint64_t*>(pawn_poses_.data());
+
+  if (idx == idx_t::null_idx()) {
+    return TileState::TILE_EMPTY;
+  }
 
   uint64_t mask = static_cast<uint64_t>(idx.get_bytes());
-  mask = mask << 8;
-  mask = mask << 16;
-  mask = mask << 32;
+  mask = mask | (mask << 8);
+  mask = mask | (mask << 16);
+  mask = mask | (mask << 32);
 
   for (i = 0; i < NPawns / 8; i++) {
     uint64_t xor_search = mask ^ pawn_poses[i];
@@ -1178,8 +1192,8 @@ typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
     if (zero_mask != 0) {
       uint32_t set_bit_idx = __builtin_ctzl(zero_mask);
       // Black has the even indices, white has the odd.
-      return ((set_bit_idx / 16) & 0x1) ? TileState::TILE_WHITE
-                                        : TileState::TILE_BLACK;
+      return ((set_bit_idx / 8) & 0x1) ? TileState::TILE_WHITE
+                                       : TileState::TILE_BLACK;
     }
   }
 

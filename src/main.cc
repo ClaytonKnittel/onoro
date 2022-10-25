@@ -24,6 +24,7 @@ static double timespec_diff(struct timespec* start, struct timespec* end) {
 }
 
 static int benchmark() {
+  srand(0);
   onoro::Game<n_pawns> g;
 
   static constexpr uint32_t n_moves = 600000;
@@ -35,17 +36,28 @@ static int benchmark() {
       return true;
     });
 
+    if (move_cnt == 0) {
+      printf("no legal moves!\n");
+      return -1;
+    }
+
     int which = rand() % move_cnt;
     g.forEachMove([&g, &which](onoro::P1Move move) {
       if (which == 0) {
         onoro::Game<n_pawns> g2(g, move);
         g = std::move(g2);
+        printf("Move (%u, %u)\n", move.loc.x(), move.loc.y());
         return false;
       } else {
         which--;
         return true;
       }
     });
+
+    if (g.isFinished()) {
+      printf("%s won!\n", g.blackWins() ? "black" : "white");
+      return 0;
+    }
   }
 
   struct timespec start, end;
@@ -304,8 +316,8 @@ int main(int argc, char* argv[]) {
 
   printf("Game size: %zu bytes\n", sizeof(onoro::Game<N>));
 
-  // return benchmark();
-  return playout();
+  return benchmark();
+  // return playout();
   onoro::GameHash<N> h;
 
   /*
@@ -348,7 +360,7 @@ int main(int argc, char* argv[]) {
   }
 
   onoro::GameView<N> v1(&g1);
-  onoro::GameView<N> v2(&g2, K4(C2(0), C2(0)), true);
+  onoro::GameView<N> v2(&g2, K4(C2(0), C2(0)), false);
 
   printf("%s\n", v1.game().Print().c_str());
   printf("%s\n", v1.game().Print2().c_str());

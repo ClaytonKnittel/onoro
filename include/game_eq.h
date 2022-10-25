@@ -93,8 +93,9 @@ bool GameEq<NPawns>::compareViews(
     //        to_view1.toString().c_str());
     idx_t idx2 = Game<NPawns>::posToIdx(p2.apply_d6_c(decanon2) + origin2);
 
-    // printf("Pos (%d, %d) translated to (%d, %d)\n", idx.first, idx.second,
-    //        idx2.first, idx2.second);
+    // printf("Pos (%d, %d) translated to (%d, %d)\n", idx.x(), idx.y(),
+    // idx2.x(),
+    //        idx2.y());
 
     if (g2.getTile(idx2) == Game<NPawns>::TileState::TILE_EMPTY) {
       // printf("EMPTY TILE!!!\n");
@@ -105,7 +106,7 @@ bool GameEq<NPawns>::compareViews(
     // printf("Tile 1: %d\n", g1.getTile(idx));
     // printf("Tile 2: %d\n", g2.getTile(idx2));
     // if (!bool((g1.getTile(idx) != g2.getTile(idx2)) ^ same_color)) {
-    // printf("UNEQUAL TILES!!!!\n");
+    //   printf("UNEQUAL TILES!!!!\n");
     // }
 
     return bool((g1.getTile(idx) != g2.getTile(idx2)) ^ same_color);
