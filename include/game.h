@@ -656,14 +656,14 @@ constexpr std::pair<idx_t, HexPos> Game<NPawns>::calcMoveShift(idx_t move) {
   if (move.y() == 0) {
     offset = idx_t::add_y(1);
     hex_offset = HexPos{ 0, 1 };
-  } else if (move.y() == getBoardWidth()) {
+  } else if (move.y() == getBoardWidth() - 1) {
     offset = idx_t::add_y(-1);
     hex_offset = HexPos{ 0, -1 };
   }
-  if (move.x() < 0) {
+  if (move.x() == 0) {
     offset += idx_t::add_x(1);
     hex_offset += HexPos{ 1, 0 };
-  } else if (move.x() == getBoardWidth()) {
+  } else if (move.x() == getBoardWidth() - 1) {
     offset += idx_t::add_x(-1);
     hex_offset = HexPos{ -1, 0 };
   }
@@ -1131,7 +1131,13 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
 
 template <uint32_t NPawns>
 constexpr void Game<NPawns>::shiftTiles(idx_t offset) {
-  // TODO complete this method
+  if (offset != idx_t(0, 0)) {
+    for (uint32_t i = 0; i < nPawnsInPlay(); i++) {
+      if (pawn_poses_[i] != idx_t::null_idx()) {
+        pawn_poses_[i] += offset;
+      }
+    }
+  }
 }
 
 template <uint32_t NPawns>

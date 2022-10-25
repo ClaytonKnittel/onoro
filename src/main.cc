@@ -70,6 +70,7 @@ static int benchmark() {
     });
 
     if (move_cnt == 0) {
+      printf("%s\n", g.Print().c_str());
       printf("Player won by no legal moves\n");
       return -1;
     }
@@ -80,6 +81,7 @@ static int benchmark() {
         onoro::Game<n_pawns> g2(g, move);
         g = std::move(g2);
 
+        /*
         std::ostringstream ostr;
         if (i != 0) {
           ostr << CSI_CHA(0);
@@ -89,6 +91,7 @@ static int benchmark() {
         }
         printf("%s%s\n", ostr.str().c_str(), g.Print().c_str());
         usleep(1000);
+        */
         return false;
       } else {
         which--;
