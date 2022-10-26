@@ -251,6 +251,7 @@ class Game {
       // Calculate the index the iterator will land on knowing it jumps by two.
       it.pawn_iterator::idx_ =
           n_pawns + ((static_cast<uint32_t>(!black) ^ n_pawns) & 1);
+      return it;
     }
   };
 
@@ -535,12 +536,13 @@ class Game {
   bool forEachPawn(CallbackFnT cb) const;
 
   /*
-   * Iterates over all pawns on the board belonging to the player whose turn it
-   * currrently is, calling cb with the idx_t of the pawn as the only argument.
-   * If cb returns false, iteration halts and this method returns false.
+   * Iterates over all pawns on the board belonging to the black (black = true)
+   * or white (black = false) player, calling cb with the idx_t of the pawn as
+   * the only argument. If cb returns false, iteration halts and this method
+   * returns false.
    */
   template <class CallbackFnT>
-  bool forEachPlayablePawn(CallbackFnT cb) const;
+  bool forEachPlayerPawn(bool black, CallbackFnT cb) const;
 };
 
 template <uint32_t NPawns>
@@ -1051,82 +1053,45 @@ template <uint32_t NPawns>
 bool Game<NPawns>::checkWin(idx_t last_move) const {
   // Check for a win in all 3 directions
   HexPos last_move_pos = idxToPos(last_move);
-  uint32_t n_in_row;
 
-  TileState move_color = getTile(last_move);
+  // Bitvector of positions occupied by pawns of this color along the 3 lines
+  // extending out from last_move.
+  // - s0: line running along the x-axis, with bit i corresponding to (x, i)
+  // - s2: line running along the line x = y, with bit i corresponding to (x -
+  //     min(x, y) + i, y - min(x, y) + i).
+  // - s4: line running along the y-axis, with bit i corresponding to (i, y)
+  uint32_t s0 = (1u << last_move_pos.x);
+  uint32_t s2 = (1u << std::min(last_move_pos.x, last_move_pos.y));
+  uint32_t s4 = (1u << last_move_pos.y);
 
-  {
-    n_in_row = 0;
-    HexPos last_pos = last_move_pos + (HexPos){ n_in_row_to_win + 1, 0 };
-    for (HexPos i = last_move_pos - (HexPos){ n_in_row_to_win, 0 };
-         i != last_pos; i += (HexPos){ 1, 0 }) {
-      if (i.x < 0 || i.x >= static_cast<int32_t>(NPawns) || i.y < 0 ||
-          i.y >= static_cast<int32_t>(NPawns)) {
-        continue;
-      }
-
-      idx_t idx = posToIdx(i);
-      if (getTile(idx) == move_color) {
-        n_in_row++;
-      } else {
-        n_in_row = 0;
-      }
-
-      if (n_in_row == n_in_row_to_win) {
-        return true;
-      }
+  // Unsafe pawn iteration: rely on the fact that idx_t::null_idx() will not
+  // complete a line in the first phase of the game (can't reach the border
+  // without being able to move pawns), and for phase two, all pawns are placed,
+  // so this is safe.
+  for (uint32_t i = blackTurn() ? 1 : 0; i < NPawns; i += 2) {
+    idx_t idx = pawn_poses_[i];
+    HexPos pos = idxToPos(idx);
+    HexPos delta = idxToPos(idx) - last_move_pos;
+    if (delta.y == 0) {
+      s0 = s0 | (1u << pos.x);
+    } else if (delta.x == delta.y) {
+      s2 = s2 | (1u << std::min(pos.x, pos.y));
+    } else if (delta.x == 0) {
+      s4 = s4 | (1u << pos.y);
     }
   }
 
-  {
-    n_in_row = 0;
-    HexPos last_pos =
-        last_move_pos + (HexPos){ n_in_row_to_win + 1, n_in_row_to_win + 1 };
-    for (HexPos i =
-             last_move_pos - (HexPos){ n_in_row_to_win, n_in_row_to_win };
-         i != last_pos; i += (HexPos){ 1, 1 }) {
-      if (i.x < 0 || i.x >= static_cast<int32_t>(NPawns) || i.y < 0 ||
-          i.y >= static_cast<int32_t>(NPawns)) {
-        continue;
-      }
+  // Check if any of the bitmasks have 4 bits in a row set:
+  s0 = (s0 & (s0 << 2));
+  s0 = (s0 & (s0 << 1));
 
-      idx_t idx = posToIdx(i);
-      if (getTile(idx) == move_color) {
-        n_in_row++;
-      } else {
-        n_in_row = 0;
-      }
+  s2 = (s2 & (s2 << 2));
+  s2 = (s2 & (s2 << 1));
 
-      if (n_in_row == n_in_row_to_win) {
-        return true;
-      }
-    }
-  }
+  s4 = (s4 & (s4 << 2));
+  s4 = (s4 & (s4 << 1));
 
-  {
-    n_in_row = 0;
-    HexPos last_pos = last_move_pos + (HexPos){ 0, n_in_row_to_win + 1 };
-    for (HexPos i = last_move_pos - (HexPos){ 0, n_in_row_to_win };
-         i != last_pos; i += (HexPos){ 0, 1 }) {
-      if (i.x < 0 || i.x >= static_cast<int32_t>(NPawns) || i.y < 0 ||
-          i.y >= static_cast<int32_t>(NPawns)) {
-        continue;
-      }
-
-      idx_t idx = posToIdx(i);
-      if (getTile(idx) == move_color) {
-        n_in_row++;
-      } else {
-        n_in_row = 0;
-      }
-
-      if (n_in_row == n_in_row_to_win) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return s0 != 0 || s2 != 0 || s4 != 0;
 }
 
 template <uint32_t NPawns>
@@ -1549,10 +1514,9 @@ bool Game<NPawns>::forEachPawn(CallbackFnT cb) const {
 
 template <uint32_t NPawns>
 template <class CallbackFnT>
-bool Game<NPawns>::forEachPlayablePawn(CallbackFnT cb) const {
-  const color_pawn_iterator end = color_pawns_end(state_.blackTurn);
-  for (color_pawn_iterator it = color_pawns_begin(state_.blackTurn); it != end;
-       ++it) {
+bool Game<NPawns>::forEachPlayerPawn(bool black, CallbackFnT cb) const {
+  const color_pawn_iterator end = color_pawns_end(black);
+  for (color_pawn_iterator it = color_pawns_begin(black); it != end; ++it) {
     if (!cb(*it)) {
       return false;
     }

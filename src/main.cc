@@ -54,6 +54,7 @@ static int benchmark() {
     });
 
     if (g.isFinished()) {
+      printf("%s\n", g.Print().c_str());
       printf("%s won!\n", g.blackWins() ? "black" : "white");
       return 0;
     }
