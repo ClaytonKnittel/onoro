@@ -50,7 +50,6 @@ template <typename T>
 uint32_t UnionFind<T>::GetRoot(uint32_t idx) {
   uint32_t parent = buffer_[idx];
 
-  // TODO see if this actually helps.
   // The common case, after the tree has been flattened.
   if (buffer_[parent] == parent) {
     return parent;
