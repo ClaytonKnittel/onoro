@@ -271,17 +271,30 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
 static int playout() {
   struct timespec start, end;
   onoro::Game<n_pawns> g;
+
+  printf("Game size: %zu bytes\n", sizeof(onoro::Game<n_pawns>));
+  printf("Game view size: %zu bytes\n", sizeof(onoro::GameView<n_pawns>));
+
   printf("%s\n", g.Print().c_str());
 
   TranspositionTable m;
-  uint32_t max_depth = 20;
+  uint32_t max_depth = 14;
 
-  // for (uint32_t i = 0; i < n_pawns - 3; i++) {
   for (uint32_t i = 0; i < 1; i++) {
     clock_gettime(CLOCK_MONOTONIC, &start);
+    int32_t score;
+    P1Move p1_move;
+    P2Move p2_move;
 
-    auto [score, move] = findMove<n_pawns, onoro::P1Move>(g, m, max_depth);
-    // auto [score, move] = findMove(g, m, n_pawns - 4 - i);
+    if (g.inPhase2()) {
+      auto [_score, move] = findMove<n_pawns, onoro::P2Move>(g, m, max_depth);
+      score = _score;
+      p2_move = move;
+    } else {
+      auto [_score, move] = findMove<n_pawns, onoro::P1Move>(g, m, max_depth);
+      score = _score;
+      p1_move = move;
+    }
 
     clock_gettime(CLOCK_MONOTONIC, &end);
     printf("Move search time at depth %u: %lf s\n", timespec_diff(&start, &end),
@@ -292,21 +305,37 @@ static int playout() {
       break;
     }
 
-    printf("Move (%d, %d), score %d (%llu playouts, %f%% hits)\n", move.loc.x(),
-           move.loc.y(), score, g_n_moves,
-           100. * g_n_hits / (double) (g_n_misses + g_n_hits));
+    if (g.inPhase2()) {
+      onoro::idx_t from = g.idxAt(p2_move.from_idx);
+      printf(
+          "Move (%d, %d) from (%d, %d), score %d (%llu playouts, %f%% hits, %f "
+          "playouts/sec)\n",
+          p2_move.to.x(), p2_move.to.y(), from.x(), from.y(), score, g_n_moves,
+          100. * g_n_hits / (double) (g_n_misses + g_n_hits),
+          (double) g_n_moves / timespec_diff(&start, &end));
+    } else {
+      printf(
+          "Move (%d, %d), score %d (%llu playouts, %f%% hits, %f "
+          "playouts/sec)\n",
+          p1_move.loc.x(), p1_move.loc.y(), score, g_n_moves,
+          100. * g_n_hits / (double) (g_n_misses + g_n_hits),
+          (double) g_n_moves / timespec_diff(&start, &end));
+    }
+    g_n_moves = 0;
     g_n_misses = 0;
     g_n_hits = 0;
 
-    g = onoro::Game<n_pawns>(g, move);
+    if (g.inPhase2()) {
+      g = onoro::Game<n_pawns>(g, p2_move);
+    } else {
+      g = onoro::Game<n_pawns>(g, p1_move);
+    }
     printf("%s\n", g.Print().c_str());
 
     if (g.isFinished()) {
       printf("%s won\n", g.blackWins() ? "black" : "white");
       break;
     }
-
-    break;
   }
 
   /*
@@ -329,10 +358,8 @@ static int playout() {
 int main(int argc, char* argv[]) {
   static constexpr const uint32_t N = 8;
 
-  printf("Game size: %zu bytes\n", sizeof(onoro::Game<N>));
-
-  return benchmark();
-  // return playout();
+  // return benchmark();
+  return playout();
   onoro::GameHash<N> h;
 
   /*

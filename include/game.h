@@ -61,7 +61,7 @@ class idx_t {
   }
 
   static constexpr idx_t null_idx() {
-    return idx_t(0x0fu);
+    return idx_t(0x00u);
   }
 
   // Constructs an idx_t that will increase/decrease the value of the x
@@ -489,6 +489,9 @@ class Game {
   bool inPhase2() const;
 
   TileState getTile(idx_t idx) const;
+
+  // Returns the idx_t for the pawn at position i in pawn_poses_
+  idx_t idxAt(uint32_t i) const;
 
   // returns true if black won, given isFinished() == true
   bool blackWins() const;
@@ -1179,6 +1182,11 @@ typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
 }
 
 template <uint32_t NPawns>
+idx_t Game<NPawns>::idxAt(uint32_t i) const {
+  return pawn_poses_[i];
+}
+
+template <uint32_t NPawns>
 bool Game<NPawns>::blackWins() const {
   return !state_.blackTurn;
 }
@@ -1435,7 +1443,7 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
     });
   }
 
-  return false;
+  return true;
 }
 
 template <uint32_t NPawns>
