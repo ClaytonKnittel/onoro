@@ -599,7 +599,7 @@ constexpr bool GameHash<NPawns>::symmTableShouldReuseTile(uint32_t p_idx,
 
 template <uint32_t NPawns>
 constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
-  util::Random random(1, 0);
+  util::math::Random random(1, 0);
 
   SymmTable table{ { { 0 } } };
 
@@ -672,7 +672,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
 
 template <uint32_t NPawns>
 constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
-  util::Random random(3, 0);
+  util::math::Random random(3, 0);
 
   SymmTable table{ { { 0 } } };
 
@@ -737,7 +737,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
 
 template <uint32_t NPawns>
 constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initK4Table() {
-  util::Random random(5, 0);
+  util::math::Random random(5, 0);
 
   SymmTable table{ { { 0 } } };
 
@@ -789,7 +789,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initK4Table() {
 template <uint32_t NPawns>
 constexpr typename GameHash<NPawns>::SymmTable
 GameHash<NPawns>::initC2CVTable() {
-  util::Random random(7, 0);
+  util::math::Random random(7, 0);
 
   SymmTable table{ { { 0 } } };
 
@@ -819,7 +819,7 @@ GameHash<NPawns>::initC2CVTable() {
 template <uint32_t NPawns>
 constexpr typename GameHash<NPawns>::SymmTable
 GameHash<NPawns>::initC2CETable() {
-  util::Random random(13, 0);
+  util::math::Random random(13, 0);
 
   SymmTable table{ { { 0 } } };
 
@@ -849,7 +849,7 @@ GameHash<NPawns>::initC2CETable() {
 template <uint32_t NPawns>
 constexpr typename GameHash<NPawns>::SymmTable
 GameHash<NPawns>::initC2EVTable() {
-  util::Random random(17, 0);
+  util::math::Random random(17, 0);
 
   SymmTable table{ { { 0 } } };
 
@@ -879,7 +879,7 @@ GameHash<NPawns>::initC2EVTable() {
 template <uint32_t NPawns>
 constexpr typename GameHash<NPawns>::SymmTable
 GameHash<NPawns>::initTrivialTable() {
-  util::Random random(23, 0);
+  util::math::Random random(23, 0);
 
   SymmTable table{ { { 0 } } };
 
