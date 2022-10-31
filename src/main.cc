@@ -285,7 +285,7 @@ static int playout() {
   printf("%s\n", g.Print().c_str());
 
   TranspositionTable m(arena);
-  uint32_t max_depth = 14;
+  uint32_t max_depth = 16;
 
   for (uint32_t i = 0; i < 1; i++) {
     clock_gettime(CLOCK_MONOTONIC, &start);

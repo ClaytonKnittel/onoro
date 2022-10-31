@@ -1058,14 +1058,18 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
   HexPos last_move_pos = idxToPos(last_move);
 
   // Bitvector of positions occupied by pawns of this color along the 3 lines
-  // extending out from last_move.
-  // - s0: line running along the x-axis, with bit i corresponding to (x, i)
-  // - s2: line running along the line x = y, with bit i corresponding to (x -
-  //     min(x, y) + i, y - min(x, y) + i).
-  // - s4: line running along the y-axis, with bit i corresponding to (i, y)
-  uint32_t s0 = (1u << last_move_pos.x);
-  uint32_t s2 = (1u << std::min(last_move_pos.x, last_move_pos.y));
-  uint32_t s4 = (1u << last_move_pos.y);
+  // extending out from last_move. Intentionally leave a zero bit between each
+  // of the 3 sets so they can't form a continuous string of 1's across borders.
+  // - s[0-15]: line running along the x-axis, with bit i corresponding to
+  //     (x, i)
+  // - s[17-32]: line running along the line x = y, with bit i corresponding to
+  //     (x - min(x, y) + i, y - min(x, y) + i).
+  // - s[34-49]: line running along the y-axis, with bit i corresponding to
+  //     (i, y)
+  uint64_t s =
+      (UINT64_C(0x1) << last_move_pos.x) |
+      (UINT64_C(0x20000) << std::min(last_move_pos.x, last_move_pos.y)) |
+      (UINT64_C(0x400000000) << last_move_pos.y);
 
   // Unsafe pawn iteration: rely on the fact that idx_t::null_idx() will not
   // complete a line in the first phase of the game (can't reach the border
@@ -1074,27 +1078,21 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
   for (uint32_t i = blackTurn() ? 1 : 0; i < NPawns; i += 2) {
     idx_t idx = pawn_poses_[i];
     HexPos pos = idxToPos(idx);
-    HexPos delta = idxToPos(idx) - last_move_pos;
+    HexPos delta = pos - last_move_pos;
     if (delta.y == 0) {
-      s0 = s0 | (1u << pos.x);
+      s = s | (UINT64_C(0x1) << pos.x);
     } else if (delta.x == delta.y) {
-      s2 = s2 | (1u << std::min(pos.x, pos.y));
+      s = s | (UINT64_C(0x20000) << std::min(pos.x, pos.y));
     } else if (delta.x == 0) {
-      s4 = s4 | (1u << pos.y);
+      s = s | (UINT64_C(0x400000000) << pos.y);
     }
   }
 
-  // Check if any of the bitmasks have 4 bits in a row set:
-  s0 = (s0 & (s0 << 2));
-  s0 = (s0 & (s0 << 1));
+  // Check if any 4 bits in a row are set:
+  s = (s & (s << 2));
+  s = (s & (s << 1));
 
-  s2 = (s2 & (s2 << 2));
-  s2 = (s2 & (s2 << 1));
-
-  s4 = (s4 & (s4 << 2));
-  s4 = (s4 & (s4 << 1));
-
-  return s0 != 0 || s2 != 0 || s4 != 0;
+  return s != 0;
 }
 
 template <uint32_t NPawns>
