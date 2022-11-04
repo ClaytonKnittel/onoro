@@ -732,6 +732,11 @@ Game<NPawns>::Game(const Game& g, P2Move move)
     : pawn_poses_(g.pawn_poses_),
       state_(g.state_),
       sum_of_mass_(g.sum_of_mass_) {
+  if ((move.from_idx % 2) != !state_.blackTurn) {
+    printf("wrong idx %u\n", move.from_idx);
+    printf("%s\n", Print().c_str());
+    abort();
+  }
   moveTile(move.to, move.from_idx);
 
   auto [offset, hex_offset] = calcMoveShift(move.to);
@@ -1070,6 +1075,8 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
       (UINT64_C(0x1) << last_move_pos.x) |
       (UINT64_C(0x20000) << std::min(last_move_pos.x, last_move_pos.y)) |
       (UINT64_C(0x400000000) << last_move_pos.y);
+  uint64_t cnt = 0;
+  uint64_t cnt2 = 0;
 
   // Unsafe pawn iteration: rely on the fact that idx_t::null_idx() will not
   // complete a line in the first phase of the game (can't reach the border
@@ -1079,6 +1086,9 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
     idx_t idx = pawn_poses_[i];
     HexPos pos = idxToPos(idx);
     HexPos delta = pos - last_move_pos;
+    if (pos == last_move_pos) {
+      cnt++;
+    }
     if (delta.y == 0) {
       s = s | (UINT64_C(0x1) << pos.x);
     } else if (delta.x == delta.y) {
@@ -1086,6 +1096,19 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
     } else if (delta.x == 0) {
       s = s | (UINT64_C(0x400000000) << pos.y);
     }
+  }
+
+  for (uint32_t i = !blackTurn() ? 1 : 0; i < NPawns; i += 2) {
+    idx_t idx = pawn_poses_[i];
+    HexPos pos = idxToPos(idx);
+    if (pos == last_move_pos) {
+      cnt2++;
+    }
+  }
+
+  if (cnt + cnt2 != 1) {
+    printf("Expect cnt == 1, but cnt = %llu\n", cnt);
+    abort();
   }
 
   // Check if any 4 bits in a row are set:
