@@ -882,7 +882,7 @@ absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
                         (state.pawns_size() + 1) / 2, state.pawns_size() / 2));
   }
 
-  HexPos shift{ 1, 1 };
+  HexPos shift{ 2, 2 };
   for (uint32_t i = 0; i < static_cast<uint32_t>(state.pawns_size()); i++) {
     onoro::proto::GameState::Pawn pawn;
     if (i % 2 == 0) {
@@ -899,7 +899,10 @@ absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
     g.shiftTiles(off);
     g.sum_of_mass_ += g.nPawnsInPlay() * hex_off;
 
-    g.state_.finished = g.checkWin(idx + off);
+    if (i == static_cast<uint32_t>(state.pawns_size()) - 1) {
+      // TODO center the game state based on c.o.m.
+      g.state_.finished = g.checkWin(idx + off);
+    }
 
     shift += hex_off;
   }
@@ -920,6 +923,7 @@ absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
     g.state_.blackTurn = state.black_turn();
   }
   if (state.finished() != g.state_.finished) {
+    printf("%s\n", g.Print().c_str());
     return absl::InternalError(
         absl::StrFormat("Game is %s, but state has %s",
                         g.state_.finished ? "finished" : "unfinished",

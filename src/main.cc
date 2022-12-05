@@ -23,6 +23,28 @@ static double timespec_diff(struct timespec* start, struct timespec* end) {
          (((double) (end->tv_nsec - start->tv_nsec)) / 1000000000.);
 }
 
+template <uint32_t NPawns>
+bool verifySerializesToSelf(const onoro::Game<n_pawns>& g) {
+  auto s = g.SerializeState();
+  // printf("%s\n", s.DebugString().c_str());
+
+  absl::StatusOr<onoro::Game<NPawns>> res = onoro::Game<NPawns>::LoadState(s);
+  if (!res.ok()) {
+    std::cout << res.status() << std::endl;
+    return false;
+  }
+  onoro::Game<NPawns> g2 = *res;
+
+  printf("%s\n", g.Print().c_str());
+  // printf("%s\n", g2.Print().c_str());
+
+  onoro::GameView<NPawns> v1(&g);
+  onoro::GameView<NPawns> v2(&g2);
+  GameEq<NPawns> eq;
+
+  return eq(v1, v2);
+}
+
 static int benchmark() {
   srand(0);
   onoro::Game<n_pawns> g;
@@ -213,6 +235,10 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
     g_n_moves++;
     int32_t score;
 
+    if (!verifySerializesToSelf<NPawns>(g2)) {
+      abort();
+    }
+
     // If this move finished the game, it means playing it made us win.
     if (g2.isFinished()) {
       score = 1;
@@ -355,37 +381,11 @@ static int playout() {
   return 0;
 }
 
-template <uint32_t NPawns>
-bool verifySerializesToSelf(const onoro::Game<n_pawns>& g) {
-  auto s = g.SerializeState();
-  printf("%s\n", s.DebugString().c_str());
-
-  absl::StatusOr<onoro::Game<NPawns>> res = onoro::Game<NPawns>::LoadState(s);
-  if (!res.ok()) {
-    std::cout << res.status() << std::endl;
-    return false;
-  }
-  onoro::Game<NPawns> g2 = *res;
-
-  printf("%s\n", g.Print().c_str());
-  printf("%s\n", g2.Print().c_str());
-
-  onoro::GameView<NPawns> v1(&g);
-  onoro::GameView<NPawns> v2(&g2);
-  GameEq<NPawns> eq;
-
-  return eq(v1, v2);
-}
-
 int main(int argc, char* argv[]) {
   static constexpr const uint32_t N = 8;
 
-  onoro::Game<16> g;
-  printf("Serializes? %s\n", verifySerializesToSelf<16>(g) ? "yes" : "no");
-  return 0;
-
   // return benchmark();
-  // return playout();
+  return playout();
   onoro::GameHash<N> h;
 
   /*
