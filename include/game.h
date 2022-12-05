@@ -7,6 +7,9 @@
 #include <string>
 #include <utility>
 
+#include "absl/status/statusor.h"
+#include "absl/strings/str_format.h"
+#include "game_state.pb.h"
 #include "hash_group.h"
 #include "hex_pos.h"
 #include "union_find.h"
@@ -420,6 +423,9 @@ class Game {
 
   std::string Print() const;
   std::string Print2() const;
+  onoro::proto::GameState SerializeState() const;
+
+  static absl::StatusOr<Game> LoadState(const onoro::proto::GameState& state);
 
   bool validate() const;
 
@@ -813,6 +819,117 @@ std::string Game<NPawns>::Print2() const {
 }
 
 template <uint32_t NPawns>
+onoro::proto::GameState Game<NPawns>::SerializeState() const {
+  onoro::proto::GameState state;
+
+  state.set_black_turn(blackTurn());
+  state.set_turn_num(state_.turn);
+  state.set_finished(state_.finished);
+
+  HexPos bl_corner{ INT32_MAX, INT32_MAX };
+  for (auto it = pawns_begin(); it != pawns_end(); ++it) {
+    HexPos pos = idxToPos(*it);
+    bl_corner =
+        HexPos{ std::min(bl_corner.x, pos.x), std::min(bl_corner.y, pos.y) };
+  }
+
+  for (auto it = pawns_begin(); it != pawns_end(); ++it) {
+    HexPos rel_pos = idxToPos(*it) - bl_corner;
+
+    onoro::proto::GameState::Pawn& pawn = *state.add_pawns();
+    pawn.set_x(rel_pos.x);
+    pawn.set_y(rel_pos.y);
+    pawn.set_black(it.isBlack());
+  }
+
+  return state;
+}
+
+template <uint32_t NPawns>
+absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
+    const onoro::proto::GameState& state) {
+  Game g;
+  g.state_ = (Game::GameState){
+    .turn = 0xf,
+    .blackTurn = 1,
+    .finished = 0,
+  };
+  g.sum_of_mass_ = (HexPos){ 0, 0 };
+
+  if (state.turn_num() < NPawns - 1 &&
+      static_cast<int>(state.turn_num()) != state.pawns_size() - 1) {
+    return absl::InternalError(absl::StrFormat(
+        "Unexpected num pawns for turn %d (found %d, expect %d)",
+        state.turn_num(), state.pawns_size(), state.turn_num() + 1));
+  }
+
+  std::vector<onoro::proto::GameState::Pawn> black_pawns;
+  std::vector<onoro::proto::GameState::Pawn> white_pawns;
+
+  for (const auto& pawn : state.pawns()) {
+    if (pawn.black()) {
+      black_pawns.push_back(pawn);
+    } else {
+      white_pawns.push_back(pawn);
+    }
+  }
+
+  if (static_cast<uint64_t>(black_pawns.size() - white_pawns.size()) > 1) {
+    return absl::InternalError(
+        absl::StrFormat("Unexpected number of black/white pawns, have %zu and "
+                        "%zu, but expect %zu and %zu",
+                        black_pawns.size(), white_pawns.size(),
+                        (state.pawns_size() + 1) / 2, state.pawns_size() / 2));
+  }
+
+  HexPos shift{ 1, 1 };
+  for (uint32_t i = 0; i < static_cast<uint32_t>(state.pawns_size()); i++) {
+    onoro::proto::GameState::Pawn pawn;
+    if (i % 2 == 0) {
+      pawn = black_pawns[i / 2];
+    } else {
+      pawn = white_pawns[i / 2];
+    }
+
+    HexPos p{ static_cast<int32_t>(pawn.x()), static_cast<int32_t>(pawn.y()) };
+    idx_t idx = posToIdx(p + shift);
+    g.appendTile(idx);
+
+    auto [off, hex_off] = calcMoveShift(idx);
+    g.shiftTiles(off);
+    g.sum_of_mass_ += g.nPawnsInPlay() * hex_off;
+
+    g.state_.finished = g.checkWin(idx + off);
+
+    shift += hex_off;
+  }
+
+  if (g.state_.turn != state.turn_num()) {
+    return absl::InternalError(
+        absl::StrFormat("Pawns imply turn %u, but have turn %u in state",
+                        g.state_.turn, state.turn_num()));
+  }
+  if (state.turn_num() == NPawns - 1) {
+    if (g.state_.blackTurn != state.black_turn()) {
+      return absl::InternalError(
+          absl::StrFormat("Expected %s turn, but state has %s turn",
+                          g.state_.blackTurn ? "black" : "white",
+                          state.black_turn() ? "black" : "white"));
+    }
+  } else {
+    g.state_.blackTurn = state.black_turn();
+  }
+  if (state.finished() != g.state_.finished) {
+    return absl::InternalError(
+        absl::StrFormat("Game is %s, but state has %s",
+                        g.state_.finished ? "finished" : "unfinished",
+                        state.finished() ? "finished" : "unfinished"));
+  }
+
+  return g;
+}
+
+template <uint32_t NPawns>
 bool Game<NPawns>::validate() const {
   uint32_t n_b_pawns = 0;
   uint32_t n_w_pawns = 0;
@@ -1098,7 +1215,7 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
     }
   }
 
-  for (uint32_t i = !blackTurn() ? 1 : 0; i < NPawns; i += 2) {
+  for (uint32_t i = blackTurn() ? 0 : 1; i < NPawns; i += 2) {
     idx_t idx = pawn_poses_[i];
     HexPos pos = idxToPos(idx);
     if (pos == last_move_pos) {

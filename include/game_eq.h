@@ -13,11 +13,7 @@ class GameEq {
   bool operator()(const GameView<NPawns>& view1,
                   const GameView<NPawns>& view2) const noexcept;
 
-  static void setGameArena(const util::memory::Arena<Game<NPawns>>& arena);
-
  private:
-  static const util::memory::Arena<Game<NPawns>>* g_arena_;
-
   template <class SymmetryClassOp>
   static bool compareViews(const GameView<NPawns>& view1,
                            const GameView<NPawns>& view2,
@@ -26,15 +22,12 @@ class GameEq {
 };
 
 template <uint32_t NPawns>
-const util::memory::Arena<Game<NPawns>>* GameEq<NPawns>::g_arena_ = nullptr;
-
-template <uint32_t NPawns>
 bool GameEq<NPawns>::operator()(const GameView<NPawns>& view1,
                                 const GameView<NPawns>& view2) const noexcept {
   using SymmState = typename Game<NPawns>::BoardSymmetryState;
 
-  SymmState s1 = view1.game(*g_arena_).calcSymmetryState();
-  SymmState s2 = view2.game(*g_arena_).calcSymmetryState();
+  SymmState s1 = view1.game().calcSymmetryState();
+  SymmState s2 = view2.game().calcSymmetryState();
 
   if (s1.symm_class != s2.symm_class) {
     return false;
@@ -45,12 +38,6 @@ bool GameEq<NPawns>::operator()(const GameView<NPawns>& view1,
 }
 
 template <uint32_t NPawns>
-void GameEq<NPawns>::setGameArena(
-    const util::memory::Arena<Game<NPawns>>& arena) {
-  g_arena_ = &arena;
-}
-
-template <uint32_t NPawns>
 template <class SymmetryClassOp>
 bool GameEq<NPawns>::compareViews(
     const GameView<NPawns>& view1, const GameView<NPawns>& view2,
@@ -58,8 +45,8 @@ bool GameEq<NPawns>::compareViews(
     typename Game<NPawns>::BoardSymmetryState s2) {
   typedef typename SymmetryClassOp::Group Group;
 
-  const Game<NPawns>& g1 = view1.game(*g_arena_);
-  const Game<NPawns>& g2 = view2.game(*g_arena_);
+  const Game<NPawns>& g1 = view1.game();
+  const Game<NPawns>& g2 = view2.game();
 
   bool same_color = !(view1.areColorsInverted() ^ view2.areColorsInverted());
 

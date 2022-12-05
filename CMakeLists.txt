@@ -36,6 +36,13 @@ set(ENABLE_TESTING OFF CACHE BOOL "When enabled, build all unit tests. The
 
 
 ############################################################
+# Dependencies
+############################################################
+
+find_package(Protobuf REQUIRED)
+
+
+############################################################
 # Build Rules
 ############################################################
 
@@ -48,14 +55,20 @@ file(GLOB_RECURSE C_SRC
 file(GLOB_RECURSE ASM_SRC
 	"${PROJECT_SOURCE_DIR}/src/*.s"
 )
+file(GLOB_RECURSE PROTO_SRC
+  "${PROJECT_SOURCE_DIR}/proto/*.proto"
+)
 
 # remove arch_test dir
 list(FILTER CXX_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
 list(FILTER C_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
 list(FILTER ASM_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
+list(FILTER PROTO_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
+
+protobuf_generate_cpp(PROTO_GEN_SRCS PROTO_GEN_HDRS ${PROTO_SRC})
 
 add_executable(onoro
-  ${CXX_SRC} ${C_SRC} ${ASM_SRC}
+  ${CXX_SRC} ${C_SRC} ${ASM_SRC} ${PROTO_GEN_SRCS} ${PROT_GEN_HDRS}
 )
 
 if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
@@ -80,7 +93,7 @@ target_compile_options(onoro
 		$<$<COMPILE_LANGUAGE:CXX>:-Wno-nested-anon-types -Wno-ignored-qualifiers
 		-Wno-gnu-anonymous-struct -Wno-unused-parameter -Wno-newline-eof
 		-Wno-c++11-extensions -Wno-c++14-extensions -Wno-c++17-extensions
-    -Wno-gnu-zero-variadic-macro-arguments -Wno-vla-extension>
+    -Wno-gnu-zero-variadic-macro-arguments -Wno-vla-extension -Wno-gcc-compat>
 )
 
 if("${CMAKE_ASM_COMPILER_ID}" MATCHES "GNU")
@@ -153,11 +166,12 @@ target_include_directories(onoro
 		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/include>
 		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/abseil-cpp>
 		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/utils/include>
+    $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
 target_link_libraries(onoro
 	PUBLIC
-		"${LINK_LIBS}" absl::flat_hash_map utils
+    "${LINK_LIBS}" absl::flat_hash_map absl::statusor absl::str_format utils ${Protobuf_LIBRARIES}
 )
 
 if (${ENABLE_TESTING})

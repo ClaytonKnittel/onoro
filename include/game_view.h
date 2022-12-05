@@ -1,7 +1,6 @@
 #pragma once
 
 #include <utils/math/group/dihedral.h>
-#include <utils/memory/arena.h>
 
 #include <cstdint>
 
@@ -11,15 +10,13 @@
 namespace onoro {
 
 using namespace hash_group;
-using namespace util::memory;
 
 template <uint32_t NPawns>
 class GameView {
  public:
-  constexpr GameView(ArenaPtr<Game<NPawns>>, const Arena<Game<NPawns>>&);
+  constexpr GameView(const Game<NPawns>*);
   template <class Group>
-  constexpr GameView(ArenaPtr<Game<NPawns>>, const Arena<Game<NPawns>>&,
-                     Group view_op, bool color_invert);
+  constexpr GameView(const Game<NPawns>*, Group view_op, bool color_invert);
 
   GameView(const GameView& view) = default;
 
@@ -39,7 +36,7 @@ class GameView {
 
   constexpr bool areColorsInverted() const;
 
-  constexpr const Game<NPawns>& game(const Arena<Game<NPawns>>&) const;
+  constexpr const Game<NPawns>& game() const;
 
   constexpr std::size_t hash() const;
 
@@ -51,7 +48,7 @@ class GameView {
   };
 
  private:
-  const ArenaPtr<Game<NPawns>> game_;
+  const Game<NPawns>* game_;
 
   // Ordinal of the view operation to apply to the game.
   uint8_t view_op_ordinal_;
@@ -67,23 +64,21 @@ class GameView {
 };
 
 template <uint32_t NPawns>
-constexpr GameView<NPawns>::GameView(ArenaPtr<Game<NPawns>> game,
-                                     const Arena<Game<NPawns>>& arena)
+constexpr GameView<NPawns>::GameView(const Game<NPawns>* game)
     : game_(game),
       view_op_ordinal_(0),
       color_invert_(0),
-      hash_(GameHash<NPawns>::calcHash(*game.get(arena))) {}
+      hash_(GameHash<NPawns>::calcHash(*game)) {}
 
 template <uint32_t NPawns>
 template <class Group>
-constexpr GameView<NPawns>::GameView(ArenaPtr<Game<NPawns>> game,
-                                     const Arena<Game<NPawns>>& arena,
-                                     Group view_op, bool color_invert)
+constexpr GameView<NPawns>::GameView(const Game<NPawns>* game, Group view_op,
+                                     bool color_invert)
     : game_(game),
       view_op_ordinal_(view_op.ordinal()),
       color_invert_(color_invert),
-      hash_(hash_group::apply<Group>(
-          view_op, GameHash<NPawns>::calcHash(*game.get(arena)))) {}
+      hash_(hash_group::apply<Group>(view_op,
+                                     GameHash<NPawns>::calcHash(*game))) {}
 
 template <uint32_t NPawns>
 template <class Group>
@@ -117,9 +112,8 @@ constexpr bool GameView<NPawns>::areColorsInverted() const {
 }
 
 template <uint32_t NPawns>
-constexpr const Game<NPawns>& GameView<NPawns>::game(
-    const Arena<Game<NPawns>>& arena) const {
-  return *game_.get(arena);
+constexpr const Game<NPawns>& GameView<NPawns>::game() const {
+  return *game_;
 }
 
 template <uint32_t NPawns>
