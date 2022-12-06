@@ -40,6 +40,7 @@ set(ENABLE_TESTING OFF CACHE BOOL "When enabled, build all unit tests. The
 ############################################################
 
 find_package(Protobuf REQUIRED)
+find_package(Python REQUIRED COMPONENTS Interpreter)
 
 
 ############################################################
@@ -188,4 +189,20 @@ if (${ENABLE_TESTING})
 
 	add_subdirectory(test)
 endif()
+
+############################################################
+# Python lib
+############################################################
+
+protobuf_generate_python(PROTO_GEN_PY ${PROTO_SRC})
+
+add_custom_target("py"
+  DEPENDS ${PROTO_GEN_PY}
+  COMMENT "Run python version of onoro"
+)
+
+add_custom_command(
+  TARGET "py"
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} python3 ${CMAKE_SOURCE_DIR}/pylib/init.py
+)
 
