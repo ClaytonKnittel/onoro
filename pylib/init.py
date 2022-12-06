@@ -23,8 +23,8 @@ class Onoro:
     self.pawns = list(pawns)
 
   def serialize(self) -> GameState:
-    black_pawns = [piece for piece in self.pawns if piece.black()]
-    white_pawns = [piece for piece in self.pawns if not piece.black()]
+    black_pawns = [piece for piece in self.pawns if piece.black]
+    white_pawns = [piece for piece in self.pawns if not piece.black]
 
     if len(black_pawns) < len(white_pawns):
       raise RuntimeError('Fewer black pawns than white (%d vs %d)' %
