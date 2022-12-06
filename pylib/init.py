@@ -80,8 +80,7 @@ class Onoro:
         if coord not in counts:
           counts[coord] = 0
         counts[coord] += 1
-    counts = {loc: count for loc, count in counts.items() if count >= 2}
-    return counts.keys()
+    return (loc for loc, count in counts.items() if count >= 2)
 
   def _RemoveAdjacent(self, pawn: Tuple[int, int], pawns: Set[Tuple[int, int]]) -> Set[Tuple[int, int]]:
     for neighbor in coord_neighbors(pawn):
