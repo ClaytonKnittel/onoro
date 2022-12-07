@@ -219,6 +219,11 @@ constexpr HexPos operator*(const T& a, const HexPos& b) {
   return { static_cast<int32_t>(a * b.x), static_cast<int32_t>(a * b.y) };
 }
 
+template <typename T>
+constexpr HexPos operator/(const HexPos& a, const T& b) {
+  return { static_cast<int32_t>(a.x / b), static_cast<int32_t>(a.y / b) };
+}
+
 constexpr HexPos operator+(const HexPos& a, const HexPos& b) {
   return { a.x + b.x, a.y + b.y };
 }

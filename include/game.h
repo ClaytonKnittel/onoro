@@ -882,7 +882,19 @@ absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
                         (state.pawns_size() + 1) / 2, state.pawns_size() / 2));
   }
 
-  HexPos shift{ 2, 2 };
+  HexPos minPos{ INT32_MAX, INT32_MAX };
+  HexPos maxPos{ INT32_MIN, INT32_MIN };
+
+  for (const onoro::proto::GameState::Pawn& pawn : state.pawns()) {
+    minPos =
+        HexPos{ std::min(minPos.x, pawn.x()), std::min(minPos.y, pawn.y()) };
+    maxPos =
+        HexPos{ std::min(maxPos.x, pawn.x()), std::min(maxPos.y, pawn.y()) };
+  }
+
+  HexPos mid = (minPos + maxPos) / 2u;
+  HexPos shift = HexPos{ NPawns / 2 - 1, NPawns / 2 - 1 } - mid;
+
   for (uint32_t i = 0; i < static_cast<uint32_t>(state.pawns_size()); i++) {
     onoro::proto::GameState::Pawn pawn;
     if (i % 2 == 0) {

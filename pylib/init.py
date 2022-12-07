@@ -6,6 +6,7 @@ from game_state_pb2 import GameState
 
 Pawn = GameState.Pawn
 
+
 def main():
   random.seed(1)
   n_pawns = 16
@@ -28,6 +29,7 @@ def main():
     print(g)
 
     gs = g.serialize()
+
 
 if __name__ == '__main__':
   main()

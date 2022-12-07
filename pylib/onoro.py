@@ -73,6 +73,34 @@ class Onoro:
         res += '\n'
     return res
 
+  def __eq__(self, other) -> bool:
+    if not isinstance(other, Onoro):
+      return False
+
+    if self.num_pawns != other.num_pawns:
+      return False
+    if self.black_turn != other.black_turn:
+      return False
+    if len(self.pawns) != len(other.pawns):
+      return False
+
+    self_off_x = min((pawn.x for pawn in self.pawns))
+    self_off_y = min((pawn.y for pawn in self.pawns))
+    other_off_x = min((pawn.x for pawn in other.pawns))
+    other_off_y = min((pawn.y for pawn in other.pawns))
+
+    self_off = Coord(self_off_x, self_off_y)
+    other_off = Coord(other_off_x, other_off_y)
+
+    for pawn in self.pawns:
+      coord = PawnToCoord(pawn)
+      expected = CoordToPawn(coord - self_off + other_off, pawn.black)
+
+      if expected not in other.pawns:
+        return False
+
+    return True
+
   def PawnAt(self, coord: Coord) -> int:
     """Returns the color of the pawn at coord, or EMPTY if no pawn is there."""
     pawns_at = [pawn for pawn in self.pawns if (pawn.x, pawn.y) == coord]
