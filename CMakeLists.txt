@@ -57,7 +57,6 @@ file(GLOB_RECURSE PROTO_SRC
 
 set(TEST_CXX_SRC ${CXX_SRC})
 list(FILTER TEST_CXX_SRC INCLUDE REGEX "test_[^/]+\.cc")
-message("test src: ${TEST_CXX_SRC}")
 
 list(FILTER CXX_SRC EXCLUDE REGEX "test_[^/]+\.cc")
 
