@@ -1,22 +1,78 @@
 
+from __future__ import annotations
 import random
-from typing import Iterable, List, Set, Tuple
+from typing import Any, Iterable, List, Set, Tuple
 
 from game_state_pb2 import GameState
 
 Pawn = GameState.Pawn
 
-def coord_neighbors(pawn: Tuple[int, int]) -> Iterable[Tuple[int, int]]:
+
+class Coord:
+
+  def __init__(self, x, y):
+    self.x = x
+    self.y = y
+
+  def __eq__(self, coord: Any) -> Coord:
+    if isinstance(coord, Coord):
+      return self.x == coord.x and self.y == coord.y
+    if isinstance(coord, Tuple):
+      return self.x == coord[0] and self.y == coord[1]
+    return NotImplemented()
+
+  def __radd__(self, coord: Any) -> Coord:
+    return self + coord
+
+  def __add__(self, coord: Any) -> Coord:
+    if isinstance(coord, Coord):
+      return Coord(self.x + coord.x, self.y + coord.y)
+    if isinstance(coord, Tuple):
+      return Coord(self.x + coord[0], self.y + coord[1])
+    return NotImplemented()
+
+  def __radd__(self, coord: Any) -> Coord:
+    return self + coord
+
+  def __sub__(self, coord: Any) -> Coord:
+    if isinstance(coord, Coord):
+      return Coord(self.x - coord.x, self.y - coord.y)
+    if isinstance(coord, Tuple):
+      return Coord(self.x - coord[0], self.y - coord[1])
+    return NotImplemented()
+
+  def __rsub__(self, coord: Any) -> Coord:
+    inv = self - coord
+    return Coord(-inv.x, -inv.y)
+
+  def __hash__(self) -> str:
+    return hash((self.x, self.y))
+
+
+def PawnToCoord(pawn: Pawn) -> Coord:
+  return Coord(pawn.x, pawn.y)
+
+
+def CoordToPawn(coord: Coord, black: bool) -> Pawn:
+  return Pawn(x=coord.x, y=coord.y, black=black)
+
+
+def coord_neighbors(pawn: Coord) -> Iterable[Coord]:
   return (
-      (pawn[0] + 1, pawn[1]),
-      (pawn[0] + 1, pawn[1] + 1),
-      (pawn[0], pawn[1] + 1),
-      (pawn[0] - 1, pawn[1]),
-      (pawn[0] - 1, pawn[1] - 1),
-      (pawn[0], pawn[1] - 1),
+      pawn + (1, 0),
+      pawn + (1, 1),
+      pawn + (0, 1),
+      pawn + (-1, 0),
+      pawn + (-1, -1),
+      pawn + (0, -1),
     )
 
+
 class Onoro:
+
+  _EMPTY = 0
+  _BLACK = 1
+  _WHITE = 2
 
   def __init__(self, num_pawns: int, pawns: List[GameState.Pawn], black_turn: bool):
     self.num_pawns = num_pawns
@@ -71,7 +127,42 @@ class Onoro:
         res += '\n'
     return res
 
-  def PlayableSpots(self, pawns: Set[Tuple[int, int]]) -> Iterable[Tuple[int, int]]:
+  def PawnAt(self, coord: Coord) -> int:
+    """Returns the color of the pawn at coord, or EMPTY if no pawn is there."""
+    pawns_at = [pawn for pawn in self.pawns if (pawn.x, pawn.y) == coord]
+    if not pawns_at:
+      return self._EMPTY
+    if len(pawns_at) == 1:
+      return self._BLACK if pawns_at[0].black else self._WHITE
+    raise RuntimeError('Multiple pawns at position (%d, %d)' % (coord.x, coord.y))
+
+  def HasWinner(self) -> bool:
+    """Checks if a player has won, only returning true if it is not the winning player's turn."""
+    for pawn in pawns:
+      color = self._BLACK if pawn.black else self._WHITE
+      pawn_pos = Coord(pawn.x, pawn.y)
+
+      for delta in ((1, 0), (1, 1), (0, 1)):
+        n_in_row = 1
+
+        pos = pawn_pos + delta
+        while PawnAt(pos) == color:
+          n_in_row + 1
+          pos += delta
+
+        pos = pawn_pos - delta
+        while PawnAt(pos) == color:
+          n_in_row + 1
+          pos -= delta
+
+        if n_in_row >= 4:
+          if pawn.black == self.black_turn:
+            raise RuntimeError('Cannot have current player winning')
+          return True
+
+    return False
+
+  def PlayableSpots(self, pawns: Set[Coord]) -> Iterable[Coord]:
     counts = dict()
     for pawn in pawns:
       for coord in coord_neighbors(pawn):
@@ -82,20 +173,20 @@ class Onoro:
         counts[coord] += 1
     return (loc for loc, count in counts.items() if count >= 2)
 
-  def _RemoveAdjacent(self, pawn: Tuple[int, int], pawns: Set[Tuple[int, int]]) -> Set[Tuple[int, int]]:
+  def _RemoveAdjacent(self, pawn: Coord, pawns: Set[Coord]) -> Set[Coord]:
     for neighbor in coord_neighbors(pawn):
       if neighbor in pawns:
         pawns = pawns - {neighbor}
         pawns = self._RemoveAdjacent(neighbor, pawns)
     return pawns
 
-  def Connected(self, pawns: Set[Tuple[int, int]]) -> bool:
+  def Connected(self, pawns: Set[Coord]) -> bool:
     if not pawns:
       return True
     pawn = pawns.pop()
     return not self._RemoveAdjacent(pawn, pawns)
 
-  def TwoNeighborsEach(self, pawns: Set[Tuple[int, int]]) -> bool:
+  def TwoNeighborsEach(self, pawns: Set[Coord]) -> bool:
     for pawn in pawns:
       n_neighbors = len([neighbor for neighbor in coord_neighbors(pawn) if neighbor in pawns])
       if n_neighbors < 2:
@@ -106,8 +197,8 @@ class Onoro:
     if len(self.pawns) >= self.num_pawns:
       raise RuntimeError('Not phase 1, %d pawns in play' % (len(self.num_pawns)))
 
-    pawns = {(pawn.x, pawn.y) for pawn in self.pawns}
-    return (Pawn(x=pawn[0], y=pawn[1], black=self.black_turn) for pawn in self.PlayableSpots(pawns))
+    coords = {PawnToCoord(pawn) for pawn in self.pawns}
+    return (CoordToPawn(coord, self.black_turn) for coord in self.PlayableSpots(coords))
 
   def MakeP1Move(self, move: Pawn) -> None:
     self.pawns += [move,]
@@ -117,12 +208,12 @@ class Onoro:
     if len(self.pawns) != self.num_pawns:
       raise RuntimeError('Not phase 2, %d pawns in play' % (len(self.num_pawns)))
 
-    pawns = {(pawn.x, pawn.y) for pawn in self.pawns}
+    pawns = {PawnToCoord(pawn) for pawn in self.pawns}
     for pawn in self.pawns:
       if pawn.black != self.black_turn:
         continue
 
-      pawn_coord = (pawn.x, pawn.y)
+      pawn_coord = PawnToCoord(pawn)
       rem_pawns = pawns - {pawn_coord}
       for coord in self.PlayableSpots(rem_pawns):
         if coord == pawn_coord:
@@ -130,7 +221,7 @@ class Onoro:
 
         new_pawns = rem_pawns | {coord}
         if self.Connected(new_pawns) and self.TwoNeighborsEach(new_pawns):
-          yield (pawn, Pawn(x=coord[0], y=coord[1], black=pawn.black))
+          yield (pawn, CoordToPawn(coord, pawn.black))
 
   def MakeP2Move(self, move: Tuple[Pawn, Pawn]) -> None:
     self.pawns.remove(move[0])
