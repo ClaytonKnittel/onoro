@@ -8,7 +8,7 @@ Pawn = GameState.Pawn
 
 def main():
   random.seed(1)
-  n_pawns = 6
+  n_pawns = 16
   pawns = (
       Pawn(x=1, y=1, black=True),
       Pawn(x=1, y=2, black=False),
@@ -19,22 +19,12 @@ def main():
   game = deserialize(gs, n_pawns)
   print(game)
 
-  for i in range(3, n_pawns):
+  for i in range(len(pawns), n_pawns + 5):
     g = deserialize(gs, n_pawns)
-    moves = list(g.P1Moves())
+    moves = list(g.Moves())
     move = random.choice(moves)
 
-    g.MakeP1Move(move)
-    print(g)
-
-    gs = g.serialize()
-
-  for i in range(n_pawns, n_pawns + 5):
-    g = deserialize(gs, n_pawns)
-    moves = list(g.P2Moves())
-    move = random.choice(moves)
-
-    g.MakeP2Move(move)
+    g.MakeMove(move)
     print(g)
 
     gs = g.serialize()

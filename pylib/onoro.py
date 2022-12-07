@@ -1,5 +1,5 @@
 
-from typing import Iterable, List, Set, Tuple
+from typing import Iterable, List, Set, Tuple, Union
 
 from coord import Coord, PawnToCoord, CoordToPawn, coord_neighbors
 from game_state_pb2 import GameState
@@ -14,6 +14,8 @@ class Onoro:
   _WHITE = 2
 
   _N_IN_ROW_TO_WIN = 4
+
+  SHOW_NEXT_MOVES = False
 
   def __init__(self, num_pawns: int, pawns: List[GameState.Pawn], black_turn: bool):
     self.num_pawns = num_pawns
@@ -172,6 +174,20 @@ class Onoro:
     self.pawns.remove(move[0])
     self.pawns += (move[1],)
     self.black_turn = not self.black_turn
+
+  def Moves(self) -> Union[Iterable[Pawn], Iterable[Tuple[Pawn, Pawn]]]:
+    if len(self.pawns) == self.num_pawns:
+      return self.P2Moves()
+    else:
+      return self.P1Moves()
+
+  def MakeMove(self, move: Union[Pawn, Tuple[Pawn, Pawn]]) -> None:
+    if len(self.pawns) == self.num_pawns:
+      assert(isinstance(move, Tuple))
+      self.MakeP2Move(move)
+    else:
+      assert(isinstance(move, Pawn))
+      self.MakeP1Move(move)
 
 
 def deserialize(gs: GameState, num_pawns: int) -> Onoro:
