@@ -33,6 +33,7 @@ set(BUILD_SHARED_LIBS ON CACHE BOOL "When enabled, builds libonoro as a
 set(ENABLE_TESTING OFF CACHE BOOL "When enabled, build all unit tests. The
 	unit tests can then be run from within the build directory with
 	'make run_tests'.")
+set(ABSL_PROPAGATE_CXX_STD ON)
 
 
 ############################################################
@@ -50,108 +51,36 @@ find_package(Python REQUIRED COMPONENTS Interpreter)
 file(GLOB_RECURSE CXX_SRC
 	"${PROJECT_SOURCE_DIR}/src/*.cc"
 )
-file(GLOB_RECURSE C_SRC
-	"${PROJECT_SOURCE_DIR}/src/*.c"
-)
-file(GLOB_RECURSE ASM_SRC
-	"${PROJECT_SOURCE_DIR}/src/*.s"
-)
 file(GLOB_RECURSE PROTO_SRC
   "${PROJECT_SOURCE_DIR}/proto/*.proto"
 )
 
+set(TEST_CXX_SRC ${CXX_SRC})
+list(FILTER TEST_CXX_SRC INCLUDE REGEX "test_[^/]+\.cc")
+message("test src: ${TEST_CXX_SRC}")
+
+list(FILTER CXX_SRC EXCLUDE REGEX "test_[^/]+\.cc")
+
 # remove arch_test dir
 list(FILTER CXX_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
-list(FILTER C_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
-list(FILTER ASM_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
 list(FILTER PROTO_SRC EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/src/arch_test/*")
 
 protobuf_generate_cpp(PROTO_GEN_SRCS PROTO_GEN_HDRS ${PROTO_SRC})
 
-add_executable(onoro
-  ${CXX_SRC} ${C_SRC} ${ASM_SRC} ${PROTO_GEN_SRCS} ${PROT_GEN_HDRS}
+add_executable("onoro"
+  ${CXX_SRC} ${PROTO_GEN_SRCS} ${PROT_GEN_HDRS}
 )
 
-if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
-	enable_language(ASM)
-	if(CMAKE_ASM_COMPILER_WORKS)
-		set(can_use_assembler TRUE)
-	endif()
-endif()
+set(TEST_CXX_EXES "")
 
-if(NOT can_use_assembler)
-	message(SEND_ERROR "No assembler found")
-endif()
-
-target_compile_options(onoro PRIVATE
-	$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:-Wpedantic -Wall -Wextra
-  -Wno-unused-function -Wno-format -march=native -mtune=native>
-)
-target_compile_options(onoro
-	PRIVATE
-		$<$<COMPILE_LANGUAGE:CXX>:-Wno-extra-semi -Wno-c99-extensions>
-	PUBLIC
-		$<$<COMPILE_LANGUAGE:CXX>:-Wno-nested-anon-types -Wno-ignored-qualifiers
-		-Wno-gnu-anonymous-struct -Wno-unused-parameter -Wno-newline-eof
-		-Wno-c++11-extensions -Wno-c++14-extensions -Wno-c++17-extensions
-    -Wno-gnu-zero-variadic-macro-arguments -Wno-vla-extension -Wno-gcc-compat>
-)
-
-if("${CMAKE_ASM_COMPILER_ID}" MATCHES "GNU")
-	set(ASM_OPTIONS -Wa,--64 -Wa,-msyntax=intel -Wa,-mnaked-reg)
-elseif("${CMAKE_ASM_COMPILER_ID}" MATCHES "Clang")
-	set(ASM_OPTIONS -masm=intel)
-else()
-	message(SEND_ERROR "Unsupported assembler (${CMAKE_ASM_COMPILER_ID})")
-endif()
-
-target_compile_options(onoro PRIVATE $<$<COMPILE_LANGUAGE:ASM>:${ASM_OPTIONS}>)
-
-if (${ENABLE_TESTING})
-	target_compile_definitions(onoro PRIVATE DO_TESTING)
-endif()
-
-if("${CMAKE_BUILD_TYPE}" MATCHES "Debug" OR "${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
-	target_compile_definitions(onoro PRIVATE DEBUG_BUILD)
-elseif("${CMAKE_BUILD_TYPE}" MATCHES "Release")
-	target_compile_definitions(onoro PRIVATE RELEASE_BUILD)
-endif()
-
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
-
-if (NOT COMPILER_SUPPORTS_CXX17)
-	message(SEND_ERROR "The compiler ${CMAKE_CXX_COMPILER} does not support "
-		"c++17, please use a different compiler")
-endif()
-
-set_property(TARGET onoro PROPERTY CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD 17)
-
-############################################################
-# Installation Rules
-############################################################
-
-# Library
-if(${BUILD_SHARED_LIBS})
-	install(TARGETS onoro LIBRARY DESTINATION lib)
-else()
-	install(TARGETS onoro ARCHIVE DESTINATION lib)
-endif()
-
-# Header files
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/
-    DESTINATION include)
-
-# make uninstall
-add_custom_target("uninstall" COMMENT "Uninstall installed files")
-add_custom_command(
-    TARGET "uninstall"
-    POST_BUILD
-    COMMENT "Uninstall files with install_manifest.txt"
-    COMMAND xargs rm -vf < install_manifest.txt || echo Nothing in
-            install_manifest.txt to be uninstalled!
-)
+# Add an executable for each test_*.cc file
+foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
+  string(REGEX REPLACE "^.+test_([^/]+)\.cc" "test_\\1" EXE_NAME ${TEST_CXX_SRC})
+  add_executable(${EXE_NAME}
+    ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
+  )
+  list(APPEND TEST_CXX_EXES ${EXE_NAME})
+endforeach()
 
 ############################################################
 # Add submodules
@@ -160,35 +89,68 @@ add_custom_command(
 add_subdirectory(modules/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(modules/utils EXCLUDE_FROM_ALL)
 
-target_include_directories(onoro
-	PRIVATE
-		"/usr/local/include"
-	PUBLIC
-		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/include>
-		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/abseil-cpp>
-		$<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/utils/include>
-    $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${CMAKE_CURRENT_BINARY_DIR}>
-)
+set(ONORO_EXE "onoro")
 
-target_link_libraries(onoro
-	PUBLIC
-    "${LINK_LIBS}" absl::flat_hash_map absl::statusor absl::str_format utils ${Protobuf_LIBRARIES}
-)
+foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
 
-if (${ENABLE_TESTING})
-	find_library(check check REQUIRED)
+  if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
+    enable_language(ASM)
+    if(CMAKE_ASM_COMPILER_WORKS)
+      set(can_use_assembler TRUE)
+    endif()
+  endif()
 
-	target_link_directories(onoro
-		PUBLIC "/usr/local/lib"
-	)
+  if(NOT can_use_assembler)
+    message(SEND_ERROR "No assembler found")
+  endif()
 
-	target_link_libraries(onoro
-		PUBLIC
-			check
-	)
+  target_compile_options(${EXE} PRIVATE
+    $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:-Wpedantic -Wall -Wextra
+    -Wno-unused-function -Wno-format -march=native -mtune=native>
+  )
+  target_compile_options(${EXE}
+    PRIVATE
+      $<$<COMPILE_LANGUAGE:CXX>:-Wno-extra-semi -Wno-c99-extensions>
+    PUBLIC
+      $<$<COMPILE_LANGUAGE:CXX>:-Wno-nested-anon-types -Wno-ignored-qualifiers
+      -Wno-gnu-anonymous-struct -Wno-unused-parameter -Wno-newline-eof
+      -Wno-c++11-extensions -Wno-c++14-extensions -Wno-c++17-extensions
+      -Wno-gnu-zero-variadic-macro-arguments -Wno-vla-extension -Wno-gcc-compat>
+  )
 
-	add_subdirectory(test)
-endif()
+  if("${CMAKE_BUILD_TYPE}" MATCHES "Debug" OR "${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
+    target_compile_definitions(${EXE} PRIVATE DEBUG_BUILD)
+  elseif("${CMAKE_BUILD_TYPE}" MATCHES "Release")
+    target_compile_definitions(${EXE} PRIVATE RELEASE_BUILD)
+  endif()
+
+  include(CheckCXXCompilerFlag)
+  CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
+
+  if (NOT COMPILER_SUPPORTS_CXX17)
+    message(SEND_ERROR "The compiler ${CMAKE_CXX_COMPILER} does not support "
+      "c++17, please use a different compiler")
+  endif()
+
+  set_property(TARGET ${EXE} PROPERTY CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD 17)
+
+  target_include_directories(${EXE}
+    PRIVATE
+      "/usr/local/include"
+    PUBLIC
+      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/include>
+      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/abseil-cpp>
+      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/utils/include>
+      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${CMAKE_CURRENT_BINARY_DIR}>
+  )
+
+  target_link_libraries(${EXE}
+    PUBLIC
+      "${LINK_LIBS}" absl::flat_hash_map absl::statusor absl::str_format utils ${Protobuf_LIBRARIES}
+  )
+
+endforeach()
 
 ############################################################
 # Python lib

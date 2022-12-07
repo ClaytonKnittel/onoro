@@ -98,7 +98,7 @@ double test_alg_1(uint32_t w, uint32_t h) {
   return time;
 }
 
-void TestUnionFind() {
+int main(int argc, char* argv[]) {
   {
     UnionFind<uint32_t> uf(10);
 
