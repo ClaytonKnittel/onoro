@@ -45,8 +45,11 @@ class Coord:
     inv = self - coord
     return Coord(-inv.x, -inv.y)
 
-  def __hash__(self) -> str:
+  def __hash__(self) -> int:
     return hash((self.x, self.y))
+
+  def __repr__(self) -> str:
+    return str((self.x, self.y))
 
 
 def PawnToCoord(pawn: Pawn) -> Coord:
@@ -74,6 +77,8 @@ class Onoro:
   _BLACK = 1
   _WHITE = 2
 
+  _N_IN_ROW_TO_WIN = 4
+
   def __init__(self, num_pawns: int, pawns: List[GameState.Pawn], black_turn: bool):
     self.num_pawns = num_pawns
     self.black_turn = black_turn
@@ -97,7 +102,7 @@ class Onoro:
         pawns=self.pawns,
         black_turn=self.black_turn,
         turn_num=len(self.pawns) - 1,
-        finished=False
+        finished=self.HasWinner()
       )
     return gs
 
@@ -120,6 +125,9 @@ class Onoro:
       board[x + y * self.num_pawns] = 'B' if pawn.black else 'W'
 
     res = ''
+    if self.HasWinner():
+      res += 'WINNER: %s\n' % ('white' if self.black_turn else 'black')
+
     for line in range(self.num_pawns):
       r = self.num_pawns - line - 1
       res += ''.join([' '] * line) + ' '.join(board[(self.num_pawns * r):(self.num_pawns * (r + 1))])
@@ -138,24 +146,25 @@ class Onoro:
 
   def HasWinner(self) -> bool:
     """Checks if a player has won, only returning true if it is not the winning player's turn."""
-    for pawn in pawns:
+    for pawn in self.pawns:
       color = self._BLACK if pawn.black else self._WHITE
       pawn_pos = Coord(pawn.x, pawn.y)
 
+      # Check for a win in all 3 possible directions
       for delta in ((1, 0), (1, 1), (0, 1)):
         n_in_row = 1
 
         pos = pawn_pos + delta
-        while PawnAt(pos) == color:
-          n_in_row + 1
+        while self.PawnAt(pos) == color:
+          n_in_row += 1
           pos += delta
 
         pos = pawn_pos - delta
-        while PawnAt(pos) == color:
-          n_in_row + 1
+        while self.PawnAt(pos) == color:
+          n_in_row += 1
           pos -= delta
 
-        if n_in_row >= 4:
+        if n_in_row >= self._N_IN_ROW_TO_WIN:
           if pawn.black == self.black_turn:
             raise RuntimeError('Cannot have current player winning')
           return True
@@ -235,7 +244,14 @@ def deserialize(gs: GameState, num_pawns: int) -> Onoro:
   if gs.turn_num < num_pawns - 1 and gs.black_turn != ((gs.turn_num % 2) == 1):
     raise RuntimeError('Expect %s player on turn %d' %
                        ('black' if not gs.black_turn else 'white', gs.turn_num))
-  return Onoro(num_pawns, gs.pawns, gs.black_turn)
+  game = Onoro(num_pawns, gs.pawns, gs.black_turn)
+
+  if gs.finished != game.HasWinner():
+    raise RuntimeError('Game state reports %s, but game has %s'
+                       % ('winner' if gs.finished else 'no winner',
+                          'a winner' if game.HasWinner() else 'no winner'))
+
+  return game
 
 def main():
   random.seed(1)
