@@ -34,7 +34,7 @@ static absl::StatusOr<std::string> readFromStdin() {
         "Failed to read %u protobuf bytes from stdin", n_bytes));
   }
 
-  return buf;
+  return std::string(buf, n_bytes);
 }
 
 static absl::Status writeToStdout(const std::string& msg) {
@@ -63,8 +63,8 @@ int main() {
     std::cerr << read_res.status().message() << std::endl;
     return -1;
   }
-
   const std::string game_str = *read_res;
+
   onoro::proto::GameState state;
   if (!state.ParseFromString(game_str)) {
     std::cerr << "Failed to parse protobuf" << std::endl;

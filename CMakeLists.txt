@@ -167,3 +167,13 @@ add_custom_command(
   COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} python3 ${CMAKE_SOURCE_DIR}/pylib/init.py
 )
 
+add_custom_target("py_test_next_moves"
+  DEPENDS ${PROTO_GEN_PY} test_next_moves
+  COMMENT "Compare next move generation between python and C++ implementations"
+)
+
+add_custom_command(
+  TARGET "py_test_next_moves"
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} python3 ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
+)
+
