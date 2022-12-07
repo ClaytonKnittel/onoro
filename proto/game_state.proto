@@ -15,3 +15,7 @@ message GameState {
   optional uint32 turn_num = 2;
   optional bool finished = 3;
 }
+
+message GameStates {
+  repeated GameState state = 1;
+}

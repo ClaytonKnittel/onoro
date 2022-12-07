@@ -37,6 +37,25 @@ static absl::StatusOr<std::string> readFromStdin() {
   return buf;
 }
 
+static absl::Status writeToStdout(const std::string& msg) {
+  uint32_t msg_size = htonl(msg.size());
+
+  if (write(STDOUT_FILENO, &msg_size, sizeof(msg_size)) == -1) {
+    return absl::InternalError("Failed to write message length to stdout");
+  }
+
+  if (write(STDOUT_FILENO, msg.data(), msg.size()) == -1) {
+    return absl::InternalError(absl::StrFormat(
+        "Failed to write message of size %" PRIu32 " to stdout", msg.size()));
+  }
+
+  return absl::OkStatus();
+}
+
+/*
+ * Reads <uint32 size><onoro::proto::GameState proto msg> from stdin.
+ * Writes <uint32 size><onoro::proto::GameStates proto msg> to stdout.
+ */
 int main() {
   // Read the game state from stdin.
   const auto read_res = readFromStdin();
@@ -49,6 +68,43 @@ int main() {
   onoro::proto::GameState state;
   if (!state.ParseFromString(game_str)) {
     std::cerr << "Failed to parse protobuf" << std::endl;
+    return -1;
+  }
+
+  absl::StatusOr<onoro::Game<NPawns>> game_res =
+      onoro::Game<NPawns>::LoadState(state);
+  if (!game_res.ok()) {
+    std::cerr << game_res.status() << std::endl;
+    return -1;
+  }
+  const onoro::Game<NPawns>& game = *game_res;
+
+  onoro::proto::GameStates states;
+
+  if (!game.inPhase2()) {
+    game.forEachMove([&game, &states](onoro::P1Move move) {
+      onoro::Game g2(game, move);
+      *states.add_state() = g2.SerializeState();
+      return true;
+    });
+  } else {
+    game.forEachMoveP2([&game, &states](onoro::P2Move move) {
+      onoro::Game g2(game, move);
+      *states.add_state() = g2.SerializeState();
+      return true;
+    });
+  }
+
+  std::string serialized_msg;
+  if (!states.SerializeToString(&serialized_msg)) {
+    std::cerr << "Failed to serialize GameStates object" << std::endl;
+    return -1;
+  }
+
+  absl::Status write_status = writeToStdout(serialized_msg);
+  if (!write_status.ok()) {
+    std::cerr << write_status.message() << std::endl;
+    return -1;
   }
 
   return 0;
