@@ -46,6 +46,52 @@ class Onoro:
       )
     return gs
 
+  # Returns the move made from diff to self, in terms of pawns on self's board.
+  def game_diff(self, diff: Onoro) -> Union[Pawn, Tuple[Pawn, Pawn]]:
+    minx = min((pawn.x for pawn in self.pawns))
+    miny = min((pawn.y for pawn in self.pawns))
+    dminx = min((pawn.x for pawn in diff.pawns))
+    dminy = min((pawn.y for pawn in diff.pawns))
+
+    for offset in (
+        Coord(0, 0),
+        Coord(1, 0),
+        Coord(1, 1),
+        Coord(0, 1),
+        Coord(-1, 0),
+        Coord(-1, -1),
+        Coord(0, -1)):
+      mx = dminx + offset.x
+      my = dminy + offset.y
+
+      n_new = 0
+      new_pawn = None
+      for pawn in self.pawns:
+        p = Pawn(
+            x=pawn.x - minx + mx,
+            y=pawn.y - miny + my,
+            black=pawn.black)
+        if p not in diff.pawns:
+          n_new += 1
+          new_pawn = p
+
+      n_old = 0
+      old_pawn = None
+      for pawn in diff.pawns:
+        p = Pawn(
+            x=pawn.x - mx + minx,
+            y=pawn.y - my + miny,
+            black=pawn.black)
+        if p not in self.pawns:
+          n_old += 1
+          old_pawn = p
+
+      if n_new == 1 and n_old == 1:
+        return (old_pawn, new_pawn)
+      if n_new == 1 and n_old == 0:
+        return new_pawn
+    raise RuntimeError('game state\n' + str(self) + '\ncould not have come from\n' + str(diff))
+
   def __repr__(self, check_errors: bool = True, diff: Onoro = None) -> str:
     minx = min((pawn.x for pawn in self.pawns))
     maxx = max((pawn.x for pawn in self.pawns))
@@ -126,6 +172,16 @@ class Onoro:
     res = ''
     if self.HasWinner(check_errors=check_errors):
       res += 'WINNER: %s\n' % ('white' if self.black_turn else 'black')
+    else:
+      res += 'turn: %s\n' % ('black' if self.black_turn else 'white')
+
+      self_off_x = min((pawn.x for pawn in self.pawns))
+      self_off_y = min((pawn.y for pawn in self.pawns))
+      h = (
+        tuple((pawn.x - self_off_x, pawn.y - self_off_y, pawn.black) for pawn in self.pawns),
+        self.black_turn,
+        self.num_pawns,
+      )
 
     for line in range(self.num_pawns):
       r = self.num_pawns - line - 1
@@ -165,8 +221,12 @@ class Onoro:
   def __hash__(self) -> int:
     self_off_x = min((pawn.x for pawn in self.pawns))
     self_off_y = min((pawn.y for pawn in self.pawns))
+
+    def pawn_key(pawn: Pawn) -> int:
+      return (pawn.x - self_off_x) + (pawn.y - self_off_y) * self.num_pawns
+
     return hash((
-      tuple((pawn.x - self_off_x, pawn.y - self_off_y, pawn.black) for pawn in self.pawns),
+      tuple((pawn.x - self_off_x, pawn.y - self_off_y, pawn.black) for pawn in sorted(self.pawns, key=pawn_key)),
       self.black_turn,
       self.num_pawns,
     ))
@@ -231,10 +291,14 @@ class Onoro:
   def Connected(self, pawns: Set[Coord]) -> bool:
     if not pawns:
       return True
+    pawns = copy.copy(pawns)
     pawn = pawns.pop()
     return not self._RemoveAdjacent(pawn, pawns)
 
   def TwoNeighborsEach(self, pawns: Set[Coord]) -> bool:
+    minx = min((pawn.x for pawn in pawns))
+    miny = min((pawn.y for pawn in pawns))
+
     for pawn in pawns:
       n_neighbors = len([neighbor for neighbor in coord_neighbors(pawn) if neighbor in pawns])
       if n_neighbors < 2:
@@ -262,11 +326,13 @@ class Onoro:
         continue
 
       pawn_coord = PawnToCoord(pawn)
+      assert(pawn_coord in pawns)
       rem_pawns = pawns - {pawn_coord}
       for coord in self.PlayableSpots(rem_pawns):
         if coord == pawn_coord:
           continue
 
+        assert(coord not in rem_pawns)
         new_pawns = rem_pawns | {coord}
         if self.Connected(new_pawns) and self.TwoNeighborsEach(new_pawns):
           yield (pawn, CoordToPawn(coord, pawn.black))

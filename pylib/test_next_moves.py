@@ -55,7 +55,7 @@ def get_next_moves_cc(game: Onoro) -> Iterable[Onoro]:
 
   proc.wait(timeout=1)
   if proc.returncode != 0:
-    print(proc.stdout.read().decode('utf-8'))
+    print('process stderr:')
     print(proc.stderr.read().decode('utf-8'))
     assert(proc.returncode == 0)
 
@@ -97,16 +97,27 @@ def test_next_moves(game: Onoro) -> bool:
   if len(cc_only) + len(py_only) != 0:
     print(game)
 
+  def sort_token(g: Onoro) -> int:
+    diff = g.game_diff(game)
+    n = game.num_pawns
+    return n * n * (diff[0].x + diff[0].y * n) + diff[1].x + diff[1].y * n
+
   res = True
   if len(cc_only) != 0:
     print('Found moves in C++ version only:')
-    for g in cc_only:
+    # for g in cc_only:
+    for g in sorted(cc_only, key=sort_token):
       print(g.__repr__(diff=game))
     res = False
   if len(py_only) != 0:
     print('Found moves in python version only:')
-    for g in py_only:
+    # for g in py_only:
+    for g in sorted(py_only, key=sort_token):
       print(g.__repr__(diff=game))
+
+    # print('all python moves:')
+    # for g in sorted(s_py, key=sort_token):
+    #   print(g.__repr__(diff=game))
     res = False
 
   return res
@@ -114,6 +125,9 @@ def test_next_moves(game: Onoro) -> bool:
 
 def test_random_moves(game: Onoro, max_moves: int) -> bool:
   for i in range(max_moves):
+    if game.HasWinner():
+      print('someone won after %d moves!' % i)
+      break
     if not test_next_moves(game):
       print('Failed after', i, 'moves')
       return False
@@ -124,7 +138,7 @@ def test_random_moves(game: Onoro, max_moves: int) -> bool:
 
 
 def main():
-  random.seed(1)
+  random.seed(2)
   num_pawns = 16
   game = gen_starting_game(num_pawns)
 

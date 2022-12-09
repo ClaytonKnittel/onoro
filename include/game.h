@@ -912,7 +912,6 @@ absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
     g.sum_of_mass_ += g.nPawnsInPlay() * hex_off;
 
     if (i == static_cast<uint32_t>(state.pawns_size()) - 1) {
-      // TODO center the game state based on c.o.m.
       g.state_.finished = g.checkWin(idx + off);
     }
 
@@ -924,7 +923,7 @@ absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
         absl::StrFormat("Pawns imply turn %u, but have turn %u in state",
                         g.state_.turn, state.turn_num()));
   }
-  if (state.turn_num() == NPawns - 1) {
+  if (state.turn_num() < NPawns - 1) {
     if (g.state_.blackTurn != state.black_turn()) {
       return absl::InternalError(
           absl::StrFormat("Expected %s turn, but state has %s turn",
