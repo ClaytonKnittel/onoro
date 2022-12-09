@@ -154,7 +154,7 @@ def main():
   # gs.ParseFromString(gstr)
   # game = deserialize(gs, num_pawns)
 
-  print(test_random_moves(game, 100))
+  print(test_random_moves(game, 500))
 
 
 if __name__ == '__main__':
