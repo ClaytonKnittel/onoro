@@ -35,9 +35,6 @@ bool verifySerializesToSelf(const onoro::Game<n_pawns>& g) {
   }
   onoro::Game<NPawns> g2 = *res;
 
-  printf("%s\n", g.Print().c_str());
-  // printf("%s\n", g2.Print().c_str());
-
   onoro::GameView<NPawns> v1(&g);
   onoro::GameView<NPawns> v2(&g2);
   GameEq<NPawns> eq;
@@ -235,9 +232,9 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
     g_n_moves++;
     int32_t score;
 
-    if (!verifySerializesToSelf<NPawns>(g2)) {
-      abort();
-    }
+    // if (!verifySerializesToSelf<NPawns>(g2)) {
+    //   abort();
+    // }
 
     // If this move finished the game, it means playing it made us win.
     if (g2.isFinished()) {
