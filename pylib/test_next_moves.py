@@ -124,7 +124,14 @@ def test_next_moves(game: Onoro) -> bool:
 
 
 def test_random_moves(game: Onoro, max_moves: int) -> bool:
+  prev = None
   for i in range(max_moves):
+    if prev is not None:
+      print(game.__repr__(diff=prev))
+    else:
+      print(game)
+    prev = copy.deepcopy(game)
+
     if game.HasWinner():
       print('someone won after %d moves!' % i)
       break

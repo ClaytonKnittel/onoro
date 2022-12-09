@@ -137,7 +137,7 @@ class Onoro:
               black=pawn.black) not in self.pawns:
             n_old += 1
 
-        if n_new == 1 and n_old == 1:
+        if n_new == 1 and n_old <= 1:
           dminx = mx
           dminy = my
           break
