@@ -1463,7 +1463,8 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
   });
 
   // Another pass to enumerate all moves
-  for (pawn_iterator it = pawns_begin(); it != pawns_end(); ++it) {
+  for (color_pawn_iterator it = color_pawns_begin(blackTurn());
+       it != color_pawns_end(blackTurn()); ++it) {
     UnionFind<uint32_t> uf(getBoardSize());
 
     idx_t next_idx = *it;
