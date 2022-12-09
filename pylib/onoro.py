@@ -1,4 +1,6 @@
 
+from __future__ import annotations
+import copy
 from typing import Iterable, List, Set, Tuple, Union
 
 from coord import Coord, PawnToCoord, CoordToPawn, coord_neighbors
@@ -44,7 +46,7 @@ class Onoro:
       )
     return gs
 
-  def __repr__(self) -> str:
+  def __repr__(self, check_errors: bool = True, diff: Onoro = None) -> str:
     minx = min((pawn.x for pawn in self.pawns))
     maxx = max((pawn.x for pawn in self.pawns))
     miny = min((pawn.y for pawn in self.pawns))
@@ -56,14 +58,73 @@ class Onoro:
     offx = self.num_pawns // 2 - 1 - midx
     offy = self.num_pawns // 2 - 1 - midy
 
+    if diff is not None:
+      dminx = min((pawn.x for pawn in diff.pawns))
+      dminy = min((pawn.y for pawn in diff.pawns))
+
+      for offset in (
+          Coord(0, 0),
+          Coord(1, 0),
+          Coord(1, 1),
+          Coord(0, 1),
+          Coord(-1, 0),
+          Coord(-1, -1),
+          Coord(0, -1),
+          None):
+        assert(offset is not None)
+        mx = dminx + offset.x
+        my = dminy + offset.y
+
+        n_new = 0
+        for pawn in self.pawns:
+          if Pawn(
+              x=pawn.x - minx + mx,
+              y=pawn.y - miny + my,
+              black=pawn.black) not in diff.pawns:
+            n_new += 1
+
+        n_old = 0
+        for pawn in diff.pawns:
+          if Pawn(
+              x=pawn.x - mx + minx,
+              y=pawn.y - my + miny,
+              black=pawn.black) not in self.pawns:
+            n_old += 1
+
+        if n_new == 1 and n_old == 1:
+          dminx = mx
+          dminy = my
+          break
+
     board = ['.'] * (self.num_pawns * self.num_pawns)
     for pawn in self.pawns:
       x = pawn.x + offx
       y = pawn.y + offy
-      board[x + y * self.num_pawns] = 'B' if pawn.black else 'W'
+
+      if diff is not None and Pawn(
+          x=pawn.x - minx + dminx,
+          y=pawn.y - miny + dminy,
+          black=pawn.black) not in diff.pawns:
+        b = '\033[0;32mB\033[0;39m'
+        w = '\033[0;32mW\033[0;39m'
+      else:
+        b = 'B'
+        w = 'W'
+
+      board[x + y * self.num_pawns] = b if pawn.black else w
+
+    if diff is not None:
+      for pawn in diff.pawns:
+        x = pawn.x - dminx + minx
+        y = pawn.y - dminy + miny
+        if Pawn(x=x, y=y, black=pawn.black) not in self.pawns:
+          if Pawn(x=x, y=y, black=not pawn.black) in self.pawns:
+            board[(x + offx) + (y + offy) * self.num_pawns] = '\033[0;31mX\033[0;39m'
+          else:
+            board[(x + offx) + (y + offy) * self.num_pawns] = '\033[0;31m0\033[0;39m'
 
     res = ''
-    if self.HasWinner():
+    if self.HasWinner(check_errors=check_errors):
       res += 'WINNER: %s\n' % ('white' if self.black_turn else 'black')
 
     for line in range(self.num_pawns):
@@ -101,6 +162,18 @@ class Onoro:
 
     return True
 
+  def __hash__(self) -> int:
+    self_off_x = min((pawn.x for pawn in self.pawns))
+    self_off_y = min((pawn.y for pawn in self.pawns))
+    return hash((
+      tuple((pawn.x - self_off_x, pawn.y - self_off_y, pawn.black) for pawn in self.pawns),
+      self.black_turn,
+      self.num_pawns,
+    ))
+
+  def __deepcopy__(self, memo) -> Onoro:
+    return Onoro(self.num_pawns, copy.deepcopy(self.pawns), self.black_turn)
+
   def PawnAt(self, coord: Coord) -> int:
     """Returns the color of the pawn at coord, or EMPTY if no pawn is there."""
     pawns_at = [pawn for pawn in self.pawns if (pawn.x, pawn.y) == coord]
@@ -110,7 +183,7 @@ class Onoro:
       return self._BLACK if pawns_at[0].black else self._WHITE
     raise RuntimeError('Multiple pawns at position (%d, %d)' % (coord.x, coord.y))
 
-  def HasWinner(self) -> bool:
+  def HasWinner(self, check_errors: bool = True) -> bool:
     """Checks if a player has won, only returning true if it is not the winning player's turn."""
     for pawn in self.pawns:
       color = self._BLACK if pawn.black else self._WHITE
@@ -131,7 +204,7 @@ class Onoro:
           pos -= delta
 
         if n_in_row >= self._N_IN_ROW_TO_WIN:
-          if pawn.black == self.black_turn:
+          if check_errors and pawn.black == self.black_turn:
             raise RuntimeError('Cannot have current player winning')
           return True
 
@@ -218,16 +291,16 @@ class Onoro:
       self.MakeP1Move(move)
 
 
-def deserialize(gs: GameState, num_pawns: int) -> Onoro:
-  if gs.turn_num != len(gs.pawns) - 1:
+def deserialize(gs: GameState, num_pawns: int, check_errors: bool = True) -> Onoro:
+  if check_errors and gs.turn_num != len(gs.pawns) - 1:
     raise RuntimeError('Turn num != num_pawns - 1 (%d vs %d)' %
                        (gs.turn_num, len(gs.pawns)))
-  if gs.turn_num < num_pawns - 1 and gs.black_turn != ((gs.turn_num % 2) == 1):
+  if check_errors and gs.turn_num < num_pawns - 1 and gs.black_turn != ((gs.turn_num % 2) == 1):
     raise RuntimeError('Expect %s player on turn %d' %
                        ('black' if not gs.black_turn else 'white', gs.turn_num))
   game = Onoro(num_pawns, gs.pawns, gs.black_turn)
 
-  if gs.finished != game.HasWinner():
+  if check_errors and gs.finished != game.HasWinner(check_errors=check_errors):
     raise RuntimeError('Game state reports %s, but game has %s'
                        % ('winner' if gs.finished else 'no winner',
                           'a winner' if game.HasWinner() else 'no winner'))
