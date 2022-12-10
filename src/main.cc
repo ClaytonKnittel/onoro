@@ -1,5 +1,6 @@
 
 #include <absl/container/flat_hash_map.h>
+#include <absl/types/optional.h>
 #include <unistd.h>
 #include <utils/fun/print_csi.h>
 
@@ -130,24 +131,24 @@ static int benchmark() {
 
 class TranspositionTable {
   using TableT =
-      absl::flat_hash_map<onoro::GameView<n_pawns>, int32_t,
+      absl::flat_hash_map<onoro::Game<n_pawns>, int32_t,
                           onoro::GameHash<n_pawns>, onoro::GameEq<n_pawns>>;
   using SymmState = typename Game<n_pawns>::BoardSymmetryState;
 
  public:
   TranspositionTable() {}
 
-  TableT::const_iterator find(const onoro::GameView<n_pawns>& view) {
-    SymmState s = view.game().calcSymmetryState();
-    SymmetryClassOpApplyAndReturn(s.symm_class, tryFindSymmetries, view, s);
+  absl::optional<int> find(const onoro::Game<n_pawns>& game) {
+    SymmState s = game.calcSymmetryState();
+    SymmetryClassOpApplyAndReturn(s.symm_class, tryFindSymmetries, game, s);
   }
 
-  void insert(const onoro::GameView<n_pawns>& view, int32_t score) {
-    table_.insert({ view, score });
+  void insert(const onoro::Game<n_pawns>& game, int32_t score) {
+    table_.insert({ game, score });
   }
 
-  void insert_or_assign(const onoro::GameView<n_pawns>& view, int32_t score) {
-    table_.insert_or_assign(view, score);
+  void insert_or_assign(const onoro::Game<n_pawns>& game, int32_t score) {
+    table_.insert_or_assign(game, score);
   }
 
   const TableT& table() const {
@@ -160,11 +161,12 @@ class TranspositionTable {
 
  private:
   template <class SymmetryClassOp>
-  TableT::const_iterator tryFindSymmetries(onoro::GameView<n_pawns> view,
-                                           SymmState symm_state) {
+  absl::optional<int> tryFindSymmetries(onoro::Game<n_pawns> game,
+                                        SymmState symm_state) {
     typedef typename SymmetryClassOp::Group Group;
 
     // printf("%s\n", view.game().Print().c_str());
+    onoro::GameView<n_pawns> view(&game);
 
     for (bool swap_colors : { false, true }) {
       (void) swap_colors;
@@ -181,7 +183,7 @@ class TranspositionTable {
                  swap_colors ? "swapped" : "not swapped",
                  symm_state.op.toString().c_str());
           printf("\n");*/
-          return it;
+          return it->second * (view.areColorsInverted() ? -1 : 1);
           /*} else {
             printf("Didn't find under %s (%s) (%s)!\n", op.toString().c_str(),
                    swap_colors ? "swapped" : "not swapped",
@@ -193,7 +195,7 @@ class TranspositionTable {
     }
     // printf("\n");
 
-    return end();
+    return {};
   }
 
  private:
@@ -241,20 +243,15 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
       score = 1;
     } else {
       if (depth > 0) {
-        onoro::Game<n_pawns>* g_ptr = new onoro::Game<n_pawns>(std::move(g2));
-        onoro::GameView<n_pawns> view(g_ptr);
-        auto it = m.find(view);
+        auto cached_score = m.find(g2);
 
-        if (it != m.end()) {
+        if (cached_score.has_value()) {
           g_n_hits++;
 
-          score =
-              it->second *
-              ((it->first.areColorsInverted() ^ view.areColorsInverted()) ? -1
-                                                                          : 1);
+          score = *cached_score;
         } else {
           g_n_misses++;
-          m.insert(view, 0);
+          m.insert(g2, 0);
 
           int32_t _score;
           if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
@@ -268,7 +265,7 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
           }
           score = std::min(-_score, 1);
 
-          m.insert_or_assign(std::move(view), score);
+          m.insert_or_assign(std::move(g2), score);
         }
       } else {
         score = 0;

@@ -146,7 +146,7 @@ foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
 
   target_link_libraries(${EXE}
     PUBLIC
-      "${LINK_LIBS}" absl::flat_hash_map absl::statusor absl::str_format utils ${Protobuf_LIBRARIES}
+      "${LINK_LIBS}" absl::flat_hash_map absl::optional absl::statusor absl::str_format utils ${Protobuf_LIBRARIES}
   )
 
 endforeach()
