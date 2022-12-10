@@ -155,10 +155,6 @@ class TranspositionTable {
     return table_;
   }
 
-  const TableT::const_iterator end() const {
-    return table_.end();
-  }
-
  private:
   template <class SymmetryClassOp>
   absl::optional<int> tryFindSymmetries(onoro::Game<n_pawns> game,
@@ -178,7 +174,7 @@ class TranspositionTable {
         //        GameHash<n_pawns>::printC2Hash(view.hash()).c_str());
 
         auto it = table_.find(view);
-        if (it != end()) {
+        if (it != table_.end()) {
           /*printf("Found under %s (%s) (%s)!\n", op.toString().c_str(),
                  swap_colors ? "swapped" : "not swapped",
                  symm_state.op.toString().c_str());
