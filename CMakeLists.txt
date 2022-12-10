@@ -134,6 +134,18 @@ foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
   set_property(TARGET ${EXE} PROPERTY CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD 17)
 
+  if ("${CMAKE_BUILD_TYPE}" MATCHES "Release" OR "${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT IPO_SUPPORT_CHECK_OUTPUT LANGUAGES CXX)
+
+    if (NOT IPO_SUPPORTED)
+      message(WARNING "Interprocedural optimization not supported: ${IPO_SUPPORT_CHECK_OUTPUT}")
+    else()
+      # enable link-time optimization
+      set_property(TARGET ${EXE} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    endif()
+  endif()
+
   target_include_directories(${EXE}
     PRIVATE
       "/usr/local/include"
