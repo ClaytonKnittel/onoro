@@ -85,6 +85,16 @@ endforeach()
 # Add submodules
 ############################################################
 
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
+
+if (NOT COMPILER_SUPPORTS_CXX17)
+  message(SEND_ERROR "The compiler ${CMAKE_CXX_COMPILER} does not support "
+    "c++17, please use a different compiler")
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+
 add_subdirectory(modules/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(modules/utils EXCLUDE_FROM_ALL)
 
@@ -123,16 +133,7 @@ foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
     target_compile_definitions(${EXE} PRIVATE RELEASE_BUILD)
   endif()
 
-  include(CheckCXXCompilerFlag)
-  CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
-
-  if (NOT COMPILER_SUPPORTS_CXX17)
-    message(SEND_ERROR "The compiler ${CMAKE_CXX_COMPILER} does not support "
-      "c++17, please use a different compiler")
-  endif()
-
   set_property(TARGET ${EXE} PROPERTY CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD 17)
 
   if ("${CMAKE_BUILD_TYPE}" MATCHES "Release" OR "${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
     include(CheckIPOSupported)
