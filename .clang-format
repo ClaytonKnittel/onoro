@@ -239,3 +239,6 @@ SpacesBeforeTrailingComments: 1
 TabWidth: 8
 UseTab: Never
 ...
+---
+Language: Proto
+BasedOnStyle: Google
