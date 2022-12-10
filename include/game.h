@@ -474,7 +474,7 @@ class Game {
   GameState state_;
 
   // Sum of all HexPos's of pieces on the board
-  HexPos sum_of_mass_;
+  HexPos16 sum_of_mass_;
 
  public:
   // Returns an ordinal for the given index. Ordinals are a unique mapping from
@@ -728,7 +728,7 @@ Game<NPawns>::Game(const Game<NPawns>& g, P1Move move)
 
   auto [offset, hex_offset] = calcMoveShift(move.loc);
   shiftTiles(offset);
-  sum_of_mass_ += nPawnsInPlay() * hex_offset;
+  sum_of_mass_ += static_cast<HexPos16>(nPawnsInPlay() * hex_offset);
 
   state_.finished = checkWin(move.loc + offset);
 }
@@ -742,7 +742,7 @@ Game<NPawns>::Game(const Game& g, P2Move move)
 
   auto [offset, hex_offset] = calcMoveShift(move.to);
   shiftTiles(offset);
-  sum_of_mass_ += NPawns * hex_offset;
+  sum_of_mass_ += static_cast<HexPos16>(NPawns * hex_offset);
 
   state_.finished = checkWin(move.to + offset);
 }
@@ -849,7 +849,7 @@ absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
     .blackTurn = 1,
     .finished = 0,
   };
-  g.sum_of_mass_ = (HexPos){ 0, 0 };
+  g.sum_of_mass_ = (HexPos16){ 0, 0 };
 
   if (state.turn_num() < NPawns - 1 &&
       static_cast<int>(state.turn_num()) != state.pawns_size() - 1) {
@@ -904,7 +904,7 @@ absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
 
     auto [off, hex_off] = calcMoveShift(idx);
     g.shiftTiles(off);
-    g.sum_of_mass_ += g.nPawnsInPlay() * hex_off;
+    g.sum_of_mass_ += static_cast<HexPos16>(g.nPawnsInPlay() * hex_off);
 
     if (i == static_cast<uint32_t>(state.pawns_size()) - 1) {
       g.state_.finished = g.checkWin(idx + off);
@@ -990,7 +990,7 @@ bool Game<NPawns>::validate() const {
     return false;
   }
 
-  if (sum_of_mass != sum_of_mass_) {
+  if (sum_of_mass != static_cast<HexPos>(sum_of_mass_)) {
     printf("Sum of mass not correct: expect (%d, %d), but have (%d, %d)\n",
            sum_of_mass.x, sum_of_mass.y, sum_of_mass_.x, sum_of_mass_.y);
     return false;
@@ -1171,7 +1171,7 @@ void Game<NPawns>::appendTile(idx_t pos) {
   pawn_poses_[state_.turn] = pos;
 
   state_.blackTurn = !state_.blackTurn;
-  sum_of_mass_ += idxToPos(pos);
+  sum_of_mass_ += static_cast<HexPos16>(idxToPos(pos));
 }
 
 template <uint32_t NPawns>
@@ -1180,7 +1180,7 @@ void Game<NPawns>::moveTile(idx_t pos, uint32_t i) {
   pawn_poses_[i] = pos;
 
   state_.blackTurn = !state_.blackTurn;
-  sum_of_mass_ += idxToPos(pos) - idxToPos(old_idx);
+  sum_of_mass_ += static_cast<HexPos16>(idxToPos(pos) - idxToPos(old_idx));
 }
 
 template <uint32_t NPawns>
