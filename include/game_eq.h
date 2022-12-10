@@ -41,8 +41,8 @@ bool GameEq<NPawns>::operator()(const Game<NPawns>& game1,
     return false;
   }
 
-  GameView<NPawns> view1(&game1, 0);
-  GameView<NPawns> view2(&game2, 0);
+  GameView<NPawns> view1(&game1);
+  GameView<NPawns> view2(&game2);
 
   SymmetryClassOpApplyAndReturn(s1.symm_class, compareViews, view1, view2, s1,
                                 s2);
@@ -60,7 +60,7 @@ bool GameEq<NPawns>::operator()(const GameView<NPawns>& view1,
     return false;
   }
 
-  GameView<NPawns> view2(&game2, 0);
+  GameView<NPawns> view2(&game2);
 
   SymmetryClassOpApplyAndReturn(s1.symm_class, compareViews, view1, view2, s1,
                                 s2);
@@ -78,7 +78,7 @@ bool GameEq<NPawns>::operator()(const Game<NPawns>& game1,
     return false;
   }
 
-  GameView<NPawns> view1(&game1, 0);
+  GameView<NPawns> view1(&game1);
 
   SymmetryClassOpApplyAndReturn(s1.symm_class, compareViews, view1, view2, s1,
                                 s2);

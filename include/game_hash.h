@@ -165,7 +165,7 @@ GameHash<NPawns>::GameHash() {}
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::operator()(
     const Game<NPawns>& game) const noexcept {
-  return calcHash(game);
+  return game.hash();
 }
 
 template <uint32_t NPawns>

@@ -16,8 +16,6 @@ class GameView {
  public:
   explicit constexpr GameView(const Game<NPawns>*);
 
-  constexpr GameView(const Game<NPawns>*, std::size_t hash);
-
   template <class Group>
   constexpr GameView(const Game<NPawns>*, Group view_op, bool color_invert);
 
@@ -68,11 +66,7 @@ class GameView {
 
 template <uint32_t NPawns>
 constexpr GameView<NPawns>::GameView(const Game<NPawns>* game)
-    : GameView(game, GameHash<NPawns>::calcHash(*game)) {}
-
-template <uint32_t NPawns>
-constexpr GameView<NPawns>::GameView(const Game<NPawns>* game, std::size_t hash)
-    : game_(game), view_op_ordinal_(0), color_invert_(0), hash_(hash) {}
+    : game_(game), view_op_ordinal_(0), color_invert_(0), hash_(game->hash()) {}
 
 template <uint32_t NPawns>
 template <class Group>
@@ -81,8 +75,7 @@ constexpr GameView<NPawns>::GameView(const Game<NPawns>* game, Group view_op,
     : game_(game),
       view_op_ordinal_(view_op.ordinal()),
       color_invert_(color_invert),
-      hash_(hash_group::apply<Group>(view_op,
-                                     GameHash<NPawns>::calcHash(*game))) {}
+      hash_(hash_group::apply<Group>(view_op, game->hash())) {}
 
 template <uint32_t NPawns>
 template <class Group>

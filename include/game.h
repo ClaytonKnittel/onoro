@@ -113,12 +113,13 @@ class GameHash;
 template <uint32_t NPawns>
 class GameEq;
 
-template <uint32_t NPawns>
+template <uint32_t NPawns, typename Hash>
 class Game;
 
 struct P1Move {
-  template <uint32_t NPawns, class CallbackFn>
-  static constexpr bool forEachMoveFn(const Game<NPawns>& g, CallbackFn cb) {
+  template <uint32_t NPawns, typename Hash, class CallbackFn>
+  static constexpr bool forEachMoveFn(const Game<NPawns, Hash>& g,
+                                      CallbackFn cb) {
     return g.forEachMove(cb);
   }
 
@@ -127,8 +128,9 @@ struct P1Move {
 };
 
 struct P2Move {
-  template <uint32_t NPawns, class CallbackFn>
-  static constexpr bool forEachMoveFn(const Game<NPawns>& g, CallbackFn cb) {
+  template <uint32_t NPawns, typename Hash, class CallbackFn>
+  static constexpr bool forEachMoveFn(const Game<NPawns, Hash>& g,
+                                      CallbackFn cb) {
     return g.forEachMoveP2(cb);
   }
 
@@ -138,7 +140,7 @@ struct P2Move {
   uint8_t from_idx;
 };
 
-template <uint32_t NPawns>
+template <uint32_t NPawns, typename Hash = GameHash<NPawns>>
 class Game {
   template <uint32_t NPawns_>
   friend class GameHash;
@@ -176,7 +178,7 @@ class Game {
   };
 
   class pawn_iterator {
-    friend class Game<NPawns>;
+    friend class Game<NPawns, Hash>;
 
    public:
     pawn_iterator& operator++() {
@@ -208,13 +210,14 @@ class Game {
     }
 
    protected:
-    explicit pawn_iterator(const Game<NPawns>& game) : game_(&game), idx_(0) {}
-    pawn_iterator(const Game<NPawns>& game, uint32_t idx)
+    explicit pawn_iterator(const Game<NPawns, Hash>& game)
+        : game_(&game), idx_(0) {}
+    pawn_iterator(const Game<NPawns, Hash>& game, uint32_t idx)
         : game_(&game), idx_(idx) {}
 
     pawn_iterator() {}
 
-    static constexpr pawn_iterator end(const Game<NPawns>& game) {
+    static constexpr pawn_iterator end(const Game<NPawns, Hash>& game) {
       pawn_iterator it;
       it.game_ = nullptr;
       it.idx_ = game.nPawnsInPlay();
@@ -222,18 +225,18 @@ class Game {
     }
 
    protected:
-    const Game<NPawns>* game_;
+    const Game<NPawns, Hash>* game_;
 
     // index of the current pawn in the list of pawn_poses_
     uint32_t idx_;
   };
 
   class color_pawn_iterator : public pawn_iterator {
-    friend class Game<NPawns>;
+    friend class Game<NPawns, Hash>;
 
    public:
     // Constructs the begin() iterator.
-    color_pawn_iterator(const Game<NPawns>& game, bool black)
+    color_pawn_iterator(const Game<NPawns, Hash>& game, bool black)
         : pawn_iterator(game, black ? 0 : 1) {}
 
     color_pawn_iterator& operator++() {
@@ -245,7 +248,7 @@ class Game {
     // default constructor is for the end() iterator
     color_pawn_iterator() {}
 
-    static constexpr color_pawn_iterator end(const Game<NPawns>& game,
+    static constexpr color_pawn_iterator end(const Game<NPawns, Hash>& game,
                                              bool black) {
       uint32_t n_pawns = game.nPawnsInPlay();
       color_pawn_iterator it;
@@ -265,7 +268,8 @@ class Game {
     uint8_t turn       : 4;
     uint8_t blackTurn  : 1;
     uint8_t finished   : 1;
-    uint8_t __reserved : 2;
+    uint8_t hashed     : 1;
+    uint8_t __reserved : 1;
   };
 
   // bits per entry in the board
@@ -476,6 +480,8 @@ class Game {
   // Sum of all HexPos's of pieces on the board
   HexPos16 sum_of_mass_;
 
+  std::size_t hash_;
+
  public:
   // Returns an ordinal for the given index. Ordinals are a unique mapping from
   // idx_t to non-negative integers exactly covering the range [0,
@@ -493,6 +499,8 @@ class Game {
   bool blackTurn() const;
 
   bool inPhase2() const;
+
+  std::size_t hash() const;
 
   TileState getTile(idx_t idx) const;
 
@@ -554,29 +562,29 @@ class Game {
   bool forEachPlayerPawn(bool black, CallbackFnT cb) const;
 };
 
-template <uint32_t NPawns>
-constexpr uint32_t Game<NPawns>::getBoardWidth() {
+template <uint32_t NPawns, typename Hash>
+constexpr uint32_t Game<NPawns, Hash>::getBoardWidth() {
   return NPawns;
 }
 
-template <uint32_t NPawns>
-constexpr uint32_t Game<NPawns>::getBoardSize() {
+template <uint32_t NPawns, typename Hash>
+constexpr uint32_t Game<NPawns, Hash>::getBoardSize() {
   return getBoardWidth() * getBoardWidth();
 }
 
-template <uint32_t NPawns>
-constexpr uint32_t Game<NPawns>::getSymmStateTableWidth() {
+template <uint32_t NPawns, typename Hash>
+constexpr uint32_t Game<NPawns, Hash>::getSymmStateTableWidth() {
   return NPawns;
 }
 
-template <uint32_t NPawns>
-constexpr uint32_t Game<NPawns>::getSymmStateTableSize() {
+template <uint32_t NPawns, typename Hash>
+constexpr uint32_t Game<NPawns, Hash>::getSymmStateTableSize() {
   return getSymmStateTableWidth() * getSymmStateTableWidth();
 }
 
-template <uint32_t NPawns>
-constexpr D6 Game<NPawns>::symmStateOp(uint32_t x, uint32_t y,
-                                       uint32_t n_pawns) {
+template <uint32_t NPawns, typename Hash>
+constexpr D6 Game<NPawns, Hash>::symmStateOp(uint32_t x, uint32_t y,
+                                             uint32_t n_pawns) {
   // (x2, y2) is (x, y) folded across the line y = x
   uint32_t x2 = std::max(x, y);
   uint32_t y2 = std::min(x, y);
@@ -629,9 +637,10 @@ constexpr D6 Game<NPawns>::symmStateOp(uint32_t x, uint32_t y,
   }
 }
 
-template <uint32_t NPawns>
-constexpr SymmetryClass Game<NPawns>::symmStateClass(uint32_t x, uint32_t y,
-                                                     uint32_t n_pawns) {
+template <uint32_t NPawns, typename Hash>
+constexpr SymmetryClass Game<NPawns, Hash>::symmStateClass(uint32_t x,
+                                                           uint32_t y,
+                                                           uint32_t n_pawns) {
   // (x2, y2) is (x, y) folded across the line y = x
   uint32_t x2 = std::max(x, y);
   uint32_t y2 = std::min(x, y);
@@ -659,8 +668,9 @@ constexpr SymmetryClass Game<NPawns>::symmStateClass(uint32_t x, uint32_t y,
   }
 }
 
-template <uint32_t NPawns>
-constexpr std::pair<idx_t, HexPos> Game<NPawns>::calcMoveShift(idx_t move) {
+template <uint32_t NPawns, typename Hash>
+constexpr std::pair<idx_t, HexPos> Game<NPawns, Hash>::calcMoveShift(
+    idx_t move) {
   idx_t offset(0, 0);
   HexPos hex_offset{ 0, 0 };
 
@@ -684,8 +694,9 @@ constexpr std::pair<idx_t, HexPos> Game<NPawns>::calcMoveShift(idx_t move) {
 
 // Black goes first, but since black has 2 forced moves and white only has 1,
 // white is effectively first to make a choice.
-template <uint32_t NPawns>
-Game<NPawns>::Game() : state_({ 0xfu, 1, 0, 0 }), sum_of_mass_{ 0, 0 } {
+template <uint32_t NPawns, typename Hash>
+Game<NPawns, Hash>::Game()
+    : state_({ 0xfu, 1, 0, 0, 0 }), sum_of_mass_{ 0, 0 } {
   static_assert(NPawns <= 2 * max_pawns_per_player);
 
   for (uint32_t i = 0; i < NPawns; i++) {
@@ -719,8 +730,8 @@ Game<NPawns>::Game() : state_({ 0xfu, 1, 0, 0 }), sum_of_mass_{ 0, 0 } {
   }
 }
 
-template <uint32_t NPawns>
-Game<NPawns>::Game(const Game<NPawns>& g, P1Move move)
+template <uint32_t NPawns, typename Hash>
+Game<NPawns, Hash>::Game(const Game<NPawns, Hash>& g, P1Move move)
     : pawn_poses_(g.pawn_poses_),
       state_(g.state_),
       sum_of_mass_(g.sum_of_mass_) {
@@ -733,8 +744,8 @@ Game<NPawns>::Game(const Game<NPawns>& g, P1Move move)
   state_.finished = checkWin(move.loc + offset);
 }
 
-template <uint32_t NPawns>
-Game<NPawns>::Game(const Game& g, P2Move move)
+template <uint32_t NPawns, typename Hash>
+Game<NPawns, Hash>::Game(const Game& g, P2Move move)
     : pawn_poses_(g.pawn_poses_),
       state_(g.state_),
       sum_of_mass_(g.sum_of_mass_) {
@@ -747,8 +758,8 @@ Game<NPawns>::Game(const Game& g, P2Move move)
   state_.finished = checkWin(move.to + offset);
 }
 
-template <uint32_t NPawns>
-std::string Game<NPawns>::Print() const {
+template <uint32_t NPawns, typename Hash>
+std::string Game<NPawns, Hash>::Print() const {
   static const char tile_str[3] = {
     '.',
     'B',
@@ -773,8 +784,8 @@ std::string Game<NPawns>::Print() const {
   return ostr.str();
 }
 
-template <uint32_t NPawns>
-std::string Game<NPawns>::Print2() const {
+template <uint32_t NPawns, typename Hash>
+std::string Game<NPawns, Hash>::Print2() const {
   static const char* tile_str[3] = {
     P_256_BG_COLOR(7),
     P_256_BG_COLOR(4),
@@ -813,8 +824,8 @@ std::string Game<NPawns>::Print2() const {
   return ostr.str();
 }
 
-template <uint32_t NPawns>
-onoro::proto::GameState Game<NPawns>::SerializeState() const {
+template <uint32_t NPawns, typename Hash>
+onoro::proto::GameState Game<NPawns, Hash>::SerializeState() const {
   onoro::proto::GameState state;
 
   state.set_black_turn(blackTurn());
@@ -840,14 +851,15 @@ onoro::proto::GameState Game<NPawns>::SerializeState() const {
   return state;
 }
 
-template <uint32_t NPawns>
-absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
+template <uint32_t NPawns, typename Hash>
+absl::StatusOr<Game<NPawns, Hash>> Game<NPawns, Hash>::LoadState(
     const onoro::proto::GameState& state) {
   Game g;
   g.state_ = (Game::GameState){
     .turn = 0xf,
     .blackTurn = 1,
     .finished = 0,
+    .hashed = 0,
   };
   g.sum_of_mass_ = (HexPos16){ 0, 0 };
 
@@ -938,8 +950,8 @@ absl::StatusOr<Game<NPawns>> Game<NPawns>::LoadState(
   return g;
 }
 
-template <uint32_t NPawns>
-bool Game<NPawns>::validate() const {
+template <uint32_t NPawns, typename Hash>
+bool Game<NPawns, Hash>::validate() const {
   uint32_t n_b_pawns = 0;
   uint32_t n_w_pawns = 0;
   HexPos sum_of_mass = { 0, 0 };
@@ -1007,8 +1019,8 @@ bool Game<NPawns>::validate() const {
   return true;
 }
 
-template <uint32_t NPawns>
-void Game<NPawns>::printSymmStateTableOps(uint32_t n_reps) {
+template <uint32_t NPawns, typename Hash>
+void Game<NPawns, Hash>::printSymmStateTableOps(uint32_t n_reps) {
   static constexpr const uint32_t id[D6::order()] = {
     1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14,
   };
@@ -1028,8 +1040,8 @@ void Game<NPawns>::printSymmStateTableOps(uint32_t n_reps) {
   }
 }
 
-template <uint32_t NPawns>
-void Game<NPawns>::printSymmStateTableSymms(uint32_t n_reps) {
+template <uint32_t NPawns, typename Hash>
+void Game<NPawns, Hash>::printSymmStateTableSymms(uint32_t n_reps) {
   static constexpr const uint32_t id[7] = {
     1, 2, 3, 4, 5, 6, 7,
   };
@@ -1147,10 +1159,10 @@ void Game<NPawns>::printSymmStateTableSymms(uint32_t n_reps) {
  * the game state when canonicalizing if the center of mass lies on an e, since
  * they are symmetries of each other in this K4 group.
  */
-template <uint32_t NPawns>
-constexpr std::array<typename Game<NPawns>::BoardSymmStateData,
-                     Game<NPawns>::getSymmStateTableSize()>
-Game<NPawns>::genSymmStateTable() {
+template <uint32_t NPawns, typename Hash>
+constexpr std::array<typename Game<NPawns, Hash>::BoardSymmStateData,
+                     Game<NPawns, Hash>::getSymmStateTableSize()>
+Game<NPawns, Hash>::genSymmStateTable() {
   constexpr uint32_t N = getSymmStateTableWidth();
 
   std::array<BoardSymmStateData, getSymmStateTableSize()> table;
@@ -1165,26 +1177,28 @@ Game<NPawns>::genSymmStateTable() {
   return table;
 }
 
-template <uint32_t NPawns>
-void Game<NPawns>::appendTile(idx_t pos) {
+template <uint32_t NPawns, typename Hash>
+void Game<NPawns, Hash>::appendTile(idx_t pos) {
   state_.turn++;
   pawn_poses_[state_.turn] = pos;
 
   state_.blackTurn = !state_.blackTurn;
+  state_.hashed = 0;
   sum_of_mass_ += static_cast<HexPos16>(idxToPos(pos));
 }
 
-template <uint32_t NPawns>
-void Game<NPawns>::moveTile(idx_t pos, uint32_t i) {
+template <uint32_t NPawns, typename Hash>
+void Game<NPawns, Hash>::moveTile(idx_t pos, uint32_t i) {
   idx_t old_idx = pawn_poses_[i];
   pawn_poses_[i] = pos;
 
   state_.blackTurn = !state_.blackTurn;
+  state_.hashed = 0;
   sum_of_mass_ += static_cast<HexPos16>(idxToPos(pos) - idxToPos(old_idx));
 }
 
-template <uint32_t NPawns>
-bool Game<NPawns>::checkWin(idx_t last_move) const {
+template <uint32_t NPawns, typename Hash>
+bool Game<NPawns, Hash>::checkWin(idx_t last_move) const {
   // Check for a win in all 3 directions
   HexPos last_move_pos = idxToPos(last_move);
 
@@ -1226,8 +1240,8 @@ bool Game<NPawns>::checkWin(idx_t last_move) const {
   return s != 0;
 }
 
-template <uint32_t NPawns>
-constexpr void Game<NPawns>::shiftTiles(idx_t offset) {
+template <uint32_t NPawns, typename Hash>
+constexpr void Game<NPawns, Hash>::shiftTiles(idx_t offset) {
   if (offset != idx_t(0, 0)) {
     for (uint32_t i = 0; i < nPawnsInPlay(); i++) {
       if (pawn_poses_[i] != idx_t::null_idx()) {
@@ -1235,45 +1249,56 @@ constexpr void Game<NPawns>::shiftTiles(idx_t offset) {
       }
     }
   }
+  state_.hashed = 0;
 }
 
-template <uint32_t NPawns>
-constexpr uint32_t Game<NPawns>::idxOrd(idx_t idx) {
+template <uint32_t NPawns, typename Hash>
+constexpr uint32_t Game<NPawns, Hash>::idxOrd(idx_t idx) {
   return idx.x() + idx.y() * NPawns;
 }
 
-template <uint32_t NPawns>
-constexpr idx_t Game<NPawns>::ordToIdx(uint32_t ord) {
+template <uint32_t NPawns, typename Hash>
+constexpr idx_t Game<NPawns, Hash>::ordToIdx(uint32_t ord) {
   return idx_t(ord % NPawns, ord / NPawns);
 }
 
-template <uint32_t NPawns>
-constexpr HexPos Game<NPawns>::idxToPos(idx_t idx) {
+template <uint32_t NPawns, typename Hash>
+constexpr HexPos Game<NPawns, Hash>::idxToPos(idx_t idx) {
   return { static_cast<int32_t>(idx.x()), static_cast<int32_t>(idx.y()) };
 }
 
-template <uint32_t NPawns>
-constexpr idx_t Game<NPawns>::posToIdx(HexPos pos) {
+template <uint32_t NPawns, typename Hash>
+constexpr idx_t Game<NPawns, Hash>::posToIdx(HexPos pos) {
   return idx_t(static_cast<uint32_t>(pos.x), static_cast<uint32_t>(pos.y));
 }
 
-template <uint32_t NPawns>
-uint32_t Game<NPawns>::nPawnsInPlay() const {
+template <uint32_t NPawns, typename Hash>
+uint32_t Game<NPawns, Hash>::nPawnsInPlay() const {
   return state_.turn + 1;
 }
 
-template <uint32_t NPawns>
-bool Game<NPawns>::blackTurn() const {
+template <uint32_t NPawns, typename Hash>
+bool Game<NPawns, Hash>::blackTurn() const {
   return state_.blackTurn;
 }
 
-template <uint32_t NPawns>
-bool Game<NPawns>::inPhase2() const {
+template <uint32_t NPawns, typename Hash>
+bool Game<NPawns, Hash>::inPhase2() const {
   return state_.turn == NPawns - 1;
 }
 
-template <uint32_t NPawns>
-typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
+template <uint32_t NPawns, typename Hash>
+std::size_t Game<NPawns, Hash>::hash() const {
+  if (!state_.hashed) {
+    const_cast<Game<NPawns>*>(this)->hash_ = Hash::calcHash(*this);
+    const_cast<Game<NPawns>*>(this)->state_.hashed = 1;
+  }
+  return hash_;
+}
+
+template <uint32_t NPawns, typename Hash>
+typename Game<NPawns, Hash>::TileState Game<NPawns, Hash>::getTile(
+    idx_t idx) const {
   uint64_t i;
   const uint64_t* pawn_poses =
       reinterpret_cast<const uint64_t*>(pawn_poses_.data());
@@ -1310,24 +1335,24 @@ typename Game<NPawns>::TileState Game<NPawns>::getTile(idx_t idx) const {
   return TileState::TILE_EMPTY;
 }
 
-template <uint32_t NPawns>
-idx_t Game<NPawns>::idxAt(uint32_t i) const {
+template <uint32_t NPawns, typename Hash>
+idx_t Game<NPawns, Hash>::idxAt(uint32_t i) const {
   return pawn_poses_[i];
 }
 
-template <uint32_t NPawns>
-bool Game<NPawns>::blackWins() const {
+template <uint32_t NPawns, typename Hash>
+bool Game<NPawns, Hash>::blackWins() const {
   return !state_.blackTurn;
 }
 
-template <uint32_t NPawns>
-bool Game<NPawns>::isFinished() const {
+template <uint32_t NPawns, typename Hash>
+bool Game<NPawns, Hash>::isFinished() const {
   return state_.finished;
 }
 
-template <uint32_t NPawns>
+template <uint32_t NPawns, typename Hash>
 template <class CallbackFnT>
-bool Game<NPawns>::forEachNeighbor(idx_t idx, CallbackFnT cb) const {
+bool Game<NPawns, Hash>::forEachNeighbor(idx_t idx, CallbackFnT cb) const {
   // clang-format off
 #define CB_OR_RET(...)    \
     if (!cb(__VA_ARGS__)) \
@@ -1344,9 +1369,10 @@ bool Game<NPawns>::forEachNeighbor(idx_t idx, CallbackFnT cb) const {
   return true;
 }
 
-template <uint32_t NPawns>
+template <uint32_t NPawns, typename Hash>
 template <class CallbackFnT>
-bool Game<NPawns>::forEachTopLeftNeighbor(idx_t idx, CallbackFnT cb) const {
+bool Game<NPawns, Hash>::forEachTopLeftNeighbor(idx_t idx,
+                                                CallbackFnT cb) const {
   // clang-format off
 #define CB_OR_RET(...)    \
     if (!cb(__VA_ARGS__)) \
@@ -1360,9 +1386,9 @@ bool Game<NPawns>::forEachTopLeftNeighbor(idx_t idx, CallbackFnT cb) const {
   return true;
 }
 
-template <uint32_t NPawns>
+template <uint32_t NPawns, typename Hash>
 template <class CallbackFnT>
-bool Game<NPawns>::forEachMove(CallbackFnT cb) const {
+bool Game<NPawns, Hash>::forEachMove(CallbackFnT cb) const {
   assert(!inPhase2());
   static constexpr uint32_t tmp_board_tile_bits = 2;
   static constexpr uint64_t tmp_board_tile_mask =
@@ -1402,9 +1428,9 @@ bool Game<NPawns>::forEachMove(CallbackFnT cb) const {
   });
 }
 
-template <uint32_t NPawns>
+template <uint32_t NPawns, typename Hash>
 template <class CallbackFnT>
-bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
+bool Game<NPawns, Hash>::forEachMoveP2(CallbackFnT cb) const {
   assert(inPhase2());
   static constexpr uint32_t tmp_board_tile_bits = 2;
   static constexpr uint64_t tmp_board_tile_mask =
@@ -1576,9 +1602,9 @@ bool Game<NPawns>::forEachMoveP2(CallbackFnT cb) const {
   return true;
 }
 
-template <uint32_t NPawns>
-typename Game<NPawns>::BoardSymmetryState Game<NPawns>::calcSymmetryState()
-    const {
+template <uint32_t NPawns, typename Hash>
+typename Game<NPawns, Hash>::BoardSymmetryState
+Game<NPawns, Hash>::calcSymmetryState() const {
   auto [x, y] = sum_of_mass_;
   uint32_t n_pawns = nPawnsInPlay();
 
@@ -1601,9 +1627,9 @@ typename Game<NPawns>::BoardSymmetryState Game<NPawns>::calcSymmetryState()
   }
 }
 
-template <uint32_t NPawns>
-constexpr HexPos Game<NPawns>::originTile(
-    const typename Game<NPawns>::BoardSymmetryState& state) const {
+template <uint32_t NPawns, typename Hash>
+constexpr HexPos Game<NPawns, Hash>::originTile(
+    const typename Game<NPawns, Hash>::BoardSymmetryState& state) const {
   // Operate under the assumption that x, y >= 0
   uint32_t x = static_cast<uint32_t>(sum_of_mass_.x);
   uint32_t y = static_cast<uint32_t>(sum_of_mass_.y);
@@ -1613,34 +1639,36 @@ constexpr HexPos Game<NPawns>::originTile(
   return truncated_com + state.center_offset;
 }
 
-template <uint32_t NPawns>
-typename Game<NPawns>::pawn_iterator Game<NPawns>::pawns_begin() const {
-  typename Game<NPawns>::pawn_iterator it = pawn_iterator(*this);
+template <uint32_t NPawns, typename Hash>
+typename Game<NPawns, Hash>::pawn_iterator Game<NPawns, Hash>::pawns_begin()
+    const {
+  typename Game<NPawns, Hash>::pawn_iterator it = pawn_iterator(*this);
   return it;
 }
 
-template <uint32_t NPawns>
-constexpr typename Game<NPawns>::pawn_iterator Game<NPawns>::pawns_end() const {
-  return Game<NPawns>::pawn_iterator::end(*this);
+template <uint32_t NPawns, typename Hash>
+constexpr typename Game<NPawns, Hash>::pawn_iterator
+Game<NPawns, Hash>::pawns_end() const {
+  return Game<NPawns, Hash>::pawn_iterator::end(*this);
 }
 
-template <uint32_t NPawns>
-typename Game<NPawns>::color_pawn_iterator Game<NPawns>::color_pawns_begin(
-    bool black) const {
-  typename Game<NPawns>::color_pawn_iterator it =
+template <uint32_t NPawns, typename Hash>
+typename Game<NPawns, Hash>::color_pawn_iterator
+Game<NPawns, Hash>::color_pawns_begin(bool black) const {
+  typename Game<NPawns, Hash>::color_pawn_iterator it =
       color_pawn_iterator(*this, black);
   return it;
 }
 
-template <uint32_t NPawns>
-constexpr typename Game<NPawns>::color_pawn_iterator
-Game<NPawns>::color_pawns_end(bool black) const {
-  return Game<NPawns>::color_pawn_iterator::end(*this, black);
+template <uint32_t NPawns, typename Hash>
+constexpr typename Game<NPawns, Hash>::color_pawn_iterator
+Game<NPawns, Hash>::color_pawns_end(bool black) const {
+  return Game<NPawns, Hash>::color_pawn_iterator::end(*this, black);
 }
 
-template <uint32_t NPawns>
+template <uint32_t NPawns, typename Hash>
 template <class CallbackFnT>
-bool Game<NPawns>::forEachPawn(CallbackFnT cb) const {
+bool Game<NPawns, Hash>::forEachPawn(CallbackFnT cb) const {
   for (pawn_iterator it = pawns_begin(); it != pawns_end(); ++it) {
     if (!cb(*it)) {
       return false;
@@ -1650,9 +1678,9 @@ bool Game<NPawns>::forEachPawn(CallbackFnT cb) const {
   return true;
 }
 
-template <uint32_t NPawns>
+template <uint32_t NPawns, typename Hash>
 template <class CallbackFnT>
-bool Game<NPawns>::forEachPlayerPawn(bool black, CallbackFnT cb) const {
+bool Game<NPawns, Hash>::forEachPlayerPawn(bool black, CallbackFnT cb) const {
   const color_pawn_iterator end = color_pawns_end(black);
   for (color_pawn_iterator it = color_pawns_begin(black); it != end; ++it) {
     if (!cb(*it)) {

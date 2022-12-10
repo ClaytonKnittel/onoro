@@ -9,8 +9,8 @@
 #include <iostream>
 #include <string>
 
-#include "game.h"
 #include "game_state.pb.h"
+#include "onoro.h"
 
 static constexpr uint32_t NPawns = 16;
 
