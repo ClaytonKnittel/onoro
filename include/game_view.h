@@ -14,7 +14,10 @@ using namespace hash_group;
 template <uint32_t NPawns>
 class GameView {
  public:
-  constexpr GameView(const Game<NPawns>*);
+  constexpr GameView(const Game<NPawns>&);
+
+  explicit constexpr GameView(const Game<NPawns>*);
+
   template <class Group>
   constexpr GameView(const Game<NPawns>*, Group view_op, bool color_invert);
 
@@ -64,11 +67,12 @@ class GameView {
 };
 
 template <uint32_t NPawns>
+constexpr GameView<NPawns>::GameView(const Game<NPawns>& game)
+    : GameView(&game) {}
+
+template <uint32_t NPawns>
 constexpr GameView<NPawns>::GameView(const Game<NPawns>* game)
-    : game_(game),
-      view_op_ordinal_(0),
-      color_invert_(0),
-      hash_(GameHash<NPawns>::calcHash(*game)) {}
+    : game_(game), view_op_ordinal_(0), color_invert_(0), hash_(game->hash()) {}
 
 template <uint32_t NPawns>
 template <class Group>
@@ -77,8 +81,7 @@ constexpr GameView<NPawns>::GameView(const Game<NPawns>* game, Group view_op,
     : game_(game),
       view_op_ordinal_(view_op.ordinal()),
       color_invert_(color_invert),
-      hash_(hash_group::apply<Group>(view_op,
-                                     GameHash<NPawns>::calcHash(*game))) {}
+      hash_(hash_group::apply<Group>(view_op, game->hash())) {}
 
 template <uint32_t NPawns>
 template <class Group>

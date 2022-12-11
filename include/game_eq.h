@@ -8,6 +8,8 @@ namespace onoro {
 template <uint32_t NPawns>
 class GameEq {
  public:
+  using is_transparent = void;
+
   GameEq() = default;
 
   bool operator()(const GameView<NPawns>& view1,
@@ -49,10 +51,6 @@ bool GameEq<NPawns>::compareViews(
   const Game<NPawns>& g2 = view2.game();
 
   bool same_color = !(view1.areColorsInverted() ^ view2.areColorsInverted());
-
-  if (view1.hash() != view2.hash()) {
-    return false;
-  }
 
   if (s1.symm_class != s2.symm_class) {
     // printf("DIFF SYMM CLASSES!\n");

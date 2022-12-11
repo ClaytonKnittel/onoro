@@ -43,6 +43,8 @@ typedef std::pair<int32_t, int32_t> hash_idx_t;
 template <uint32_t NPawns>
 class GameHash {
  public:
+  using is_transparent = void;
+
   GameHash();
 
   game_hash_t operator()(const GameView<NPawns>& view) const noexcept;

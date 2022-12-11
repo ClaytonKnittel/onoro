@@ -3,3 +3,4 @@
 vgcore*
 build
 __pycache__
+.vscode
