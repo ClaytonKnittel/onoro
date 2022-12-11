@@ -15,13 +15,10 @@ template <typename idx_t>
 struct _HexPos {
   idx_t x, y;
 
-  template <typename T>
-  constexpr _HexPos(_HexPos<T> other);
-
   constexpr _HexPos(idx_t x, idx_t y);
 
   template <typename T>
-  constexpr _HexPos& operator=(const _HexPos<T>& other);
+  explicit constexpr operator _HexPos<T>() const;
 
   static constexpr _HexPos origin();
 
@@ -144,19 +141,12 @@ constexpr _HexPos<idx_t> operator-=(_HexPos<idx_t>& a,
 }
 
 template <typename idx_t>
-template <typename T>
-constexpr _HexPos<idx_t>::_HexPos(_HexPos<T> other)
-    : x(static_cast<idx_t>(other.x)), y(static_cast<idx_t>(other.y)) {}
-
-template <typename idx_t>
 constexpr _HexPos<idx_t>::_HexPos(idx_t x, idx_t y) : x(x), y(y) {}
 
 template <typename idx_t>
 template <typename T>
-constexpr _HexPos<idx_t>& _HexPos<idx_t>::operator=(const _HexPos<T>& other) {
-  this->x = other.x;
-  this->y = other.y;
-  return *this;
+constexpr _HexPos<idx_t>::operator _HexPos<T>() const {
+  return _HexPos<T>(static_cast<T>(x), static_cast<T>(y));
 }
 
 template <typename idx_t>
