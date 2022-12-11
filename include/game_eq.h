@@ -12,12 +12,6 @@ class GameEq {
 
   GameEq() = default;
 
-  bool operator()(const Game<NPawns>& game1,
-                  const Game<NPawns>& game2) const noexcept;
-  bool operator()(const GameView<NPawns>& view1,
-                  const Game<NPawns>& game2) const noexcept;
-  bool operator()(const Game<NPawns>& game1,
-                  const GameView<NPawns>& view2) const noexcept;
   bool operator()(const GameView<NPawns>& view1,
                   const GameView<NPawns>& view2) const noexcept;
 
@@ -28,61 +22,6 @@ class GameEq {
                            typename Game<NPawns>::BoardSymmetryState s1,
                            typename Game<NPawns>::BoardSymmetryState s2);
 };
-
-template <uint32_t NPawns>
-bool GameEq<NPawns>::operator()(const Game<NPawns>& game1,
-                                const Game<NPawns>& game2) const noexcept {
-  using SymmState = typename Game<NPawns>::BoardSymmetryState;
-
-  SymmState s1 = game1.calcSymmetryState();
-  SymmState s2 = game2.calcSymmetryState();
-
-  if (s1.symm_class != s2.symm_class) {
-    return false;
-  }
-
-  GameView<NPawns> view1(&game1);
-  GameView<NPawns> view2(&game2);
-
-  SymmetryClassOpApplyAndReturn(s1.symm_class, compareViews, view1, view2, s1,
-                                s2);
-}
-
-template <uint32_t NPawns>
-bool GameEq<NPawns>::operator()(const GameView<NPawns>& view1,
-                                const Game<NPawns>& game2) const noexcept {
-  using SymmState = typename Game<NPawns>::BoardSymmetryState;
-
-  SymmState s1 = view1.game().calcSymmetryState();
-  SymmState s2 = game2.calcSymmetryState();
-
-  if (s1.symm_class != s2.symm_class) {
-    return false;
-  }
-
-  GameView<NPawns> view2(&game2);
-
-  SymmetryClassOpApplyAndReturn(s1.symm_class, compareViews, view1, view2, s1,
-                                s2);
-}
-
-template <uint32_t NPawns>
-bool GameEq<NPawns>::operator()(const Game<NPawns>& game1,
-                                const GameView<NPawns>& view2) const noexcept {
-  using SymmState = typename Game<NPawns>::BoardSymmetryState;
-
-  SymmState s1 = game1.calcSymmetryState();
-  SymmState s2 = view2.game().calcSymmetryState();
-
-  if (s1.symm_class != s2.symm_class) {
-    return false;
-  }
-
-  GameView<NPawns> view1(&game1);
-
-  SymmetryClassOpApplyAndReturn(s1.symm_class, compareViews, view1, view2, s1,
-                                s2);
-}
 
 template <uint32_t NPawns>
 bool GameEq<NPawns>::operator()(const GameView<NPawns>& view1,

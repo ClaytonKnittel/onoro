@@ -47,7 +47,6 @@ class GameHash {
 
   GameHash();
 
-  game_hash_t operator()(const Game<NPawns>& game) const noexcept;
   game_hash_t operator()(const GameView<NPawns>& view) const noexcept;
 
   static constexpr game_hash_t calcHash(const Game<NPawns>& game) noexcept;
@@ -161,12 +160,6 @@ class GameHash {
 
 template <uint32_t NPawns>
 GameHash<NPawns>::GameHash() {}
-
-template <uint32_t NPawns>
-game_hash_t GameHash<NPawns>::operator()(
-    const Game<NPawns>& game) const noexcept {
-  return game.hash();
-}
 
 template <uint32_t NPawns>
 game_hash_t GameHash<NPawns>::operator()(

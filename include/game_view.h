@@ -14,6 +14,8 @@ using namespace hash_group;
 template <uint32_t NPawns>
 class GameView {
  public:
+  constexpr GameView(const Game<NPawns>&);
+
   explicit constexpr GameView(const Game<NPawns>*);
 
   template <class Group>
@@ -63,6 +65,10 @@ class GameView {
   // The hash of the game with op() applied.
   std::size_t hash_;
 };
+
+template <uint32_t NPawns>
+constexpr GameView<NPawns>::GameView(const Game<NPawns>& game)
+    : GameView(&game) {}
 
 template <uint32_t NPawns>
 constexpr GameView<NPawns>::GameView(const Game<NPawns>* game)
