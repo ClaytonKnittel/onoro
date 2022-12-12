@@ -1,10 +1,7 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <absl/status/statusor.h>
-#include <absl/strings/str_format.h>
-#include <arpa/inet.h>
 
-#include <cinttypes>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>

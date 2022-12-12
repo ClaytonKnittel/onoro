@@ -526,26 +526,26 @@ typedef SymmetryClassOp<SymmetryClass::TRIVIAL> TrivialOp;
  */
 #define SymmetryClassOpApplyAndReturn(symm_class, fn, ...) \
   switch (symm_class) {                                    \
-    case SymmetryClass::C: {                               \
-      return fn<D6COp>(__VA_ARGS__);                       \
+    case onoro::SymmetryClass::C: {                        \
+      return fn<onoro::D6COp>(__VA_ARGS__);                \
     }                                                      \
-    case SymmetryClass::V: {                               \
-      return fn<D3VOp>(__VA_ARGS__);                       \
+    case onoro::SymmetryClass::V: {                        \
+      return fn<onoro::D3VOp>(__VA_ARGS__);                \
     }                                                      \
-    case SymmetryClass::E: {                               \
-      return fn<K4EOp>(__VA_ARGS__);                       \
+    case onoro::SymmetryClass::E: {                        \
+      return fn<onoro::K4EOp>(__VA_ARGS__);                \
     }                                                      \
-    case SymmetryClass::CV: {                              \
-      return fn<C2CVOp>(__VA_ARGS__);                      \
+    case onoro::SymmetryClass::CV: {                       \
+      return fn<onoro::C2CVOp>(__VA_ARGS__);               \
     }                                                      \
-    case SymmetryClass::CE: {                              \
-      return fn<C2CEOp>(__VA_ARGS__);                      \
+    case onoro::SymmetryClass::CE: {                       \
+      return fn<onoro::C2CEOp>(__VA_ARGS__);               \
     }                                                      \
-    case SymmetryClass::EV: {                              \
-      return fn<C2EVOp>(__VA_ARGS__);                      \
+    case onoro::SymmetryClass::EV: {                       \
+      return fn<onoro::C2EVOp>(__VA_ARGS__);               \
     }                                                      \
-    case SymmetryClass::TRIVIAL: {                         \
-      return fn<TrivialOp>(__VA_ARGS__);                   \
+    case onoro::SymmetryClass::TRIVIAL: {                  \
+      return fn<onoro::TrivialOp>(__VA_ARGS__);            \
     }                                                      \
     default: {                                             \
       __builtin_unreachable();                             \

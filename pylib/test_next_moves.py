@@ -7,7 +7,7 @@ from typing import Iterable
 
 from onoro import Onoro, deserialize
 from game_state_pb2 import GameState, GameStates
-import test_next_moves_cc
+from test_next_moves_cc
 
 Pawn = GameState.Pawn
 

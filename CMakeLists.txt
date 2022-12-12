@@ -217,3 +217,13 @@ add_custom_command(
   COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
 )
 
+add_custom_target("py_test_symm"
+  DEPENDS ${PROTO_GEN_PY} test_symmetries_cc
+  COMMENT "Compare symmetry checking between python and C++ implementations"
+)
+
+add_custom_command(
+  TARGET "py_test_symm"
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_eq_under_symm.py
+)
+
