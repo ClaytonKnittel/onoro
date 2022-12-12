@@ -34,8 +34,6 @@ set(ENABLE_TESTING OFF CACHE BOOL "When enabled, build all unit tests. The
 	unit tests can then be run from within the build directory with
 	'make run_tests'.")
 set(ABSL_PROPAGATE_CXX_STD ON)
-set(PYTHON_VENV_PATH "${CMAKE_CURRENT_BINARY_DIR}/.venv" CACHE STRING "Path to
-  the python virtual environment")
 
 
 ############################################################
@@ -79,9 +77,6 @@ foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
   string(REGEX REPLACE "^.+test_([^/]+)\.cc" "test_\\1" EXE_NAME ${TEST_CXX_SRC})
   if (EXE_NAME MATCHES "_pylib$")
     string(REGEX REPLACE "^(.+)_pylib$" "\\1" EXE_NAME ${EXE_NAME})
-    #add_library(${EXE_NAME} SHARED
-    #  ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
-    #)
     Python_add_library(${EXE_NAME} SHARED
       ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
     )
