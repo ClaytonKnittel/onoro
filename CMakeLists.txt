@@ -71,10 +71,12 @@ add_executable("onoro"
 )
 
 set(TEST_CXX_EXES "")
+set(PYTHON_MODULES "")
 
 # Add an executable for each test_*.cc file
 foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
   string(REGEX REPLACE "^.+test_([^/]+)\.cc" "test_\\1" EXE_NAME ${TEST_CXX_SRC})
+
   if (EXE_NAME MATCHES "_pylib$")
     string(REGEX REPLACE "^(.+)_pylib$" "\\1" EXE_NAME ${EXE_NAME})
     Python_add_library(${EXE_NAME} SHARED
@@ -84,6 +86,8 @@ foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
     set_property(TARGET ${EXE_NAME} PROPERTY OUTPUT_NAME ${EXE_NAME})
     set_property(TARGET ${EXE_NAME} PROPERTY PREFIX "")
     set_property(TARGET ${EXE_NAME} PROPERTY SUFFIX .so)
+
+    list(APPEND PYTHON_MODULES ${EXE_NAME})
   elseif (EXE_NAME MATCHES "_lib$")
     string(REGEX REPLACE "^(.+)_lib$" "\\1" EXE_NAME ${EXE_NAME})
     add_library(${EXE_NAME} SHARED
@@ -94,6 +98,7 @@ foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
       ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
     )
   endif()
+
   list(APPEND TEST_CXX_EXES ${EXE_NAME})
 endforeach()
 
@@ -174,8 +179,15 @@ foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
 
   target_link_libraries(${EXE}
     PUBLIC
-      "${LINK_LIBS}" absl::flat_hash_map absl::optional absl::statusor absl::str_format Python::Module utils ${Protobuf_LIBRARIES}
+      "${LINK_LIBS}" absl::flat_hash_map absl::optional absl::statusor absl::str_format utils ${Protobuf_LIBRARIES}
   )
+
+  list(FIND PYTHON_MODULES ${EXE} IS_PYTHON_MODULE)
+  if (NOT ${IS_PYTHON_MODULE} EQUAL "-1")
+    target_link_libraries(${EXE}
+      PUBLIC Python::Module
+    )
+  endif()
 
 endforeach()
 
