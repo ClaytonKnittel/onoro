@@ -1,11 +1,13 @@
 
 import copy
+import ctypes
 import random
 import subprocess
 from typing import Iterable
 
 from onoro import Onoro, deserialize
 from game_state_pb2 import GameState, GameStates
+import test_next_moves_cc
 
 Pawn = GameState.Pawn
 
@@ -46,6 +48,7 @@ def run_cc(game: Onoro) -> None:
 
 
 def get_next_moves_cc(game: Onoro) -> Iterable[Onoro]:
+  """
   proc = subprocess.Popen(['./test_next_moves'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
   state_bytes = bytes(game.serialize().SerializeToString())
@@ -61,6 +64,9 @@ def get_next_moves_cc(game: Onoro) -> Iterable[Onoro]:
 
   res = proc.stdout.read()
   res = res[4:]
+  """
+  state_bytes = bytes(game.serialize().SerializeToString())
+  res = test_next_moves_cc.gen_next_moves(state_bytes)
 
   gs = GameStates()
   gs.ParseFromString(res)

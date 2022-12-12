@@ -34,6 +34,8 @@ set(ENABLE_TESTING OFF CACHE BOOL "When enabled, build all unit tests. The
 	unit tests can then be run from within the build directory with
 	'make run_tests'.")
 set(ABSL_PROPAGATE_CXX_STD ON)
+set(PYTHON_VENV_PATH "${CMAKE_CURRENT_BINARY_DIR}/.venv" CACHE STRING "Path to
+  the python virtual environment")
 
 
 ############################################################
@@ -41,7 +43,7 @@ set(ABSL_PROPAGATE_CXX_STD ON)
 ############################################################
 
 find_package(Protobuf REQUIRED)
-find_package(Python REQUIRED COMPONENTS Interpreter)
+find_package(Python REQUIRED COMPONENTS Development Interpreter)
 
 
 ############################################################
@@ -75,9 +77,23 @@ set(TEST_CXX_EXES "")
 # Add an executable for each test_*.cc file
 foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
   string(REGEX REPLACE "^.+test_([^/]+)\.cc" "test_\\1" EXE_NAME ${TEST_CXX_SRC})
-  add_executable(${EXE_NAME}
-    ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
-  )
+  if (EXE_NAME MATCHES "_lib$")
+    string(REGEX REPLACE "^(.+)_lib$" "\\1" EXE_NAME ${EXE_NAME})
+    #add_library(${EXE_NAME} SHARED
+    #  ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
+    #)
+    Python_add_library(${EXE_NAME} SHARED
+      ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
+    )
+
+    set_property(TARGET ${EXE_NAME} PROPERTY OUTPUT_NAME ${EXE_NAME})
+    set_property(TARGET ${EXE_NAME} PROPERTY PREFIX "")
+    set_property(TARGET ${EXE_NAME} PROPERTY SUFFIX .so)
+  else()
+    add_executable(${EXE_NAME}
+      ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
+    )
+  endif()
   list(APPEND TEST_CXX_EXES ${EXE_NAME})
 endforeach()
 
@@ -159,7 +175,7 @@ foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
 
   target_link_libraries(${EXE}
     PUBLIC
-      "${LINK_LIBS}" absl::flat_hash_map absl::optional absl::statusor absl::str_format utils ${Protobuf_LIBRARIES}
+      "${LINK_LIBS}" absl::flat_hash_map absl::optional absl::statusor absl::str_format Python::Module utils ${Protobuf_LIBRARIES}
   )
 
 endforeach()
@@ -177,16 +193,16 @@ add_custom_target("py"
 
 add_custom_command(
   TARGET "py"
-  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} python3 ${CMAKE_SOURCE_DIR}/pylib/init.py
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} DYLD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$DYLD_LIBRARY_PATH ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/init.py
 )
 
 add_custom_target("py_test_next_moves"
-  DEPENDS ${PROTO_GEN_PY} test_next_moves
+  DEPENDS ${PROTO_GEN_PY} test_next_moves_cc
   COMMENT "Compare next move generation between python and C++ implementations"
 )
 
 add_custom_command(
   TARGET "py_test_next_moves"
-  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} python3 ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} DYLD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$$DYLD_LIBRARY_PATH ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
 )
 
