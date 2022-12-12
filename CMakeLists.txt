@@ -193,7 +193,7 @@ add_custom_target("py"
 
 add_custom_command(
   TARGET "py"
-  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} DYLD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$DYLD_LIBRARY_PATH ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/init.py
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/init.py
 )
 
 add_custom_target("py_test_next_moves"
@@ -203,6 +203,6 @@ add_custom_target("py_test_next_moves"
 
 add_custom_command(
   TARGET "py_test_next_moves"
-  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} DYLD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$$DYLD_LIBRARY_PATH ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
 )
 
