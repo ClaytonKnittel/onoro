@@ -78,8 +78,15 @@ static PyMethodDef gen_next_moves_def[] = {
 };
 
 static struct PyModuleDef test_next_moves_cc_module = {
-  PyModuleDef_HEAD_INIT, "test_next_moves_cc",
-  "Python interface for the gen_next_moves function.", -1, gen_next_moves_def
+  PyModuleDef_HEAD_INIT,
+  "test_next_moves_cc",
+  "Python interface for the gen_next_moves function.",
+  -1,
+  gen_next_moves_def,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
 };
 
 PyMODINIT_FUNC PyInit_test_next_moves_cc(void) {

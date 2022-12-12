@@ -77,8 +77,8 @@ set(TEST_CXX_EXES "")
 # Add an executable for each test_*.cc file
 foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
   string(REGEX REPLACE "^.+test_([^/]+)\.cc" "test_\\1" EXE_NAME ${TEST_CXX_SRC})
-  if (EXE_NAME MATCHES "_lib$")
-    string(REGEX REPLACE "^(.+)_lib$" "\\1" EXE_NAME ${EXE_NAME})
+  if (EXE_NAME MATCHES "_pylib$")
+    string(REGEX REPLACE "^(.+)_pylib$" "\\1" EXE_NAME ${EXE_NAME})
     #add_library(${EXE_NAME} SHARED
     #  ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
     #)
@@ -89,6 +89,11 @@ foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
     set_property(TARGET ${EXE_NAME} PROPERTY OUTPUT_NAME ${EXE_NAME})
     set_property(TARGET ${EXE_NAME} PROPERTY PREFIX "")
     set_property(TARGET ${EXE_NAME} PROPERTY SUFFIX .so)
+  elseif (EXE_NAME MATCHES "_lib$")
+    string(REGEX REPLACE "^(.+)_lib$" "\\1" EXE_NAME ${EXE_NAME})
+    add_library(${EXE_NAME} SHARED
+      ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
+    )
   else()
     add_executable(${EXE_NAME}
       ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
@@ -111,24 +116,23 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 
+if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
+  enable_language(ASM)
+  if(CMAKE_ASM_COMPILER_WORKS)
+    set(can_use_assembler TRUE)
+  endif()
+endif()
+
+if(NOT can_use_assembler)
+  message(SEND_ERROR "No assembler found")
+endif()
+
 add_subdirectory(modules/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(modules/utils EXCLUDE_FROM_ALL)
 
 set(ONORO_EXE "onoro")
 
 foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
-
-  if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
-    enable_language(ASM)
-    if(CMAKE_ASM_COMPILER_WORKS)
-      set(can_use_assembler TRUE)
-    endif()
-  endif()
-
-  if(NOT can_use_assembler)
-    message(SEND_ERROR "No assembler found")
-  endif()
-
   target_compile_options(${EXE} PRIVATE
     $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:-Wpedantic -Wall -Wextra
     -Wno-unused-function -Wno-format -march=native -mtune=native>
