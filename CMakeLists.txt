@@ -171,10 +171,11 @@ foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
     PRIVATE
       "/usr/local/include"
     PUBLIC
-      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/include>
-      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/abseil-cpp>
-      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/utils/include>
-      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${CMAKE_CURRENT_BINARY_DIR}>
+      ${PROJECT_SOURCE_DIR}/include
+      ${PROJECT_SOURCE_DIR}/modules/abseil-cpp
+      ${PROJECT_SOURCE_DIR}/modules/utils/include
+      ${CMAKE_CURRENT_BINARY_DIR}
+      ${Protobuf_INCLUDE_DIRS}
   )
 
   target_link_libraries(${EXE}
