@@ -17,10 +17,33 @@ jobs:
         sudo apt-get update -y
         sudo apt-get install -y lsb-release
         python3 -m pip install protobuf
-    - name: Install Protoc
-      uses: arduino/setup-protoc@v1
+    - name: Cache protobuf
+      id: cache-protobuf
+      uses: actions/cache@v2
+      env:
+        cache-name: protobuf
       with:
-        version: '3.20.2'
+        path: protobuf-3.20.2
+        key: protobuf-3.20.2-${{ runner.os }}-v2
+    - name: Download protobuf
+      uses: actions/checkout@v2
+      if: steps.cache-protobuf.outputs.cache-hit != 'true'
+      with:
+        repository: "protocolbuffers/protobuf"
+        ref: "3.20.2"
+        path: protobuf-3.20.2
+    - name: Build protobuf
+      id: build-protobuf
+      if: steps.cache-protobuf.outputs.cache-hit != 'true'
+      working-directory: protobuf-3.20.2
+      run: |
+        mkdir build && cd build
+        cmake ..
+        make
+    - name: install protobuf
+      working-directory: protobuf-3.20.2/build
+      run: |
+        sudo make install
     - name: Check out Onoro
       uses: actions/checkout@v2
       with:
