@@ -35,6 +35,7 @@ static absl::StatusOr<bool> _doEqUnderSymmetries(onoro::Game<NPawns> game1,
         if (swap_colors) {
           h1_rot = onoro::hash_group::color_swap(h1_rot);
         }
+
         if (h1_rot != view1.hash()) {
           return absl::InternalError(absl::StrFormat(
               "View hash is wrong, %016" PRIx64 " vs %016" PRIx64, view1.hash(),
