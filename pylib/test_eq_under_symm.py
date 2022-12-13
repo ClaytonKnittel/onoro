@@ -47,6 +47,13 @@ def each_symm(game: Onoro) -> Iterable[Onoro]:
     g.invert_colors()
 
 
+def are_symm_py(g1: Onoro, g2: Onoro) -> bool:
+  for g in each_symm(g1):
+    if g == g2:
+      return True
+  return False
+
+
 def are_symm_cc(g1: Onoro, g2: Onoro) -> bool:
   gs_bytes = GameStates(state=(g1.serialize(), g2.serialize())).SerializeToString()
   return test_symmetries_cc.are_symmetries(gs_bytes)
@@ -94,7 +101,8 @@ def test_random_moves(game: Onoro, max_moves: int, do_print=False) -> bool:
     while True:
       prev = random.choice(tuple(cache))
       g = copy.deepcopy(prev)
-      if i % 400 == 0:
+      if i % 500 == 0:
+        print('turn', i)
         print(g)
 
       if g.HasWinner():
@@ -106,6 +114,17 @@ def test_random_moves(game: Onoro, max_moves: int, do_print=False) -> bool:
 
     if not insert_symm(cache, g) and do_print:
       print(g)
+
+  cache_list = list(cache)
+
+  for t in range(10):
+    print('trial', t)
+    random.shuffle(cache_list)
+    for i, g in enumerate(cache_list):
+      if i % 1000 == 0:
+        print('ineq checking', i)
+      g2 = cache_list[(i + 1) % len(cache_list)]
+      assert(are_symm_py(g, g2) == are_symm_cc(g, g2))
 
   # print(cache)
   return True

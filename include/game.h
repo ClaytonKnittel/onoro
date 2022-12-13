@@ -940,12 +940,9 @@ absl::StatusOr<Game<NPawns, Hash>> Game<NPawns, Hash>::LoadState(
   } else {
     g.state_.blackTurn = state.black_turn();
   }
-  if (state.finished() != g.state_.finished) {
-    return absl::InternalError(
-        absl::StrFormat("Game is %s, but state has %s",
-                        g.state_.finished ? "finished" : "unfinished",
-                        state.finished() ? "finished" : "unfinished"));
-  }
+  // We have to trust this field in the proto since the last placed piece may
+  // not have been the winning move.
+  g.state_.finished = state.finished();
 
   return g;
 }
