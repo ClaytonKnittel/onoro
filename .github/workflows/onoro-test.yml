@@ -6,6 +6,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PROTOBUF_VERSION: 3.19.2
 
     steps:
     - name: Setup cmake
@@ -22,26 +24,26 @@ jobs:
       env:
         cache-name: protobuf
       with:
-        path: protobuf-3.20.2
-        key: protobuf-3.20.2-${{ runner.os }}-v2
+        path: protobuf-${{ env.PROTOBUF_VERSION }}
+        key: protobuf-${{ env.PROTOBUF_VERSION }}-${{ runner.os }}-v2
     - name: Download protobuf
       uses: actions/checkout@v2
       if: steps.cache-protobuf.outputs.cache-hit != 'true'
       with:
         repository: "protocolbuffers/protobuf"
-        ref: "3.20.2"
-        path: protobuf-3.20.2
+        ref: "${{ env.PROTOBUF_VERSION }}"
+        path: protobuf-${{ env.PROTOBUF_VERSION }}
         submodules: recursive
     - name: Build protobuf
       id: build-protobuf
       if: steps.cache-protobuf.outputs.cache-hit != 'true'
-      working-directory: protobuf-3.20.2
+      working-directory: protobuf-${{ env.PROTOBUF_VERSION }}
       run: |
         mkdir build && cd build
         cmake .. -Dprotobuf_BUILD_TESTS=OFF
         make
     - name: install protobuf
-      working-directory: protobuf-3.20.2/build
+      working-directory: protobuf-${{ env.PROTOBUF_VERSION }}/build
       run: |
         sudo make install
     - name: Check out Onoro
