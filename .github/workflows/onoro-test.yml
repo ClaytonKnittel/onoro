@@ -15,8 +15,12 @@ jobs:
     - name: install ubuntu dependencies
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y lsb-release protobuf-compiler
+        sudo apt-get install -y lsb-release
         python3 -m pip install protobuf
+    - name: Install Protoc
+      uses: arduino/setup-protoc@v1
+      with:
+        version: '3.21.9'
     - name: Check out Onoro
       uses: actions/checkout@v2
       with:
