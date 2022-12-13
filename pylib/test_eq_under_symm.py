@@ -1,7 +1,7 @@
 
 import copy
 import random
-from typing import Set
+from typing import Iterable, Set
 
 from onoro import Onoro, deserialize
 from game_state_pb2 import GameState, GameStates
@@ -20,45 +20,94 @@ def gen_starting_game(n_pawns: int) -> Onoro:
   return Onoro(n_pawns, pawns, False)
 
 
-def insert_symm(cache: Set[Onoro], game: Onoro) -> bool:
+def apply_random_symm_ops(game: Onoro) -> None:
+  color_invert = random.choice((False, True))
+  reflected = random.choice((False, True))
+  orientation = random.randrange(6)
+
+  if len(game.pawns) < game.num_pawns:
+    color_invert = False
+
+  if reflected:
+    game.refl()
+  for i in range(orientation):
+    game.rotate_60()
+  if color_invert:
+    game.invert_colors()
+
+
+def each_symm(game: Onoro) -> Iterable[Onoro]:
+  g = copy.deepcopy(game)
+  for color_invert in ((False, True) if len(game.pawns) == game.num_pawns else (False,)):
+    for reflected in (True, False):
+      for orientation in range(6):
+        yield g
+        g.rotate_60()
+      g.refl()
+    g.invert_colors()
+
+
+def are_symm_cc(g1: Onoro, g2: Onoro) -> bool:
+  gs_bytes = GameStates(state=(g1.serialize(), g2.serialize())).SerializeToString()
+  return test_symmetries_cc.are_symmetries(gs_bytes)
+
+
+def insert_symm(cache: Set[Onoro], game: Onoro, do_print=False) -> bool:
+  for g in each_symm(game):
+    if g in cache:
+      if do_print:
+        if not color_invert and not reflected and orientation == 0:
+          print('found exact game')
+        else:
+          if reflected:
+            r_str = 's' + str(orientation)
+          else:
+            r_str = 'r' + str(orientation)
+          print('found game upon ' + r_str + \
+              (' color inverted' if color_invert else ''))
+        print(g)
+
+      for g2 in each_symm(game):
+        res1 = are_symm_cc(game, g2)
+        res2 = are_symm_cc(g2, game)
+
+        if res1 is None or res2 is None:
+          print(game)
+          print(g2)
+          assert(False)
+
+        assert(res1)
+        assert(res2)
+      return False
+
   g_copy = copy.deepcopy(game)
-  for color_invert in (False, True):
-    for orientation in range(6):
-      if g_copy in cache:
-        return False
-
-      g_copy.rotate_60()
-    g_copy.invert_colors()
-
-  assert(game == g_copy)
+  apply_random_symm_ops(g_copy)
   cache.add(g_copy)
   return True
 
 
-def test_random_moves(game: Onoro, max_moves: int) -> bool:
-  prev = None
+def test_random_moves(game: Onoro, max_moves: int, do_print=False) -> bool:
   cache = set()
-
-  def print_game() -> None:
-    if prev is not None:
-      print(game.__repr__(diff=prev))
-    else:
-      print(game)
+  cache.add(game)
 
   for i in range(max_moves):
-    print_game()
-    prev = copy.deepcopy(game)
+    while True:
+      prev = random.choice(tuple(cache))
+      g = copy.deepcopy(prev)
+      if i % 400 == 0:
+        print(g)
 
-    if game.HasWinner():
-      print('someone won after %d moves!' % i)
-      break
-    move = random.choice(list(game.Moves()))
-    game.MakeMove(move)
+      if g.HasWinner():
+        continue
+      else:
+        break
+    move = random.choice(tuple(g.Moves()))
+    g.MakeMove(move)
 
-    insert_symm(cache, game)
+    if not insert_symm(cache, g) and do_print:
+      print(g)
 
-  print_game()
-  print(cache)
+  # print(cache)
   return True
 
 
@@ -67,7 +116,7 @@ def main():
   num_pawns = 16
   game = gen_starting_game(num_pawns)
 
-  print(test_random_moves(game, 5))
+  assert(test_random_moves(game, 5000))
 
 
 if __name__ == '__main__':

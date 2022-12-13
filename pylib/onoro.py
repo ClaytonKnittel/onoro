@@ -95,6 +95,9 @@ class Onoro:
   def rotate_60(self) -> None:
     self.pawns = [Pawn(x=pawn.x - pawn.y, y=pawn.x, black=pawn.black) for pawn in self.pawns]
 
+  def refl(self) -> None:
+    self.pawns = [Pawn(x=pawn.x - pawn.y, y=-pawn.y, black=pawn.black) for pawn in self.pawns]
+
   def invert_colors(self) -> None:
     self.pawns = [Pawn(x=pawn.x, y=pawn.y, black=not pawn.black) for pawn in self.pawns]
     self.black_turn = not self.black_turn

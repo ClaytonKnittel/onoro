@@ -10,12 +10,16 @@
 static constexpr uint32_t NPawns = 16;
 
 template <class SymmetryClassOp>
-static bool _doEqUnderSymmetries(onoro::Game<NPawns> game1,
-                                 onoro::Game<NPawns> game2) {
+static absl::StatusOr<bool> _doEqUnderSymmetries(onoro::Game<NPawns> game1,
+                                                 onoro::Game<NPawns> game2) {
   typedef typename SymmetryClassOp::Group Group;
   onoro::GameEq<NPawns> games_eq;
+  onoro::GameHash<NPawns> game_hash;
 
   onoro::GameView<NPawns> view1(&game1);
+
+  std::size_t h1 = game_hash(game1);
+  std::size_t h2 = game_hash(game2);
 
   for (bool swap_colors : { false, true }) {
     (void) swap_colors;
@@ -25,6 +29,11 @@ static bool _doEqUnderSymmetries(onoro::Game<NPawns> game1,
       view1.setOp(op);
 
       if (games_eq(view1, game2)) {
+        std::size_t h1_rot = onoro::hash_group::apply(view1.op<Group>(), h1);
+        if (h1_rot != h2) {
+          return absl::InternalError(absl::StrFormat(
+              "Hashes are inequal, %016" PRIx64 " vs %016" PRIx64, h1_rot, h2));
+        }
         return true;
       }
     }
@@ -35,8 +44,8 @@ static bool _doEqUnderSymmetries(onoro::Game<NPawns> game1,
   return false;
 }
 
-static bool eqUnderSymmetries(onoro::Game<NPawns> game1,
-                              onoro::Game<NPawns> game2) {
+static absl::StatusOr<bool> eqUnderSymmetries(onoro::Game<NPawns> game1,
+                                              onoro::Game<NPawns> game2) {
   using SymmState = typename onoro::Game<NPawns>::BoardSymmetryState;
 
   SymmState s = game1.calcSymmetryState();
@@ -83,7 +92,13 @@ static PyObject* are_symmetries(PyObject* self, PyObject* args) {
     games[i] = std::move(*game_res);
   }
 
-  return PyBool_FromLong(eqUnderSymmetries(a, b));
+  absl::StatusOr<bool> res = eqUnderSymmetries(a, b);
+  if (!res.ok()) {
+    std::cerr << res.status().message() << std::endl;
+    Py_RETURN_NONE;
+  }
+
+  return PyBool_FromLong(*res);
 }
 
 static PyMethodDef are_symmetries_def[] = {
