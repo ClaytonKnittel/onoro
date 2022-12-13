@@ -45,3 +45,22 @@ jobs:
       working-directory: protobuf-3.20.2/build
       run: |
         sudo make install
+    - name: Check out Onoro
+      uses: actions/checkout@v2
+      with:
+        path: onoro
+        submodules: recursive
+    - name: Initialize and Build
+      working-directory: onoro
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+        make
+    - name: Run test next moves
+      working-directory: onoro/build
+      run: |
+        make py_test_next_moves
+    - name: Run test symmetries
+      working-directory: onoro/build
+      run: |
+        make py_test_symm
