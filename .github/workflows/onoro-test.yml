@@ -1,0 +1,38 @@
+name: Build and Unit Test
+
+on:
+  push:
+    branches: [ master ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v1.12
+      with:
+        cmake-version: '3.22.1'
+    - name: install ubuntu dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y lsb-release
+    - name: Check out Onoro
+      uses: actions/checkout@v2
+      with:
+        path: onoro
+        submodules: recursive
+    - name: Initialize and Build
+      working-directory: onoro
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+        make
+    - name: Run test next moves
+      working-directory: utils/build
+      run: |
+        make py_test_next_moves
+    - name: Run test symmetries
+      working-directory: utils/build
+      run: |
+        make py_test_symm
