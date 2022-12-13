@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      PROTOBUF_VERSION: 3.19.2
+      PROTOBUF_VERSION: 3.19.x
 
     steps:
     - name: Setup cmake
