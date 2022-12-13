@@ -178,6 +178,8 @@ foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
       ${Protobuf_INCLUDE_DIRS}
   )
 
+  message("Protobuf include: ${Protobuf_INCLUDE_DIRS}")
+
   target_link_libraries(${EXE}
     PUBLIC
       "${LINK_LIBS}" absl::flat_hash_map absl::optional absl::statusor absl::str_format utils ${Protobuf_LIBRARIES}
