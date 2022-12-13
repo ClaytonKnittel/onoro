@@ -57,6 +57,14 @@ jobs:
     - name: Install python protobuf
       run: |
         python3 -m pip install protobuf
+    - name: Run test hash group
+      working-directory: onoro/build
+      run: |
+        ./test_hash_group
+    - name: Run test union find
+      working-directory: onoro/build
+      run: |
+        ./test_union_find
     - name: Run test next moves
       working-directory: onoro/build
       run: |
