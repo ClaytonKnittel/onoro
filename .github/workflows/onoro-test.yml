@@ -16,11 +16,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y lsb-release
-    - name: Install Protoc
-      uses: arduino/setup-protoc@v1
-      with:
-        version: '3.x'
+        sudo apt-get install -y lsb-release protobuf-compiler
     - name: Check out Onoro
       uses: actions/checkout@v2
       with:
