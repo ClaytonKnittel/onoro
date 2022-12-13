@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      PROTOBUF_VERSION: 3.19.x
+      PROTOBUF_VERSION: 21.11
 
     steps:
     - name: Setup cmake
@@ -17,7 +17,7 @@ jobs:
     - name: install ubuntu dependencies
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y lsb-release
+        sudo apt-get install -y lsb-release wget
     - name: Cache protobuf
       id: cache-protobuf
       uses: actions/cache@v2
@@ -27,23 +27,19 @@ jobs:
         path: protobuf-${{ env.PROTOBUF_VERSION }}
         key: protobuf-${{ env.PROTOBUF_VERSION }}-${{ runner.os }}-v2
     - name: Download protobuf
-      uses: actions/checkout@v2
       if: steps.cache-protobuf.outputs.cache-hit != 'true'
-      with:
-        repository: "protocolbuffers/protobuf"
-        ref: "${{ env.PROTOBUF_VERSION }}"
-        path: protobuf-${{ env.PROTOBUF_VERSION }}
-        submodules: recursive
+      run: |
+        wget https://github.com/protocolbuffers/protobuf/releases/download/v${{ env.PROTOBUF_VERSION }}/protobuf-all-${{ env.PROTOBUF_VERSION }}.tar.gz
+        tar -xvf protobuf-all-${{ env.PROTOBUF_VERSION }}.tar.gz
     - name: Build protobuf
       id: build-protobuf
       if: steps.cache-protobuf.outputs.cache-hit != 'true'
       working-directory: protobuf-${{ env.PROTOBUF_VERSION }}
       run: |
-        mkdir build && cd build
-        cmake .. -Dprotobuf_BUILD_TESTS=OFF
+        ./configure
         make
     - name: install protobuf
-      working-directory: protobuf-${{ env.PROTOBUF_VERSION }}/build
+      working-directory: protobuf-${{ env.PROTOBUF_VERSION }}
       run: |
         sudo make install
     - name: Check out Onoro
