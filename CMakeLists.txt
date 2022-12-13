@@ -41,7 +41,7 @@ set(ABSL_PROPAGATE_CXX_STD ON)
 ############################################################
 
 find_package(Protobuf REQUIRED)
-find_package(Python REQUIRED COMPONENTS Development Interpreter)
+find_package(Python3 REQUIRED COMPONENTS Development Interpreter)
 
 
 ############################################################
@@ -79,7 +79,7 @@ foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
 
   if (EXE_NAME MATCHES "_pylib$")
     string(REGEX REPLACE "^(.+)_pylib$" "\\1" EXE_NAME ${EXE_NAME})
-    Python_add_library(${EXE_NAME} SHARED
+    Python3_add_library(${EXE_NAME} SHARED
       ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
     )
 
@@ -185,7 +185,7 @@ foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
   list(FIND PYTHON_MODULES ${EXE} IS_PYTHON_MODULE)
   if (NOT ${IS_PYTHON_MODULE} EQUAL "-1")
     target_link_libraries(${EXE}
-      PUBLIC Python::Module
+      PUBLIC Python3::Module
     )
   endif()
 
@@ -204,7 +204,7 @@ add_custom_target("py"
 
 add_custom_command(
   TARGET "py"
-  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/init.py
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/init.py
 )
 
 add_custom_target("py_test_next_moves"
@@ -214,7 +214,7 @@ add_custom_target("py_test_next_moves"
 
 add_custom_command(
   TARGET "py_test_next_moves"
-  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
 )
 
 add_custom_target("py_test_symm"
@@ -224,6 +224,6 @@ add_custom_target("py_test_symm"
 
 add_custom_command(
   TARGET "py_test_symm"
-  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_eq_under_symm.py
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_eq_under_symm.py
 )
 
