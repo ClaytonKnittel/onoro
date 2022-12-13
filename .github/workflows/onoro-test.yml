@@ -16,7 +16,6 @@ jobs:
       run: |
         sudo apt-get update -y
         sudo apt-get install -y lsb-release
-        python3 -m pip install protobuf
     - name: Cache protobuf
       id: cache-protobuf
       uses: actions/cache@v2
@@ -56,6 +55,9 @@ jobs:
         mkdir build && cd build
         cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
         make
+    - name: Install python protobuf
+      run: |
+        python3 -m pip install protobuf
     - name: Run test next moves
       working-directory: onoro/build
       run: |
