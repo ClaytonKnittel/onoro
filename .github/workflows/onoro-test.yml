@@ -39,7 +39,7 @@ jobs:
       working-directory: protobuf-3.20.2
       run: |
         mkdir build && cd build
-        cmake ..
+        cmake .. -Dprotobuf_BUILD_TESTS=OFF
         make
     - name: install protobuf
       working-directory: protobuf-3.20.2/build
