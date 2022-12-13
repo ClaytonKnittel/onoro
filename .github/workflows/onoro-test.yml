@@ -28,10 +28,10 @@ jobs:
         cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
         make
     - name: Run test next moves
-      working-directory: utils/build
+      working-directory: onoro/build
       run: |
         make py_test_next_moves
     - name: Run test symmetries
-      working-directory: utils/build
+      working-directory: onoro/build
       run: |
         make py_test_symm
