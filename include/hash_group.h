@@ -46,6 +46,9 @@ static constexpr game_hash_t make_invariant_d3(D3 op, game_hash_t h);
 static constexpr game_hash_t make_invariant_k4(K4 op, game_hash_t h);
 static constexpr game_hash_t make_invariant_c2(C2 op, game_hash_t h);
 
+template <class Group>
+static constexpr game_hash_t make_invariant(Group op, game_hash_t h);
+
 static constexpr game_hash_t C_MASK = UINT64_C(0x0fffffffffffffff);
 static constexpr game_hash_t V_MASK = UINT64_C(0x0fffffffffffffff);
 static constexpr game_hash_t E_MASK = UINT64_C(0xffffffffffffffff);
@@ -317,6 +320,31 @@ constexpr game_hash_t make_invariant_k4(K4 op, game_hash_t h) {
 constexpr game_hash_t make_invariant_c2(C2 op, game_hash_t h) {
   // Only one symmetry operation is possible.
   return make_c2_a(h);
+}
+
+template <>
+constexpr game_hash_t make_invariant<D6>(D6 op, game_hash_t h) {
+  return make_invariant_d6(op, h);
+}
+
+template <>
+constexpr game_hash_t make_invariant<D3>(D3 op, game_hash_t h) {
+  return make_invariant_d3(op, h);
+}
+
+template <>
+constexpr game_hash_t make_invariant<K4>(K4 op, game_hash_t h) {
+  return make_invariant_k4(op, h);
+}
+
+template <>
+constexpr game_hash_t make_invariant<C2>(C2 op, game_hash_t h) {
+  return make_invariant_c2(op, h);
+}
+
+template <>
+constexpr game_hash_t make_invariant<Trivial>(Trivial op, game_hash_t h) {
+  return h;
 }
 
 constexpr game_hash_t d6_r1(game_hash_t h) {

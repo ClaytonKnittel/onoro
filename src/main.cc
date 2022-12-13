@@ -157,7 +157,7 @@ class TranspositionTable {
 
  private:
   template <class SymmetryClassOp>
-  absl::optional<int32_t> tryFindSymmetries(onoro::Game<n_pawns> game,
+  absl::optional<int32_t> tryFindSymmetries(const onoro::Game<n_pawns>& game,
                                             SymmState symm_state) {
     typedef typename SymmetryClassOp::Group Group;
 

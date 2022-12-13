@@ -1,0 +1,21 @@
+name: Lint
+
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out Onoro
+      uses: actions/checkout@v2
+      with:
+        path: onoro
+        submodules: recursive
+    - name: Run clang-format
+      uses: DoozyX/clang-format-lint-action@v0.14
+      with:
+        source: './onoro'
+        exclude: './onoro/modules'
+        extensions: 'h,cc,proto'
+        clangFormatVersion: 14

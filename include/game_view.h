@@ -105,7 +105,7 @@ constexpr Group GameView<NPawns>::op() const {
 template <uint32_t NPawns>
 template <class Group>
 void GameView<NPawns>::setOp(Group op) {
-  hash_ = hash_group::apply<Group>(this->op<Group>().inverse() * op, hash_);
+  hash_ = hash_group::apply<Group>(op * this->op<Group>().inverse(), hash_);
   view_op_ordinal_ = op.ordinal();
 }
 

@@ -92,6 +92,16 @@ class Onoro:
         return new_pawn
     raise RuntimeError('game state\n' + str(self) + '\ncould not have come from\n' + str(diff))
 
+  def rotate_60(self) -> None:
+    self.pawns = [Pawn(x=pawn.x - pawn.y, y=pawn.x, black=pawn.black) for pawn in self.pawns]
+
+  def refl(self) -> None:
+    self.pawns = [Pawn(x=pawn.x - pawn.y, y=-pawn.y, black=pawn.black) for pawn in self.pawns]
+
+  def invert_colors(self) -> None:
+    self.pawns = [Pawn(x=pawn.x, y=pawn.y, black=not pawn.black) for pawn in self.pawns]
+    self.black_turn = not self.black_turn
+
   def __repr__(self, check_errors: bool = True, diff: Onoro = None) -> str:
     minx = min((pawn.x for pawn in self.pawns))
     maxx = max((pawn.x for pawn in self.pawns))

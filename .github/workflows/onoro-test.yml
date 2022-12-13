@@ -1,0 +1,75 @@
+name: Build and Unit Test
+
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      LD_LIBRARY_PATH: '/usr/local/lib'
+      PROTOBUF_VERSION: 21.11
+
+    steps:
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v1.12
+      with:
+        cmake-version: '3.22.1'
+    - name: install ubuntu dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y lsb-release wget
+    - name: Cache protobuf
+      id: cache-protobuf
+      uses: actions/cache@v2
+      env:
+        cache-name: protobuf
+      with:
+        path: protobuf-${{ env.PROTOBUF_VERSION }}
+        key: protobuf-${{ env.PROTOBUF_VERSION }}-${{ runner.os }}-v2
+    - name: Download protobuf
+      if: steps.cache-protobuf.outputs.cache-hit != 'true'
+      run: |
+        wget https://github.com/protocolbuffers/protobuf/releases/download/v${{ env.PROTOBUF_VERSION }}/protobuf-all-${{ env.PROTOBUF_VERSION }}.tar.gz
+        tar -xvf protobuf-all-${{ env.PROTOBUF_VERSION }}.tar.gz
+    - name: Build protobuf
+      id: build-protobuf
+      if: steps.cache-protobuf.outputs.cache-hit != 'true'
+      working-directory: protobuf-${{ env.PROTOBUF_VERSION }}
+      run: |
+        ./configure
+        make
+    - name: install protobuf
+      working-directory: protobuf-${{ env.PROTOBUF_VERSION }}
+      run: |
+        sudo make install
+    - name: Check out Onoro
+      uses: actions/checkout@v2
+      with:
+        path: onoro
+        submodules: recursive
+    - name: Initialize and Build
+      working-directory: onoro
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+        make
+    - name: Install python protobuf
+      run: |
+        python3 -m pip install protobuf
+    - name: Run test hash group
+      working-directory: onoro/build
+      run: |
+        ./test_hash_group
+    - name: Run test union find
+      working-directory: onoro/build
+      run: |
+        ./test_union_find
+    - name: Run test next moves
+      working-directory: onoro/build
+      run: |
+        make py_test_next_moves
+    - name: Run test symmetries
+      working-directory: onoro/build
+      run: |
+        make py_test_symm

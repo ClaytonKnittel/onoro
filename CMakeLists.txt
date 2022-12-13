@@ -41,7 +41,7 @@ set(ABSL_PROPAGATE_CXX_STD ON)
 ############################################################
 
 find_package(Protobuf REQUIRED)
-find_package(Python REQUIRED COMPONENTS Interpreter)
+find_package(Python3 REQUIRED COMPONENTS Development Interpreter)
 
 
 ############################################################
@@ -71,13 +71,34 @@ add_executable("onoro"
 )
 
 set(TEST_CXX_EXES "")
+set(PYTHON_MODULES "")
 
 # Add an executable for each test_*.cc file
 foreach(TEST_CXX_SRC IN LISTS TEST_CXX_SRC)
   string(REGEX REPLACE "^.+test_([^/]+)\.cc" "test_\\1" EXE_NAME ${TEST_CXX_SRC})
-  add_executable(${EXE_NAME}
-    ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
-  )
+
+  if (EXE_NAME MATCHES "_pylib$")
+    string(REGEX REPLACE "^(.+)_pylib$" "\\1" EXE_NAME ${EXE_NAME})
+    Python3_add_library(${EXE_NAME} SHARED
+      ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
+    )
+
+    set_property(TARGET ${EXE_NAME} PROPERTY OUTPUT_NAME ${EXE_NAME})
+    set_property(TARGET ${EXE_NAME} PROPERTY PREFIX "")
+    set_property(TARGET ${EXE_NAME} PROPERTY SUFFIX .so)
+
+    list(APPEND PYTHON_MODULES ${EXE_NAME})
+  elseif (EXE_NAME MATCHES "_lib$")
+    string(REGEX REPLACE "^(.+)_lib$" "\\1" EXE_NAME ${EXE_NAME})
+    add_library(${EXE_NAME} SHARED
+      ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
+    )
+  else()
+    add_executable(${EXE_NAME}
+      ${TEST_CXX_SRC} ${PROTO_GEN_SRCS} ${PROTO_GEN_HDRS}
+    )
+  endif()
+
   list(APPEND TEST_CXX_EXES ${EXE_NAME})
 endforeach()
 
@@ -95,24 +116,23 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 
+if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
+  enable_language(ASM)
+  if(CMAKE_ASM_COMPILER_WORKS)
+    set(can_use_assembler TRUE)
+  endif()
+endif()
+
+if(NOT can_use_assembler)
+  message(SEND_ERROR "No assembler found")
+endif()
+
 add_subdirectory(modules/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(modules/utils EXCLUDE_FROM_ALL)
 
 set(ONORO_EXE "onoro")
 
 foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
-
-  if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
-    enable_language(ASM)
-    if(CMAKE_ASM_COMPILER_WORKS)
-      set(can_use_assembler TRUE)
-    endif()
-  endif()
-
-  if(NOT can_use_assembler)
-    message(SEND_ERROR "No assembler found")
-  endif()
-
   target_compile_options(${EXE} PRIVATE
     $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:-Wpedantic -Wall -Wextra
     -Wno-unused-function -Wno-format -march=native -mtune=native>
@@ -151,16 +171,26 @@ foreach(EXE IN LISTS ONORO_EXE TEST_CXX_EXES)
     PRIVATE
       "/usr/local/include"
     PUBLIC
-      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/include>
-      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/abseil-cpp>
-      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${PROJECT_SOURCE_DIR}/modules/utils/include>
-      $<$<NOT:$<COMPILE_LANGUAGE:ASM>>:${CMAKE_CURRENT_BINARY_DIR}>
+      ${PROJECT_SOURCE_DIR}/include
+      ${PROJECT_SOURCE_DIR}/modules/abseil-cpp
+      ${PROJECT_SOURCE_DIR}/modules/utils/include
+      ${CMAKE_CURRENT_BINARY_DIR}
+      ${Protobuf_INCLUDE_DIRS}
   )
+
+  message("Protobuf include: ${Protobuf_INCLUDE_DIRS}")
 
   target_link_libraries(${EXE}
     PUBLIC
       "${LINK_LIBS}" absl::flat_hash_map absl::optional absl::statusor absl::str_format utils ${Protobuf_LIBRARIES}
   )
+
+  list(FIND PYTHON_MODULES ${EXE} IS_PYTHON_MODULE)
+  if (NOT ${IS_PYTHON_MODULE} EQUAL "-1")
+    target_link_libraries(${EXE}
+      PUBLIC Python3::Module
+    )
+  endif()
 
 endforeach()
 
@@ -177,16 +207,26 @@ add_custom_target("py"
 
 add_custom_command(
   TARGET "py"
-  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} python3 ${CMAKE_SOURCE_DIR}/pylib/init.py
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/init.py
 )
 
 add_custom_target("py_test_next_moves"
-  DEPENDS ${PROTO_GEN_PY} test_next_moves
+  DEPENDS ${PROTO_GEN_PY} test_next_moves_cc
   COMMENT "Compare next move generation between python and C++ implementations"
 )
 
 add_custom_command(
   TARGET "py_test_next_moves"
-  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} python3 ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_next_moves.py
+)
+
+add_custom_target("py_test_symm"
+  DEPENDS ${PROTO_GEN_PY} test_symmetries_cc
+  COMMENT "Compare symmetry checking between python and C++ implementations"
+)
+
+add_custom_command(
+  TARGET "py_test_symm"
+  COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pylib/test_eq_under_symm.py
 )
 
