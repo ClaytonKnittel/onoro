@@ -13,6 +13,8 @@ template <class SymmetryClassOp>
 static absl::StatusOr<bool> _doEqUnderSymmetries(onoro::Game<NPawns> game1,
                                                  onoro::Game<NPawns> game2) {
   typedef typename SymmetryClassOp::Group Group;
+  using SymmState = typename onoro::Game<NPawns>::BoardSymmetryState;
+
   onoro::GameEq<NPawns> games_eq;
   onoro::GameHash<NPawns> game_hash;
 
@@ -30,9 +32,24 @@ static absl::StatusOr<bool> _doEqUnderSymmetries(onoro::Game<NPawns> game1,
 
       if (games_eq(view1, game2)) {
         std::size_t h1_rot = onoro::hash_group::apply(view1.op<Group>(), h1);
-        if (h1_rot != h2) {
+        if (swap_colors) {
+          h1_rot = onoro::hash_group::color_swap(h1_rot);
+        }
+        if (h1_rot != view1.hash()) {
           return absl::InternalError(absl::StrFormat(
-              "Hashes are inequal, %016" PRIx64 " vs %016" PRIx64, h1_rot, h2));
+              "View hash is wrong, %016" PRIx64 " vs %016" PRIx64, view1.hash(),
+              h1_rot));
+        }
+
+        if (h1_rot != h2) {
+          SymmState s1 = game1.calcSymmetryState();
+
+          return absl::InternalError(absl::StrFormat(
+              "Hashes are inequal, %016" PRIx64 " vs %016" PRIx64
+              "\nGroup op: %s, color invert: %s, symm class: %d",
+              h1_rot, h2, view1.op<Group>().toString(),
+              view1.areColorsInverted() ? "true" : "false",
+              static_cast<int>(s1.symm_class)));
         }
         return true;
       }
