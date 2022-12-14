@@ -171,15 +171,15 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
       score = 1;
     } else {
       if (depth > 0) {
-        auto cached_score = m.find(g2);
+        // auto cached_score = m.find(g2);
 
-        if (cached_score.has_value()) {
-          g_n_hits++;
+        if (false /* && cached_score.has_value()*/) {
+          /*g_n_hits++;
 
-          score = *cached_score;
+          score = *cached_score;*/
         } else {
           g_n_misses++;
-          m.insert(g2);
+          // m.insert(g2);
 
           int32_t _score;
           if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
@@ -193,8 +193,8 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
           }
           score = std::min(-_score, 1);
 
-          g2.setScore(score);
-          m.insert_or_assign(std::move(g2));
+          // g2.setScore(score);
+          // m.insert_or_assign(std::move(g2));
         }
       } else {
         score = 0;
@@ -227,9 +227,9 @@ static int playout() {
   printf("%s\n", g.Print().c_str());
 
   TranspositionTable<n_pawns> m;
-  uint32_t max_depth = 16;
+  uint32_t max_depth = 8;
 
-  for (uint32_t i = 0; i < 1; i++) {
+  for (uint32_t i = 0; i < 12; i++) {
     clock_gettime(CLOCK_MONOTONIC, &start);
     int32_t score;
     P1Move p1_move;
