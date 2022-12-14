@@ -1,5 +1,5 @@
 
-#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 #include <absl/types/optional.h>
 #include <unistd.h>
 #include <utils/fun/print_csi.h>
@@ -8,6 +8,7 @@
 #include "game_eq.h"
 #include "game_hash.h"
 #include "game_view.h"
+#include "transposition_table.h"
 
 static constexpr uint32_t n_pawns = 16;
 static uint64_t g_n_moves = 0;
@@ -129,75 +130,6 @@ static int benchmark() {
   return 0;
 }
 
-class TranspositionTable {
-  using TableT =
-      absl::flat_hash_map<onoro::Game<n_pawns>, int32_t,
-                          onoro::GameHash<n_pawns>, onoro::GameEq<n_pawns>>;
-  using SymmState = typename Game<n_pawns>::BoardSymmetryState;
-
- public:
-  TranspositionTable() {}
-
-  absl::optional<int32_t> find(const onoro::Game<n_pawns>& game) {
-    SymmState s = game.calcSymmetryState();
-    SymmetryClassOpApplyAndReturn(s.symm_class, tryFindSymmetries, game, s);
-  }
-
-  void insert(const onoro::Game<n_pawns>& game, int32_t score) {
-    table_.insert({ game, score });
-  }
-
-  void insert_or_assign(const onoro::Game<n_pawns>& game, int32_t score) {
-    table_.insert_or_assign(game, score);
-  }
-
-  const TableT& table() const {
-    return table_;
-  }
-
- private:
-  template <class SymmetryClassOp>
-  absl::optional<int32_t> tryFindSymmetries(const onoro::Game<n_pawns>& game,
-                                            SymmState symm_state) {
-    typedef typename SymmetryClassOp::Group Group;
-
-    // printf("%s\n", view.game().Print().c_str());
-    onoro::GameView<n_pawns> view(&game);
-
-    for (bool swap_colors : { false, true }) {
-      (void) swap_colors;
-
-      for (uint32_t op_ord = 0; op_ord < Group::order(); op_ord++) {
-        Group op(op_ord);
-        view.setOp(op);
-        // printf("hash: %s\n",
-        //        GameHash<n_pawns>::printC2Hash(view.hash()).c_str());
-
-        auto it = table_.find(view);
-        if (it != table_.end()) {
-          /*printf("Found under %s (%s) (%s)!\n", op.toString().c_str(),
-                 swap_colors ? "swapped" : "not swapped",
-                 symm_state.op.toString().c_str());
-          printf("\n");*/
-          return it->second * (view.areColorsInverted() ? -1 : 1);
-          /*} else {
-            printf("Didn't find under %s (%s) (%s)!\n", op.toString().c_str(),
-                   swap_colors ? "swapped" : "not swapped",
-                   symm_state.op.toString().c_str());*/
-        }
-      }
-
-      view.invertColors();
-    }
-    // printf("\n");
-
-    return {};
-  }
-
- private:
-  TableT table_;
-};
-
 /*
  * Returns a chosen move along with the expected outcome, in terms of the
  * player to go. I.e., +1 = current player wins, 0 = tie, -1 = current player
@@ -205,8 +137,8 @@ class TranspositionTable {
  */
 template <uint32_t NPawns, class MoveClass>
 static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
-                                              TranspositionTable& m, int depth,
-                                              int32_t alpha = -3,
+                                              TranspositionTable<NPawns>& m,
+                                              int depth, int32_t alpha = -3,
                                               int32_t beta = 3) {
   int32_t best_score = -2;
   MoveClass best_move;
@@ -247,7 +179,7 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
           score = *cached_score;
         } else {
           g_n_misses++;
-          m.insert(g2, 0);
+          m.insert(g2);
 
           int32_t _score;
           if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
@@ -261,7 +193,8 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
           }
           score = std::min(-_score, 1);
 
-          m.insert_or_assign(std::move(g2), score);
+          g2.setScore(score);
+          m.insert_or_assign(std::move(g2));
         }
       } else {
         score = 0;
@@ -293,7 +226,7 @@ static int playout() {
 
   printf("%s\n", g.Print().c_str());
 
-  TranspositionTable m;
+  TranspositionTable<n_pawns> m;
   uint32_t max_depth = 16;
 
   for (uint32_t i = 0; i < 1; i++) {

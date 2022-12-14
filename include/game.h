@@ -477,6 +477,11 @@ class Game {
 
   GameState state_;
 
+  /*
+   * Optional: can store the game score here to save space.
+   */
+  int8_t score_;
+
   // Sum of all HexPos's of pieces on the board
   HexPos16 sum_of_mass_;
 
@@ -525,6 +530,14 @@ class Game {
   // calls cb with arguments to : idx_t, from : idx_t
   template <class CallbackFnT>
   bool forEachMoveP2(CallbackFnT cb) const;
+
+  int32_t getScore() const;
+
+  /*
+   * Technically not const, but doesn't modify the game state in any way, it
+   * just setting an auxiliary field.
+   */
+  void setScore(int32_t score) const;
 
   BoardSymmetryState calcSymmetryState() const;
 
@@ -696,7 +709,7 @@ constexpr std::pair<idx_t, HexPos> Game<NPawns, Hash>::calcMoveShift(
 // white is effectively first to make a choice.
 template <uint32_t NPawns, typename Hash>
 Game<NPawns, Hash>::Game()
-    : state_({ 0xfu, 1, 0, 0, 0 }), sum_of_mass_{ 0, 0 } {
+    : state_({ 0xfu, 1, 0, 0, 0 }), score_(0), sum_of_mass_{ 0, 0 } {
   static_assert(NPawns <= 2 * max_pawns_per_player);
 
   for (uint32_t i = 0; i < NPawns; i++) {
@@ -734,6 +747,7 @@ template <uint32_t NPawns, typename Hash>
 Game<NPawns, Hash>::Game(const Game<NPawns, Hash>& g, P1Move move)
     : pawn_poses_(g.pawn_poses_),
       state_(g.state_),
+      score_(0),
       sum_of_mass_(g.sum_of_mass_) {
   appendTile(move.loc);
 
@@ -748,6 +762,7 @@ template <uint32_t NPawns, typename Hash>
 Game<NPawns, Hash>::Game(const Game& g, P2Move move)
     : pawn_poses_(g.pawn_poses_),
       state_(g.state_),
+      score_(0),
       sum_of_mass_(g.sum_of_mass_) {
   moveTile(move.to, move.from_idx);
 
@@ -1597,6 +1612,16 @@ bool Game<NPawns, Hash>::forEachMoveP2(CallbackFnT cb) const {
   }
 
   return true;
+}
+
+template <uint32_t NPawns, typename Hash>
+int32_t Game<NPawns, Hash>::getScore() const {
+  return static_cast<int32_t>(score_);
+}
+
+template <uint32_t NPawns, typename Hash>
+void Game<NPawns, Hash>::setScore(int32_t score) const {
+  const_cast<Game*>(this)->score_ = static_cast<int8_t>(score);
 }
 
 template <uint32_t NPawns, typename Hash>
