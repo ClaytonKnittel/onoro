@@ -65,6 +65,10 @@ jobs:
       working-directory: onoro/build
       run: |
         ./test_union_find
+    - name: Run transposition table
+      working-directory: onoro/build
+      run: |
+        ./test_transposition_table
     - name: Run test next moves
       working-directory: onoro/build
       run: |

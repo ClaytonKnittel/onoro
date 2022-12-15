@@ -1,7 +1,9 @@
 #pragma once
 
-#include "absl/status/statusor.h"
-#include "absl/strings/str_format.h"
+#include <absl/container/flat_hash_set.h>
+#include <absl/status/statusor.h>
+#include <absl/strings/str_format.h>
+
 #include "game.h"
 
 namespace onoro {
@@ -19,6 +21,10 @@ class TranspositionTable {
   absl::optional<int32_t> find(const onoro::Game<NPawns>& game) {
     SymmState s = game.calcSymmetryState();
     SymmetryClassOpApplyAndReturn(s.symm_class, tryFindSymmetries, game, s);
+  }
+
+  void clear() {
+    table_.clear();
   }
 
   void insert(const onoro::Game<NPawns>& game) {
@@ -60,7 +66,7 @@ class TranspositionTable {
                  swap_colors ? "swapped" : "not swapped",
                  symm_state.op.toString().c_str());
           printf("\n");*/
-          return it->getScore() * (view.areColorsInverted() ? -1 : 1);
+          return it->getScore();
           /*} else {
             printf("Didn't find under %s (%s) (%s)!\n", op.toString().c_str(),
                    swap_colors ? "swapped" : "not swapped",
