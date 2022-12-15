@@ -278,11 +278,13 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
 static int playout() {
   struct timespec start, end;
   onoro::Game<n_pawns> g;
+  onoro::Game<n_pawns> prev;
 
   printf("Game size: %zu bytes\n", sizeof(onoro::Game<n_pawns>));
   printf("Game view size: %zu bytes\n", sizeof(onoro::GameView<n_pawns>));
 
   printf("%s\n", g.Print().c_str());
+  prev = g;
 
   TranspositionTable<n_pawns> m;
   uint32_t max_depth = 9;
@@ -339,12 +341,14 @@ static int playout() {
     } else {
       g = onoro::Game<n_pawns>(g, p1_move);
     }
-    printf("%s\n", g.Print().c_str());
+    printf("%s\n", g.PrintDiff(prev).c_str());
 
     if (g.isFinished()) {
       printf("%s won\n", g.blackWins() ? "black" : "white");
       break;
     }
+
+    prev = g;
   }
 
   /*

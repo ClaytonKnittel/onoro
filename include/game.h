@@ -417,6 +417,7 @@ class Game {
   Game(const Game&) = default;
   Game(Game&&) = default;
 
+  Game& operator=(const Game&) = default;
   Game& operator=(Game&&) = default;
 
   // Make a move
@@ -426,6 +427,7 @@ class Game {
   Game(const Game&, P2Move move);
 
   std::string Print() const;
+  std::string PrintDiff(const Game<NPawns, Hash>& other) const;
   std::string Print2() const;
   onoro::proto::GameState SerializeState() const;
 
@@ -797,6 +799,83 @@ std::string Game<NPawns, Hash>::Print() const {
     }
   }
   return ostr.str();
+}
+
+template <uint32_t NPawns, typename Hash>
+std::string Game<NPawns, Hash>::PrintDiff(
+    const Game<NPawns, Hash>& other) const {
+  static const char tile_str[3] = {
+    '.',
+    'B',
+    'W',
+  };
+
+  HexPos bl_corner = { NPawns, NPawns };
+  HexPos bl_corner_other = { NPawns, NPawns };
+
+  forEachPawn([&bl_corner](idx_t idx) {
+    HexPos pos = idxToPos(idx);
+
+    bl_corner = { std::min(pos.x, bl_corner.x), std::min(pos.y, bl_corner.y) };
+    return true;
+  });
+
+  other.forEachPawn([&bl_corner_other](idx_t idx) {
+    HexPos pos = idxToPos(idx);
+
+    bl_corner_other = { std::min(pos.x, bl_corner_other.x),
+                        std::min(pos.y, bl_corner_other.y) };
+    return true;
+  });
+
+  // Technically there are some cases where this isn't enough to disambiguate
+  // where a move was made to, but those are rare so we can ignore them.
+  for (HexPos off : (HexPos[]){ { 0, 0 },
+                                { 1, 0 },
+                                { 1, 1 },
+                                { 0, 1 },
+                                { -1, 0 },
+                                { -1, -1 },
+                                { 0, -1 } }) {
+    uint32_t n_missing = 0;
+    uint32_t n_new = 0;
+    std::ostringstream ostr;
+    for (uint32_t y = getBoardWidth() - 1; y < getBoardWidth(); y--) {
+      ostr << std::setw(getBoardWidth() - 1 - y) << "";
+
+      for (uint32_t x = 0; x < getBoardWidth(); x++) {
+        idx_t trans =
+            posToIdx(idxToPos(idx_t(x, y)) - bl_corner + bl_corner_other + off);
+        TileState other_tile = other.getTile(trans);
+        TileState tile = getTile(idx_t(x, y));
+
+        if (other_tile != TileState::TILE_EMPTY &&
+            tile == TileState::TILE_EMPTY) {
+          n_missing++;
+          ostr << P_RED;
+        } else if (other_tile == TileState::TILE_EMPTY &&
+                   tile != TileState::TILE_EMPTY) {
+          n_new++;
+          ostr << P_GREEN;
+        }
+
+        ostr << tile_str[static_cast<int>(tile)] << P_DEFAULT;
+        if (x < getBoardWidth() - 1) {
+          ostr << " ";
+        }
+      }
+
+      if (y > 0) {
+        ostr << "\n";
+      }
+    }
+
+    if (n_missing > 1 || n_new != 1) {
+      continue;
+    }
+    return ostr.str();
+  }
+  return "ERROR: no way to get between those two game states in one move!";
 }
 
 template <uint32_t NPawns, typename Hash>
