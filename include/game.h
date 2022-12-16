@@ -150,8 +150,7 @@ class Game {
  public:
   enum class TileState {
     TILE_EMPTY = 0,
-    TILE_BLACK = 1,
-    TILE_WHITE = 2,
+    TILE_PAWN = 1,
   };
 
   struct BoardSymmetryState {
@@ -777,10 +776,9 @@ Game<NPawns, Hash>::Game(const Game& g, P2Move move)
 
 template <uint32_t NPawns, typename Hash>
 std::string Game<NPawns, Hash>::Print() const {
-  static const char tile_str[3] = {
+  static const char tile_str[2] = {
     '.',
-    'B',
-    'W',
+    'P',
   };
 
   std::ostringstream ostr;
@@ -804,10 +802,9 @@ std::string Game<NPawns, Hash>::Print() const {
 template <uint32_t NPawns, typename Hash>
 std::string Game<NPawns, Hash>::PrintDiff(
     const Game<NPawns, Hash>& other) const {
-  static const char tile_str[3] = {
+  static const char tile_str[2] = {
     '.',
-    'B',
-    'W',
+    'P',
   };
 
   HexPos bl_corner = { NPawns, NPawns };
@@ -880,10 +877,9 @@ std::string Game<NPawns, Hash>::PrintDiff(
 
 template <uint32_t NPawns, typename Hash>
 std::string Game<NPawns, Hash>::Print2() const {
-  static const char* tile_str[3] = {
+  static const char* tile_str[2] = {
     P_256_BG_COLOR(7),
     P_256_BG_COLOR(4),
-    P_256_BG_COLOR(1),
   };
 
   HexPos origin = originTile(calcSymmetryState());
@@ -1043,6 +1039,8 @@ absl::StatusOr<Game<NPawns, Hash>> Game<NPawns, Hash>::LoadState(
 
 template <uint32_t NPawns, typename Hash>
 bool Game<NPawns, Hash>::validate() const {
+  return true;
+  /*
   uint32_t n_b_pawns = 0;
   uint32_t n_w_pawns = 0;
   HexPos sum_of_mass = { 0, 0 };
@@ -1108,6 +1106,7 @@ bool Game<NPawns, Hash>::validate() const {
   }
 
   return true;
+  */
 }
 
 template <uint32_t NPawns, typename Hash>
@@ -1290,6 +1289,8 @@ void Game<NPawns, Hash>::moveTile(idx_t pos, uint32_t i) {
 
 template <uint32_t NPawns, typename Hash>
 bool Game<NPawns, Hash>::checkWin(idx_t last_move) const {
+  return false;
+  /*
   // Check for a win in all 3 directions
   HexPos last_move_pos = idxToPos(last_move);
 
@@ -1329,6 +1330,7 @@ bool Game<NPawns, Hash>::checkWin(idx_t last_move) const {
   s = (s & (s << 1));
 
   return s != 0;
+  */
 }
 
 template <uint32_t NPawns, typename Hash>
@@ -1409,17 +1411,16 @@ typename Game<NPawns, Hash>::TileState Game<NPawns, Hash>::getTile(
     uint64_t zero_mask = (xor_search - UINT64_C(0x0101010101010101)) &
                          ~xor_search & UINT64_C(0x8080808080808080);
     if (zero_mask != 0) {
-      uint32_t set_bit_idx = __builtin_ctzl(zero_mask);
+      // uint32_t set_bit_idx = __builtin_ctzl(zero_mask);
       // Black has the even indices, white has the odd.
-      return ((set_bit_idx / 8) & 0x1) ? TileState::TILE_WHITE
-                                       : TileState::TILE_BLACK;
+      return TileState::TILE_PAWN;
     }
   }
 
   // only necessary if NPawns not a multiple of eight
   for (i = 8 * i; i < NPawns; i++) {
     if (this->pawn_poses_[i] == idx) {
-      return (i & 0x1) ? TileState::TILE_WHITE : TileState::TILE_BLACK;
+      return TileState::TILE_PAWN;
     }
   }
 
@@ -1555,8 +1556,7 @@ bool Game<NPawns, Hash>::forEachMoveP2(CallbackFnT cb) const {
   });
 
   // Another pass to enumerate all moves
-  for (color_pawn_iterator it = color_pawns_begin(blackTurn());
-       it != color_pawns_end(blackTurn()); ++it) {
+  for (pawn_iterator it = pawns_begin(); it != pawns_end(); ++it) {
     UnionFind<uint32_t> uf(getBoardSize());
 
     idx_t next_idx = *it;

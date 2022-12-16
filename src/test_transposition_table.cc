@@ -21,19 +21,13 @@ bool eqUnderSymmT(const onoro::Game<n_pawns>& game1,
 
   onoro::GameEq<n_pawns> games_eq;
 
-  for (bool swap_colors : { false, true }) {
-    (void) swap_colors;
+  for (uint32_t op_ord = 0; op_ord < Group::order(); op_ord++) {
+    Group op(op_ord);
+    view1.setOp(op);
 
-    for (uint32_t op_ord = 0; op_ord < Group::order(); op_ord++) {
-      Group op(op_ord);
-      view1.setOp(op);
-
-      if (games_eq(view1, game2)) {
-        return true;
-      }
+    if (games_eq(view1, game2)) {
+      return true;
     }
-
-    view1.invertColors();
   }
 
   return false;

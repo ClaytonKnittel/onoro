@@ -81,8 +81,6 @@ static constexpr game_hash_t k4_c(game_hash_t h);
 
 static constexpr game_hash_t c2_a(game_hash_t h);
 
-static constexpr game_hash_t color_swap(game_hash_t h);
-
 /*
  * Given a hash, compresses it to make it invariant under the corresponding
  * group operation.
@@ -487,13 +485,6 @@ constexpr game_hash_t k4_c(game_hash_t h) {
 
 constexpr game_hash_t c2_a(game_hash_t h) {
   return (h << 32) | (h >> 32);
-}
-
-constexpr game_hash_t color_swap(game_hash_t h) {
-  game_hash_t hl = h & UINT64_C(0x5555555555555555);
-  game_hash_t hr = h & UINT64_C(0xaaaaaaaaaaaaaaaa);
-
-  return (hl << 1) | (hr >> 1);
 }
 
 constexpr game_hash_t make_d6_r1(game_hash_t h) {

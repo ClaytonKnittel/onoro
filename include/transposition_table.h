@@ -51,30 +51,24 @@ class TranspositionTable {
     // printf("%s\n", view.game().Print().c_str());
     onoro::GameView<NPawns> view(&game);
 
-    for (bool swap_colors : { false, true }) {
-      (void) swap_colors;
+    for (uint32_t op_ord = 0; op_ord < Group::order(); op_ord++) {
+      Group op(op_ord);
+      view.setOp(op);
+      // printf("hash: %s\n",
+      //        GameHash<NPawns>::printC2Hash(view.hash()).c_str());
 
-      for (uint32_t op_ord = 0; op_ord < Group::order(); op_ord++) {
-        Group op(op_ord);
-        view.setOp(op);
-        // printf("hash: %s\n",
-        //        GameHash<NPawns>::printC2Hash(view.hash()).c_str());
-
-        auto it = table_.find(view);
-        if (it != table_.end()) {
-          /*printf("Found under %s (%s) (%s)!\n", op.toString().c_str(),
+      auto it = table_.find(view);
+      if (it != table_.end()) {
+        /*printf("Found under %s (%s) (%s)!\n", op.toString().c_str(),
+               swap_colors ? "swapped" : "not swapped",
+               symm_state.op.toString().c_str());
+        printf("\n");*/
+        return it->getScore();
+        /*} else {
+          printf("Didn't find under %s (%s) (%s)!\n", op.toString().c_str(),
                  swap_colors ? "swapped" : "not swapped",
-                 symm_state.op.toString().c_str());
-          printf("\n");*/
-          return it->getScore();
-          /*} else {
-            printf("Didn't find under %s (%s) (%s)!\n", op.toString().c_str(),
-                   swap_colors ? "swapped" : "not swapped",
-                   symm_state.op.toString().c_str());*/
-        }
+                 symm_state.op.toString().c_str());*/
       }
-
-      view.invertColors();
     }
     // printf("\n");
 

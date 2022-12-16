@@ -50,8 +50,6 @@ bool GameEq<NPawns>::compareViews(
   const Game<NPawns>& g1 = view1.game();
   const Game<NPawns>& g2 = view2.game();
 
-  bool same_color = !(view1.areColorsInverted() ^ view2.areColorsInverted());
-
   if (s1.symm_class != s2.symm_class) {
     // printf("DIFF SYMM CLASSES!\n");
     return false;
@@ -60,11 +58,6 @@ bool GameEq<NPawns>::compareViews(
   if (g1.nPawnsInPlay() != g2.nPawnsInPlay()) {
     // printf("DIF N PAWNS IN PLAY!!!!! %u vs %u\n", g1.nPawnsInPlay(),
     //        g2.nPawnsInPlay());
-    return false;
-  }
-
-  if (!(g1.blackTurn() ^ g2.blackTurn() ^ same_color)) {
-    // printf("NOT SAME PLAYERS TURN NOEW!!!!!!!\n");
     return false;
   }
 
@@ -82,33 +75,33 @@ bool GameEq<NPawns>::compareViews(
   D6 canon1 = s1.op;
   D6 decanon2 = s2.op.inverse();
 
-  return g1.forEachPawn([&g1, &g2, same_color, to_view1, origin1, origin2,
-                         canon1, decanon2](idx_t idx) {
-    HexPos p2 = (Game<NPawns>::idxToPos(idx) - origin1).apply_d6_c(canon1);
-    // printf("p2 from (%d, %d) to ", p2.x, p2.y);
-    p2 = SymmetryClassOp::apply_fn(p2, to_view1);
-    // printf("(%d, %d) after applying %s\n", p2.x, p2.y,
-    //        to_view1.toString().c_str());
-    idx_t idx2 = Game<NPawns>::posToIdx(p2.apply_d6_c(decanon2) + origin2);
+  return g1.forEachPawn(
+      [&g2, to_view1, origin1, origin2, canon1, decanon2](idx_t idx) {
+        HexPos p2 = (Game<NPawns>::idxToPos(idx) - origin1).apply_d6_c(canon1);
+        // printf("p2 from (%d, %d) to ", p2.x, p2.y);
+        p2 = SymmetryClassOp::apply_fn(p2, to_view1);
+        // printf("(%d, %d) after applying %s\n", p2.x, p2.y,
+        //        to_view1.toString().c_str());
+        idx_t idx2 = Game<NPawns>::posToIdx(p2.apply_d6_c(decanon2) + origin2);
 
-    // printf("Pos (%d, %d) translated to (%d, %d)\n", idx.x(), idx.y(),
-    // idx2.x(),
-    //        idx2.y());
+        // printf("Pos (%d, %d) translated to (%d, %d)\n", idx.x(), idx.y(),
+        // idx2.x(),
+        //        idx2.y());
 
-    if (g2.getTile(idx2) == Game<NPawns>::TileState::TILE_EMPTY) {
-      // printf("EMPTY TILE!!!\n");
-      return false;
-    }
+        if (g2.getTile(idx2) == Game<NPawns>::TileState::TILE_EMPTY) {
+          // printf("EMPTY TILE!!!\n");
+          return false;
+        }
 
-    // printf("Colors same? %s\n", same_color ? "true" : "False");
-    // printf("Tile 1: %d\n", g1.getTile(idx));
-    // printf("Tile 2: %d\n", g2.getTile(idx2));
-    // if (!bool((g1.getTile(idx) != g2.getTile(idx2)) ^ same_color)) {
-    //   printf("UNEQUAL TILES!!!!\n");
-    // }
+        // printf("Colors same? %s\n", same_color ? "true" : "False");
+        // printf("Tile 1: %d\n", g1.getTile(idx));
+        // printf("Tile 2: %d\n", g2.getTile(idx2));
+        // if (!bool((g1.getTile(idx) != g2.getTile(idx2)) ^ same_color)) {
+        //   printf("UNEQUAL TILES!!!!\n");
+        // }
 
-    return bool((g1.getTile(idx) != g2.getTile(idx2)) ^ same_color);
-  });
+        return true;
+      });
 }
 
 }  // namespace onoro

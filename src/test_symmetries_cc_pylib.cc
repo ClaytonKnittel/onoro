@@ -23,40 +23,30 @@ static absl::StatusOr<bool> _doEqUnderSymmetries(onoro::Game<NPawns> game1,
   std::size_t h1 = game_hash(game1);
   std::size_t h2 = game_hash(game2);
 
-  for (bool swap_colors : { false, true }) {
-    (void) swap_colors;
+  for (uint32_t op_ord = 0; op_ord < Group::order(); op_ord++) {
+    Group op(op_ord);
+    view1.setOp(op);
 
-    for (uint32_t op_ord = 0; op_ord < Group::order(); op_ord++) {
-      Group op(op_ord);
-      view1.setOp(op);
+    if (games_eq(view1, game2)) {
+      std::size_t h1_rot = onoro::hash_group::apply(view1.op<Group>(), h1);
 
-      if (games_eq(view1, game2)) {
-        std::size_t h1_rot = onoro::hash_group::apply(view1.op<Group>(), h1);
-        if (swap_colors) {
-          h1_rot = onoro::hash_group::color_swap(h1_rot);
-        }
-
-        if (h1_rot != view1.hash()) {
-          return absl::InternalError(absl::StrFormat(
-              "View hash is wrong, %016" PRIx64 " vs %016" PRIx64, view1.hash(),
-              h1_rot));
-        }
-
-        if (h1_rot != h2) {
-          SymmState s1 = game1.calcSymmetryState();
-
-          return absl::InternalError(absl::StrFormat(
-              "Hashes are inequal, %016" PRIx64 " vs %016" PRIx64
-              "\nGroup op: %s, color invert: %s, symm class: %d",
-              h1_rot, h2, view1.op<Group>().toString(),
-              view1.areColorsInverted() ? "true" : "false",
-              static_cast<int>(s1.symm_class)));
-        }
-        return true;
+      if (h1_rot != view1.hash()) {
+        return absl::InternalError(
+            absl::StrFormat("View hash is wrong, %016" PRIx64 " vs %016" PRIx64,
+                            view1.hash(), h1_rot));
       }
-    }
 
-    view1.invertColors();
+      if (h1_rot != h2) {
+        SymmState s1 = game1.calcSymmetryState();
+
+        return absl::InternalError(
+            absl::StrFormat("Hashes are inequal, %016" PRIx64 " vs %016" PRIx64
+                            "\nGroup op: %s, symm class: %d",
+                            h1_rot, h2, view1.op<Group>().toString(),
+                            static_cast<int>(s1.symm_class)));
+      }
+      return true;
+    }
   }
 
   return false;

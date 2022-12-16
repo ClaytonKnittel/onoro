@@ -61,14 +61,10 @@ class GameHash {
  private:
   struct HashEl {
     // hash to use for black pawn in this tile.
-    game_hash_t black_hash_;
+    game_hash_t pawn_hash_;
 
-    constexpr game_hash_t black_hash() const {
-      return black_hash_;
-    }
-
-    constexpr game_hash_t white_hash() const {
-      return color_swap(black_hash_);
+    constexpr game_hash_t pawn_hash() const {
+      return pawn_hash_;
     }
   };
 
@@ -192,7 +188,7 @@ constexpr game_hash_t GameHash<NPawns>::calcHash(
   const SymmTable& hash_table = getHashTable(symm_state.symm_class);
 
   game_hash_t h = 0;
-  game.forEachPawn([&game, &h, symm_state, origin, hash_table](idx_t pawn_idx) {
+  game.forEachPawn([&h, symm_state, origin, hash_table](idx_t pawn_idx) {
     HexPos pawn_pos = Game<NPawns>::idxToPos(pawn_idx);
 
     // printf("Trans (%d, %d) -> ", (pawn_pos - origin).x, (pawn_pos -
@@ -208,17 +204,14 @@ constexpr game_hash_t GameHash<NPawns>::calcHash(
     printf("hash: %s\n", printD3Hash(hash_el.black_hash()).c_str());
     */
 
-    if (game.getTile(pawn_idx) == Game<NPawns>::TileState::TILE_BLACK) {
-      h = h ^ hash_el.black_hash();
-    } else {
-      h = h ^ hash_el.white_hash();
-    }
+    h = h ^ hash_el.pawn_hash();
     return true;
   });
 
   return h;
 }
 
+/*
 template <uint32_t NPawns>
 bool GameHash<NPawns>::validate() const {
   for (uint32_t i = 0; i < getSymmTableSize(); i++) {
@@ -460,6 +453,7 @@ bool GameHash<NPawns>::validate() const {
   }
   return true;
 }
+*/
 
 template <uint32_t NPawns>
 std::string GameHash<NPawns>::printD6Hash(game_hash_t h) {
@@ -630,7 +624,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
 
       if (symmTableShouldReuseTile(i, s)) {
         const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
-        table[i] = { apply_d6(op, el.black_hash()) };
+        table[i] = { apply_d6(op, el.pawn_hash()) };
         found_hash = true;
         break;
       }
@@ -653,7 +647,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD6Table() {
 
       if (symmTableShouldReuseTile(i, s)) {
         const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
-        table[i] = { apply_d6(op, el.black_hash()) };
+        table[i] = { apply_d6(op, el.pawn_hash()) };
         found_hash = true;
         break;
       }
@@ -696,7 +690,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
 
       if (symmTableShouldReuseTile(i, s)) {
         const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
-        table[i] = { apply_d3(op, el.black_hash()) };
+        table[i] = { apply_d3(op, el.pawn_hash()) };
         found_hash = true;
         break;
       }
@@ -719,7 +713,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initD3Table() {
 
       if (symmTableShouldReuseTile(i, s)) {
         const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
-        table[i] = { apply_d3(op, el.black_hash()) };
+        table[i] = { apply_d3(op, el.pawn_hash()) };
         found_hash = true;
         break;
       }
@@ -758,7 +752,7 @@ constexpr typename GameHash<NPawns>::SymmTable GameHash<NPawns>::initK4Table() {
 
       if (symmTableShouldReuseTile(i, s)) {
         const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
-        table[i] = { apply_k4(op, el.black_hash()) };
+        table[i] = { apply_k4(op, el.pawn_hash()) };
         found_hash = true;
         break;
       }
@@ -809,7 +803,7 @@ GameHash<NPawns>::initC2CVTable() {
       table[i] = { make_invariant_c2(C2(1), c2cvb) };
     } else if (symmTableShouldReuseTile(i, s)) {
       const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
-      table[i] = { apply_c2(C2(1), el.black_hash()) };
+      table[i] = { apply_c2(C2(1), el.pawn_hash()) };
     } else {
       table[i] = { c2cvb };
     }
@@ -839,7 +833,7 @@ GameHash<NPawns>::initC2CETable() {
       table[i] = { make_invariant_c2(C2(1), c2ceb) };
     } else if (symmTableShouldReuseTile(i, s)) {
       const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
-      table[i] = { apply_c2(C2(1), el.black_hash()) };
+      table[i] = { apply_c2(C2(1), el.pawn_hash()) };
     } else {
       table[i] = { c2ceb };
     }
@@ -869,7 +863,7 @@ GameHash<NPawns>::initC2EVTable() {
       table[i] = { make_invariant_c2(C2(1), c2evb) };
     } else if (symmTableShouldReuseTile(i, s)) {
       const HashEl& el = table[fromIdx(posToIdx(s + getCenter()))];
-      table[i] = { apply_c2(C2(1), el.black_hash()) };
+      table[i] = { apply_c2(C2(1), el.pawn_hash()) };
     } else {
       table[i] = { c2evb };
     }
