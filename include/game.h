@@ -417,6 +417,7 @@ class Game {
   Game(const Game&) = default;
   Game(Game&&) = default;
 
+  Game& operator=(const Game&) = default;
   Game& operator=(Game&&) = default;
 
   // Make a move
@@ -426,6 +427,7 @@ class Game {
   Game(const Game&, P2Move move);
 
   std::string Print() const;
+  std::string PrintDiff(const Game<NPawns, Hash>& other) const;
   std::string Print2() const;
   onoro::proto::GameState SerializeState() const;
 
@@ -477,6 +479,11 @@ class Game {
 
   GameState state_;
 
+  /*
+   * Optional: can store the game score here to save space.
+   */
+  int8_t score_;
+
   // Sum of all HexPos's of pieces on the board
   HexPos16 sum_of_mass_;
 
@@ -525,6 +532,14 @@ class Game {
   // calls cb with arguments to : idx_t, from : idx_t
   template <class CallbackFnT>
   bool forEachMoveP2(CallbackFnT cb) const;
+
+  int32_t getScore() const;
+
+  /*
+   * Technically not const, but doesn't modify the game state in any way, it
+   * just setting an auxiliary field.
+   */
+  void setScore(int32_t score) const;
 
   BoardSymmetryState calcSymmetryState() const;
 
@@ -696,7 +711,7 @@ constexpr std::pair<idx_t, HexPos> Game<NPawns, Hash>::calcMoveShift(
 // white is effectively first to make a choice.
 template <uint32_t NPawns, typename Hash>
 Game<NPawns, Hash>::Game()
-    : state_({ 0xfu, 1, 0, 0, 0 }), sum_of_mass_{ 0, 0 } {
+    : state_({ 0xfu, 1, 0, 0, 0 }), score_(0), sum_of_mass_{ 0, 0 } {
   static_assert(NPawns <= 2 * max_pawns_per_player);
 
   for (uint32_t i = 0; i < NPawns; i++) {
@@ -734,6 +749,7 @@ template <uint32_t NPawns, typename Hash>
 Game<NPawns, Hash>::Game(const Game<NPawns, Hash>& g, P1Move move)
     : pawn_poses_(g.pawn_poses_),
       state_(g.state_),
+      score_(0),
       sum_of_mass_(g.sum_of_mass_) {
   appendTile(move.loc);
 
@@ -748,6 +764,7 @@ template <uint32_t NPawns, typename Hash>
 Game<NPawns, Hash>::Game(const Game& g, P2Move move)
     : pawn_poses_(g.pawn_poses_),
       state_(g.state_),
+      score_(0),
       sum_of_mass_(g.sum_of_mass_) {
   moveTile(move.to, move.from_idx);
 
@@ -782,6 +799,83 @@ std::string Game<NPawns, Hash>::Print() const {
     }
   }
   return ostr.str();
+}
+
+template <uint32_t NPawns, typename Hash>
+std::string Game<NPawns, Hash>::PrintDiff(
+    const Game<NPawns, Hash>& other) const {
+  static const char tile_str[3] = {
+    '.',
+    'B',
+    'W',
+  };
+
+  HexPos bl_corner = { NPawns, NPawns };
+  HexPos bl_corner_other = { NPawns, NPawns };
+
+  forEachPawn([&bl_corner](idx_t idx) {
+    HexPos pos = idxToPos(idx);
+
+    bl_corner = { std::min(pos.x, bl_corner.x), std::min(pos.y, bl_corner.y) };
+    return true;
+  });
+
+  other.forEachPawn([&bl_corner_other](idx_t idx) {
+    HexPos pos = idxToPos(idx);
+
+    bl_corner_other = { std::min(pos.x, bl_corner_other.x),
+                        std::min(pos.y, bl_corner_other.y) };
+    return true;
+  });
+
+  // Technically there are some cases where this isn't enough to disambiguate
+  // where a move was made to, but those are rare so we can ignore them.
+  for (HexPos off : (HexPos[]){ { 0, 0 },
+                                { 1, 0 },
+                                { 1, 1 },
+                                { 0, 1 },
+                                { -1, 0 },
+                                { -1, -1 },
+                                { 0, -1 } }) {
+    uint32_t n_missing = 0;
+    uint32_t n_new = 0;
+    std::ostringstream ostr;
+    for (uint32_t y = getBoardWidth() - 1; y < getBoardWidth(); y--) {
+      ostr << std::setw(getBoardWidth() - 1 - y) << "";
+
+      for (uint32_t x = 0; x < getBoardWidth(); x++) {
+        idx_t trans =
+            posToIdx(idxToPos(idx_t(x, y)) - bl_corner + bl_corner_other + off);
+        TileState other_tile = other.getTile(trans);
+        TileState tile = getTile(idx_t(x, y));
+
+        if (other_tile != TileState::TILE_EMPTY &&
+            tile == TileState::TILE_EMPTY) {
+          n_missing++;
+          ostr << P_RED;
+        } else if (other_tile == TileState::TILE_EMPTY &&
+                   tile != TileState::TILE_EMPTY) {
+          n_new++;
+          ostr << P_GREEN;
+        }
+
+        ostr << tile_str[static_cast<int>(tile)] << P_DEFAULT;
+        if (x < getBoardWidth() - 1) {
+          ostr << " ";
+        }
+      }
+
+      if (y > 0) {
+        ostr << "\n";
+      }
+    }
+
+    if (n_missing > 1 || n_new != 1) {
+      continue;
+    }
+    return ostr.str();
+  }
+  return "ERROR: no way to get between those two game states in one move!";
 }
 
 template <uint32_t NPawns, typename Hash>
@@ -1597,6 +1691,16 @@ bool Game<NPawns, Hash>::forEachMoveP2(CallbackFnT cb) const {
   }
 
   return true;
+}
+
+template <uint32_t NPawns, typename Hash>
+int32_t Game<NPawns, Hash>::getScore() const {
+  return static_cast<int32_t>(score_);
+}
+
+template <uint32_t NPawns, typename Hash>
+void Game<NPawns, Hash>::setScore(int32_t score) const {
+  const_cast<Game*>(this)->score_ = static_cast<int8_t>(score);
 }
 
 template <uint32_t NPawns, typename Hash>

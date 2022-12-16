@@ -1,5 +1,4 @@
 
-#include <absl/container/flat_hash_map.h>
 #include <absl/types/optional.h>
 #include <unistd.h>
 #include <utils/fun/print_csi.h>
@@ -8,6 +7,7 @@
 #include "game_eq.h"
 #include "game_hash.h"
 #include "game_view.h"
+#include "transposition_table.h"
 
 static constexpr uint32_t n_pawns = 16;
 static uint64_t g_n_moves = 0;
@@ -129,85 +129,15 @@ static int benchmark() {
   return 0;
 }
 
-class TranspositionTable {
-  using TableT =
-      absl::flat_hash_map<onoro::Game<n_pawns>, int32_t,
-                          onoro::GameHash<n_pawns>, onoro::GameEq<n_pawns>>;
-  using SymmState = typename Game<n_pawns>::BoardSymmetryState;
-
- public:
-  TranspositionTable() {}
-
-  absl::optional<int32_t> find(const onoro::Game<n_pawns>& game) {
-    SymmState s = game.calcSymmetryState();
-    SymmetryClassOpApplyAndReturn(s.symm_class, tryFindSymmetries, game, s);
-  }
-
-  void insert(const onoro::Game<n_pawns>& game, int32_t score) {
-    table_.insert({ game, score });
-  }
-
-  void insert_or_assign(const onoro::Game<n_pawns>& game, int32_t score) {
-    table_.insert_or_assign(game, score);
-  }
-
-  const TableT& table() const {
-    return table_;
-  }
-
- private:
-  template <class SymmetryClassOp>
-  absl::optional<int32_t> tryFindSymmetries(const onoro::Game<n_pawns>& game,
-                                            SymmState symm_state) {
-    typedef typename SymmetryClassOp::Group Group;
-
-    // printf("%s\n", view.game().Print().c_str());
-    onoro::GameView<n_pawns> view(&game);
-
-    for (bool swap_colors : { false, true }) {
-      (void) swap_colors;
-
-      for (uint32_t op_ord = 0; op_ord < Group::order(); op_ord++) {
-        Group op(op_ord);
-        view.setOp(op);
-        // printf("hash: %s\n",
-        //        GameHash<n_pawns>::printC2Hash(view.hash()).c_str());
-
-        auto it = table_.find(view);
-        if (it != table_.end()) {
-          /*printf("Found under %s (%s) (%s)!\n", op.toString().c_str(),
-                 swap_colors ? "swapped" : "not swapped",
-                 symm_state.op.toString().c_str());
-          printf("\n");*/
-          return it->second * (view.areColorsInverted() ? -1 : 1);
-          /*} else {
-            printf("Didn't find under %s (%s) (%s)!\n", op.toString().c_str(),
-                   swap_colors ? "swapped" : "not swapped",
-                   symm_state.op.toString().c_str());*/
-        }
-      }
-
-      view.invertColors();
-    }
-    // printf("\n");
-
-    return {};
-  }
-
- private:
-  TableT table_;
-};
-
 /*
  * Returns a chosen move along with the expected outcome, in terms of the
  * player to go. I.e., +1 = current player wins, 0 = tie, -1 = current player
  * loses.
  */
 template <uint32_t NPawns, class MoveClass>
-static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
-                                              TranspositionTable& m, int depth,
-                                              int32_t alpha = -3,
-                                              int32_t beta = 3) {
+static std::pair<int32_t, MoveClass> findMoveAB(const onoro::Game<NPawns>& g,
+                                                int depth, int32_t alpha = -3,
+                                                int32_t beta = 3) {
   int32_t best_score = -2;
   MoveClass best_move;
 
@@ -224,45 +154,28 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
     return { best_score, best_move };
   }
 
-  MoveClass::forEachMoveFn(g, [&g, &m, &best_move, &best_score, depth, &alpha,
+  MoveClass::forEachMoveFn(g, [&g, &best_move, &best_score, depth, &alpha,
                                beta](MoveClass move) {
     onoro::Game<NPawns> g2(g, move);
     g_n_moves++;
     int32_t score;
-
-    // if (!verifySerializesToSelf<NPawns>(g2)) {
-    //   abort();
-    // }
 
     // If this move finished the game, it means playing it made us win.
     if (g2.isFinished()) {
       score = 1;
     } else {
       if (depth > 0) {
-        auto cached_score = m.find(g2);
-
-        if (cached_score.has_value()) {
-          g_n_hits++;
-
-          score = *cached_score;
+        int32_t _score;
+        if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
+          _score =
+              findMoveAB<NPawns, onoro::P2Move>(g2, depth - 1, -beta, -alpha)
+                  .first;
         } else {
-          g_n_misses++;
-          m.insert(g2, 0);
-
-          int32_t _score;
-          if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
-            _score =
-                findMove<NPawns, onoro::P2Move>(g2, m, depth - 1, -beta, -alpha)
-                    .first;
-          } else {
-            _score =
-                findMove<NPawns, onoro::P1Move>(g2, m, depth - 1, -beta, -alpha)
-                    .first;
-          }
-          score = std::min(-_score, 1);
-
-          m.insert_or_assign(std::move(g2), score);
+          _score =
+              findMoveAB<NPawns, onoro::P1Move>(g2, depth - 1, -beta, -alpha)
+                  .first;
         }
+        score = std::min(-_score, 1);
       } else {
         score = 0;
       }
@@ -284,23 +197,105 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
   return { best_score, best_move };
 }
 
+/*
+ * Returns a chosen move along with the expected outcome, in terms of the
+ * player to go. I.e., +1 = current player wins, 0 = tie, -1 = current player
+ * loses.
+ */
+template <uint32_t NPawns, class MoveClass>
+static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
+                                              TranspositionTable<NPawns>& m,
+                                              int depth) {
+  int32_t best_score = -2;
+  MoveClass best_move;
+
+  if (!MoveClass::forEachMoveFn(g,
+                                [&g, &best_move, &best_score](MoveClass move) {
+                                  onoro::Game<NPawns> g2(g, move);
+                                  if (g2.isFinished()) {
+                                    best_score = 1;
+                                    best_move = move;
+                                    return false;
+                                  }
+                                  return true;
+                                })) {
+    return { best_score, best_move };
+  }
+
+  MoveClass::forEachMoveFn(g, [&g, &m, &best_move, &best_score,
+                               depth](MoveClass move) {
+    onoro::Game<NPawns> g2(g, move);
+    g_n_moves++;
+    int32_t score;
+
+    // If this move finished the game, it means playing it made us win.
+    if (g2.isFinished()) {
+      score = 1;
+    } else {
+      if (depth > 0) {
+        auto cached_score = m.find(g2);
+
+        if (cached_score.has_value()) {
+          g_n_hits++;
+
+          score = *cached_score;
+        } else {
+          g_n_misses++;
+          if (!cached_score.has_value()) {
+            m.insert(g2);
+          }
+
+          int32_t _score;
+          if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
+            _score = findMove<NPawns, onoro::P2Move>(g2, m, depth - 1).first;
+          } else {
+            _score = findMove<NPawns, onoro::P1Move>(g2, m, depth - 1).first;
+          }
+          score = std::min(-_score, 1);
+
+          g2.setScore(score);
+          m.insert_or_assign(std::move(g2));
+        }
+      } else {
+        score = 0;
+      }
+    }
+
+    if (score > best_score) {
+      best_move = move;
+      best_score = score;
+
+      if (best_score == 1) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  return { best_score, best_move };
+}
+
 static int playout() {
   struct timespec start, end;
   onoro::Game<n_pawns> g;
+  onoro::Game<n_pawns> prev;
 
   printf("Game size: %zu bytes\n", sizeof(onoro::Game<n_pawns>));
   printf("Game view size: %zu bytes\n", sizeof(onoro::GameView<n_pawns>));
 
   printf("%s\n", g.Print().c_str());
+  prev = g;
 
-  TranspositionTable m;
-  uint32_t max_depth = 16;
+  TranspositionTable<n_pawns> m;
+  uint32_t max_depth = 9;
 
-  for (uint32_t i = 0; i < 1; i++) {
+  for (uint32_t i = 0; i < 12; i++) {
     clock_gettime(CLOCK_MONOTONIC, &start);
     int32_t score;
     P1Move p1_move;
     P2Move p2_move;
+
+    m.clear();
 
     if (g.inPhase2()) {
       auto [_score, move] = findMove<n_pawns, onoro::P2Move>(g, m, max_depth);
@@ -313,8 +308,8 @@ static int playout() {
     }
 
     clock_gettime(CLOCK_MONOTONIC, &end);
-    printf("Move search time at depth %u: %lf s\n", timespec_diff(&start, &end),
-           max_depth);
+    printf("Move search time at depth %u: %lf s (table size: %zu\n",
+           timespec_diff(&start, &end), max_depth, m.table().size());
 
     if (score == -2) {
       printf("No moves available\n");
@@ -346,12 +341,14 @@ static int playout() {
     } else {
       g = onoro::Game<n_pawns>(g, p1_move);
     }
-    printf("%s\n", g.Print().c_str());
+    printf("%s\n", g.PrintDiff(prev).c_str());
 
     if (g.isFinished()) {
       printf("%s won\n", g.blackWins() ? "black" : "white");
       break;
     }
+
+    prev = g;
   }
 
   /*
