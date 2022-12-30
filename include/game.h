@@ -420,6 +420,8 @@ class Game {
   Game& operator=(const Game&) = default;
   Game& operator=(Game&&) = default;
 
+  bool operator==(const Game&) const;
+
   // Make a move
   // Phase 1: place a pawn
   Game(const Game&, P1Move move);
@@ -830,13 +832,12 @@ std::string Game<NPawns, Hash>::PrintDiff(
 
   // Technically there are some cases where this isn't enough to disambiguate
   // where a move was made to, but those are rare so we can ignore them.
-  for (HexPos off : (HexPos[]){ { 0, 0 },
-                                { 1, 0 },
-                                { 1, 1 },
-                                { 0, 1 },
-                                { -1, 0 },
-                                { -1, -1 },
-                                { 0, -1 } }) {
+  for (HexPos off : (HexPos[]){
+           { 0, 0 },   { 1, 0 },   { 1, 1 },  { 0, 1 },  { -1, 0 },
+           { -1, -1 }, { 0, -1 },  { 2, 0 },  { 2, 1 },  { 2, 2 },
+           { 1, 2 },   { 0, 2 },   { -1, 1 }, { -2, 0 }, { -2, -1 },
+           { -2, -2 }, { -1, -2 }, { 0, -2 }, { 1, -1 },
+       }) {
     uint32_t n_missing = 0;
     uint32_t n_new = 0;
     std::ostringstream ostr;

@@ -9,7 +9,14 @@
 #include "game_view.h"
 #include "transposition_table.h"
 
-static constexpr uint32_t n_pawns = 16;
+template <uint32_t NPawns, typename Hash>
+bool onoro::Game<NPawns, Hash>::operator==(
+    const onoro::Game<NPawns, Hash>& other) const {
+  onoro::GameEq<NPawns> eq;
+  return eq(*this, other);
+}
+
+static constexpr uint32_t n_pawns = 10;
 static uint64_t g_n_moves = 0;
 static uint64_t g_n_misses = 0;
 static uint64_t g_n_hits = 0;
@@ -287,15 +294,22 @@ static int playout() {
   prev = g;
 
   TranspositionTable<n_pawns> m;
-  uint32_t max_depth = 9;
+  uint32_t max_depth = INT32_MAX;
+  std::vector<onoro::Game<n_pawns>> history;
 
-  for (uint32_t i = 0; i < 12; i++) {
+  for (uint32_t i = 0; i < -1u; i++) {
+    if (std::find(history.cbegin(), history.cend(), prev) != history.cend()) {
+      printf("State has been repeated!\n");
+      break;
+    }
+    history.push_back(prev);
+
     clock_gettime(CLOCK_MONOTONIC, &start);
     int32_t score;
     P1Move p1_move;
     P2Move p2_move;
 
-    m.clear();
+    // m.clear();
 
     if (g.inPhase2()) {
       auto [_score, move] = findMove<n_pawns, onoro::P2Move>(g, m, max_depth);
