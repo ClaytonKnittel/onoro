@@ -16,7 +16,7 @@ bool onoro::Game<NPawns, Hash>::operator==(
   return eq(*this, other);
 }
 
-static constexpr uint32_t n_pawns = 10;
+static constexpr uint32_t n_pawns = 8;
 static uint64_t g_n_moves = 0;
 static uint64_t g_n_misses = 0;
 static uint64_t g_n_hits = 0;
@@ -210,17 +210,17 @@ static std::pair<int32_t, MoveClass> findMoveAB(const onoro::Game<NPawns>& g,
  * loses.
  */
 template <uint32_t NPawns, class MoveClass>
-static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
-                                              TranspositionTable<NPawns>& m,
-                                              int depth) {
-  int32_t best_score = -2;
+static std::pair<absl::optional<onoro::Score>, MoveClass> findMove(
+    const onoro::Game<NPawns>& g, TranspositionTable<NPawns>& m,
+    uint32_t depth) {
+  absl::optional<onoro::Score> best_score;
   MoveClass best_move;
 
   if (!MoveClass::forEachMoveFn(g,
                                 [&g, &best_move, &best_score](MoveClass move) {
                                   onoro::Game<NPawns> g2(g, move);
                                   if (g2.isFinished()) {
-                                    best_score = 1;
+                                    best_score = onoro::Score::win(1);
                                     best_move = move;
                                     return false;
                                   }
@@ -233,47 +233,79 @@ static std::pair<int32_t, MoveClass> findMove(const onoro::Game<NPawns>& g,
                                depth](MoveClass move) {
     onoro::Game<NPawns> g2(g, move);
     g_n_moves++;
-    int32_t score;
+    onoro::Score score;
 
     // If this move finished the game, it means playing it made us win.
     if (g2.isFinished()) {
-      score = 1;
+      score = onoro::Score::win(1);
     } else {
       if (depth > 0) {
         auto cached_score = m.find(g2);
 
-        if (cached_score.has_value()) {
+        if (cached_score.has_value() && cached_score->determined(depth)) {
           g_n_hits++;
 
           score = *cached_score;
+        } else if (cached_score.has_value() &&
+                   *cached_score == onoro::Score::ancestor()) {
+          score = onoro::Score::tie(1);
         } else {
+          /*if (cached_score.has_value()) {
+            printf("Missed on depth %u %s\n%s\n", depth,
+                   cached_score->Print().c_str(), g2.Print().c_str());
+          }*/
           g_n_misses++;
-          if (!cached_score.has_value()) {
-            m.insert(g2);
-          }
+          onoro::Score old_score = g2.getScore();
+          g2.setScore(onoro::Score::ancestor());
+          m.insert(g2);
 
-          int32_t _score;
+          absl::optional<onoro::Score> _score;
           if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
             _score = findMove<NPawns, onoro::P2Move>(g2, m, depth - 1).first;
           } else {
             _score = findMove<NPawns, onoro::P1Move>(g2, m, depth - 1).first;
           }
-          score = std::min(-_score, 1);
+          if (!_score.has_value()) {
+            score = onoro::Score::win(1);
+          } else {
+            score = _score->backstep();
+          }
 
-          g2.setScore(score);
+          g2.setScore(old_score.merge(score));
           m.insert_or_assign(std::move(g2));
         }
       } else {
-        score = 0;
+        score = onoro::Score::tie(1);
       }
     }
 
-    if (score > best_score) {
-      best_move = move;
+    if (!best_score.has_value()) {
       best_score = score;
+      best_move = move;
+    } else {
+      int32_t _score = score.score(depth + 1);
+      int32_t _best_score = best_score->score(depth + 1);
+      if (_score > _best_score) {
+        best_move = move;
+        best_score = score;
 
-      if (best_score == 1) {
-        return false;
+        if (_score == 1) {
+          // We can stop the search early if we already have a winning move.
+          return false;
+        }
+      } else if (_best_score == -1) {
+        // Find the largest turn count needed for the opponent to force a win.
+        if (score.turn_count_win() > best_score->turn_count_win()) {
+          best_move = move;
+          best_score = score;
+        }
+      } else if (_score == 0) {
+        // If both scores were ties, take the score with the longest guaranteed
+        // tie depth.
+        if (score.turn_count_tie() > best_score->turn_count_tie()) {
+          best_move = move;
+          best_score = score;
+        }
       }
     }
     return true;
@@ -294,7 +326,7 @@ static int playout() {
   prev = g;
 
   TranspositionTable<n_pawns> m;
-  uint32_t max_depth = INT32_MAX;
+  uint32_t max_depth = 10;
   std::vector<onoro::Game<n_pawns>> history;
 
   for (uint32_t i = 0; i < -1u; i++) {
@@ -305,7 +337,7 @@ static int playout() {
     history.push_back(prev);
 
     clock_gettime(CLOCK_MONOTONIC, &start);
-    int32_t score;
+    absl::optional<onoro::Score> score;
     P1Move p1_move;
     P2Move p2_move;
 
@@ -322,10 +354,10 @@ static int playout() {
     }
 
     clock_gettime(CLOCK_MONOTONIC, &end);
-    printf("Move search time at depth %u: %lf s (table size: %zu\n",
+    printf("Move search time at depth %u: %lf s (table size: %zu)\n",
            timespec_diff(&start, &end), max_depth, m.table().size());
 
-    if (score == -2) {
+    if (!score.has_value()) {
       printf("No moves available\n");
       break;
     }
@@ -333,18 +365,17 @@ static int playout() {
     if (g.inPhase2()) {
       onoro::idx_t from = g.idxAt(p2_move.from_idx);
       printf(
-          "Move (%d, %d) from (%d, %d), score %d (%llu playouts, %f%% hits, %f "
+          "Move (%d, %d) from (%d, %d), %s (%llu playouts, %f%% hits, %f "
           "playouts/sec)\n",
-          p2_move.to.x(), p2_move.to.y(), from.x(), from.y(), score, g_n_moves,
+          p2_move.to.x(), p2_move.to.y(), from.x(), from.y(),
+          score->Print().c_str(), g_n_moves,
           100. * g_n_hits / (double) (g_n_misses + g_n_hits),
           (double) g_n_moves / timespec_diff(&start, &end));
     } else {
-      printf(
-          "Move (%d, %d), score %d (%llu playouts, %f%% hits, %f "
-          "playouts/sec)\n",
-          p1_move.loc.x(), p1_move.loc.y(), score, g_n_moves,
-          100. * g_n_hits / (double) (g_n_misses + g_n_hits),
-          (double) g_n_moves / timespec_diff(&start, &end));
+      printf("Move (%d, %d), %s (%llu playouts, %f%% hits, %f playouts/sec)\n",
+             p1_move.loc.x(), p1_move.loc.y(), score->Print().c_str(),
+             g_n_moves, 100. * g_n_hits / (double) (g_n_misses + g_n_hits),
+             (double) g_n_moves / timespec_diff(&start, &end));
     }
     g_n_moves = 0;
     g_n_misses = 0;
@@ -384,6 +415,8 @@ static int playout() {
 
 int main(int argc, char* argv[]) {
   static constexpr const uint32_t N = 8;
+  printf("score size: %zu\n", sizeof(onoro::Score));
+  printf("score align: %zu\n", alignof(onoro::Score));
 
   // return benchmark();
   return playout();
