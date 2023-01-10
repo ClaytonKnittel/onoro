@@ -105,6 +105,207 @@ class idx_t {
 
 static constexpr const uint32_t MAX_IDX = 15;
 
+class [[gnu::packed]] Score {
+ private:
+  constexpr Score(bool cur_player_wins, uint32_t turn_count_tie,
+                  uint32_t turn_count_win)
+      : turn_count_win_(static_cast<uint16_t>(turn_count_win)),
+        turn_count_tie_(static_cast<uint16_t>(turn_count_tie)),
+        score_(cur_player_wins ? 1 : 0) {}
+
+ public:
+  /*
+   * Constructs a score with no information.
+   */
+  constexpr Score() : turn_count_win_(0), turn_count_tie_(0), score_(0) {}
+
+  constexpr Score(const Score&) = default;
+
+  constexpr Score& operator=(const Score&) = default;
+
+  constexpr bool operator==(const Score& score) const {
+    return turn_count_win_ == score.turn_count_win_ &&
+           turn_count_tie_ == score.turn_count_tie_ && score_ == score.score_;
+  }
+
+  static constexpr Score nil() {
+    return Score();
+  }
+
+  static constexpr Score win(uint32_t turn_count_win) {
+    return Score(true, 0, turn_count_win);
+  }
+
+  static constexpr Score lose(uint32_t turn_count_lose) {
+    return Score(false, 0, turn_count_lose);
+  }
+
+  static constexpr Score tie(uint32_t turn_count_tie) {
+    return Score(false, turn_count_tie, 0);
+  }
+
+  /*
+   * Used to mark a game state as an ancestor of the current tree being
+   * explored. Will be overwritten with the actual score once its calculation is
+   * finished.
+   */
+  static constexpr Score ancestor() {
+    // Mark the current player as winning with turn_count_win_ = 0, which is an
+    // impossible state to be in.
+    return Score(true, 0, 0);
+  }
+
+  /*
+   * The score of the game given `depth` moves to play.
+   */
+  constexpr int32_t score(uint32_t depth) const {
+    if (depth <= turn_count_tie()) {
+      return 0;
+    } else if (depth >= turn_count_win()) {
+      return turn_count_win() * 2 - 1;
+    } else {
+      fprintf(stderr, "Attempted to resolve score at undiscovered depth\n");
+      abort();
+    }
+  }
+
+  constexpr uint32_t turn_count_win() const {
+    return static_cast<uint32_t>(turn_count_win_);
+  }
+
+  constexpr uint32_t turn_count_tie() const {
+    return static_cast<uint32_t>(turn_count_tie_);
+  }
+
+  /*
+   * Transforms a score at a given state of the game to how that score would
+   * appear from the perspective of a game state one step before it.
+   *
+   * If a winning move for one player has been found in n steps, then it is
+   * turned into a winning move for the other player in n + 1 steps.
+   */
+  constexpr Score& backstep() {
+    if (turn_count_win_ > 0) {
+      turn_count_win_++;
+      score_ = !score_;
+    }
+    turn_count_tie_++;
+    return *this;
+  }
+
+  /*
+   * Merges the information contained in another score into this one. This
+   * assumes that the scores are compatible, i.e. they don't contain conflicting
+   * information.
+   */
+  constexpr Score& merge(const Score& score) {
+    turn_count_win_ =
+        std::min(static_cast<uint32_t>(turn_count_win_) - 1,
+                 static_cast<uint32_t>(score.turn_count_win_) - 1) +
+        1;
+    turn_count_tie_ = std::max(turn_count_tie_, score.turn_count_tie_);
+    score_ = score_ || score.score_;
+    return *this;
+  }
+
+  /*
+  constexpr void set_score(int32_t score) {
+    score_ = static_cast<int8_t>(score);
+  }
+
+  constexpr void set_turn_count_win(uint32_t turn_count_win) {
+    turn_count_win_ = static_cast<uint16_t>(turn_count_win);
+  }
+
+  constexpr void set_turn_count_tie(uint32_t turn_count_tie) {
+    turn_count_tie_ = static_cast<uint16_t>(turn_count_tie);
+  }
+  */
+
+  /*
+   * True if this score can be used in place of a search that goes
+   * `search_depth` moves deep (i.e. this score will equal the score calculated
+   * by a full search this deep).
+   */
+  constexpr bool determined(uint32_t search_depth) const {
+    return (turn_count_win_ != 0 && search_depth >= turn_count_win_) ||
+           search_depth <= turn_count_tie_;
+  }
+
+  constexpr bool compatible(const Score& other) const {
+    uint32_t tc_win_1 =
+        this->turn_count_win() == 0 ? UINT32_MAX : this->turn_count_win();
+    uint32_t tc_win_2 =
+        other.turn_count_win() == 0 ? UINT32_MAX : other.turn_count_win();
+    uint32_t score_1 =
+        this->turn_count_win() == 0 ? other.score_ : this->score_;
+    uint32_t score_2 =
+        other.turn_count_win() == 0 ? this->score_ : other.score_;
+    uint32_t tc_tie_1 = this->turn_count_tie();
+    uint32_t tc_tie_2 = other.turn_count_tie();
+
+    return tc_win_1 > tc_tie_2 && tc_win_2 > tc_tie_1 && score_1 == score_2;
+  }
+
+  /*
+   * True if this score is better than `other` for the current player.
+   */
+  constexpr bool better(const Score& other) const {
+    if (other.turn_count_win_ != 0) {
+      if (other.score_ == 1) {
+        // If both scores were wins, the better is the one with the shortest
+        // path to victory.
+        return turn_count_win_ != 0 && score_ == 1 &&
+               turn_count_win_ < other.turn_count_win_;
+      } else {
+        // If both scores are losses, the better is the one with the longest
+        // path to losing.
+        return turn_count_win_ == 0 || score_ == 1 ||
+               turn_count_win_ > other.turn_count_win_;
+      }
+    } else {
+      if (turn_count_win_ != 0) {
+        // If `other` is a tie and `this` is not, this is only better if it's a
+        // win.
+        return score_ == 1;
+      } else {
+        // If both scores were ties, the better is the score with the shortest
+        // discovered tie depth.
+        return turn_count_tie_ < other.turn_count_tie_;
+      }
+    }
+  }
+
+  std::string Print() const {
+    if (*this == ancestor()) {
+      return "[ancestor]";
+    } else if (turn_count_win_ == 0) {
+      return absl::StrFormat("[tie:%u]", turn_count_tie());
+    } else {
+      return absl::StrFormat("[tie:%u,%s:%u]", turn_count_tie(),
+                             score_ ? "cur" : "oth", turn_count_win());
+    }
+  }
+
+ private:
+  /*
+   * The minimum number of moves that somebody can force a win within. If 0,
+   * then no win has been found from this state yet.
+   */
+  uint32_t turn_count_win_ : 12;
+  /*
+   * The maximum number of moves ahead that nobody can force a win within.
+   */
+  uint32_t turn_count_tie_ : 11;
+
+  /*
+   * Who can force a win after turn_count_win_ turns, with 1 being the current
+   * player and 0 being the other player. This is 0 if no win has been found
+   * yet.
+   */
+  uint32_t score_ : 1;
+};
+
 // Forward declare GameHash
 template <uint32_t NPawns>
 class GameHash;
@@ -484,7 +685,7 @@ class Game {
   /*
    * Optional: can store the game score here to save space.
    */
-  int8_t score_;
+  Score score_;
 
   // Sum of all HexPos's of pieces on the board
   HexPos16 sum_of_mass_;
@@ -535,13 +736,13 @@ class Game {
   template <class CallbackFnT>
   bool forEachMoveP2(CallbackFnT cb) const;
 
-  int32_t getScore() const;
+  Score getScore() const;
 
   /*
    * Technically not const, but doesn't modify the game state in any way, it
    * just setting an auxiliary field.
    */
-  void setScore(int32_t score) const;
+  void setScore(Score score) const;
 
   BoardSymmetryState calcSymmetryState() const;
 
@@ -713,7 +914,7 @@ constexpr std::pair<idx_t, HexPos> Game<NPawns, Hash>::calcMoveShift(
 // white is effectively first to make a choice.
 template <uint32_t NPawns, typename Hash>
 Game<NPawns, Hash>::Game()
-    : state_({ 0xfu, 1, 0, 0, 0 }), score_(0), sum_of_mass_{ 0, 0 } {
+    : state_({ 0xfu, 1, 0, 0, 0 }), sum_of_mass_{ 0, 0 } {
   static_assert(NPawns <= 2 * max_pawns_per_player);
 
   for (uint32_t i = 0; i < NPawns; i++) {
@@ -751,7 +952,6 @@ template <uint32_t NPawns, typename Hash>
 Game<NPawns, Hash>::Game(const Game<NPawns, Hash>& g, P1Move move)
     : pawn_poses_(g.pawn_poses_),
       state_(g.state_),
-      score_(0),
       sum_of_mass_(g.sum_of_mass_) {
   appendTile(move.loc);
 
@@ -766,7 +966,6 @@ template <uint32_t NPawns, typename Hash>
 Game<NPawns, Hash>::Game(const Game& g, P2Move move)
     : pawn_poses_(g.pawn_poses_),
       state_(g.state_),
-      score_(0),
       sum_of_mass_(g.sum_of_mass_) {
   moveTile(move.to, move.from_idx);
 
@@ -786,6 +985,8 @@ std::string Game<NPawns, Hash>::Print() const {
   };
 
   std::ostringstream ostr;
+  ostr << (blackTurn() ? "black:\n" : "white:\n");
+
   for (uint32_t y = getBoardWidth() - 1; y < getBoardWidth(); y--) {
     ostr << std::setw(getBoardWidth() - 1 - y) << "";
 
@@ -1695,13 +1896,13 @@ bool Game<NPawns, Hash>::forEachMoveP2(CallbackFnT cb) const {
 }
 
 template <uint32_t NPawns, typename Hash>
-int32_t Game<NPawns, Hash>::getScore() const {
-  return static_cast<int32_t>(score_);
+Score Game<NPawns, Hash>::getScore() const {
+  return score_;
 }
 
 template <uint32_t NPawns, typename Hash>
-void Game<NPawns, Hash>::setScore(int32_t score) const {
-  const_cast<Game*>(this)->score_ = static_cast<int8_t>(score);
+void Game<NPawns, Hash>::setScore(Score score) const {
+  const_cast<Game*>(this)->score_ = score;
 }
 
 template <uint32_t NPawns, typename Hash>
