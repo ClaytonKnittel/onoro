@@ -232,8 +232,48 @@ class [[gnu::packed]] Score {
            search_depth <= turn_count_tie_;
   }
 
+  constexpr bool compatible(const Score& other) const {
+    return (turn_count_win_ == 0 ||
+            (turn_count_win_ > other.turn_count_tie_ &&
+             (other.turn_count_win_ == 0 || score_ == other.score_))) &&
+           (other.turn_count_win_ == 0 ||
+            (other.turn_count_win_ > turn_count_tie_ &&
+             (turn_count_win_ == 0 || score_ == other.score_)));
+  }
+
+  /*
+   * True if this score is better than `other` for the current player.
+   */
+  constexpr bool better(const Score& other) const {
+    if (other.turn_count_win_ != 0) {
+      if (other.score_ == 1) {
+        // If both scores were wins, the better is the one with the shortest
+        // path to victory.
+        return turn_count_win_ != 0 && score_ == 1 &&
+               turn_count_win_ < other.turn_count_win_;
+      } else {
+        // If both scores are losses, the better is the one with the longest
+        // path to losing.
+        return turn_count_win_ == 0 || score_ == 1 ||
+               turn_count_win_ > other.turn_count_win_;
+      }
+    } else {
+      if (turn_count_win_ != 0) {
+        // If `other` is a tie and `this` is not, this is only better if it's a
+        // win.
+        return score_ == 1;
+      } else {
+        // If both scores were ties, the better is the score with the longest
+        // discovered tie depth.
+        return turn_count_tie_ > other.turn_count_tie_;
+      }
+    }
+  }
+
   std::string Print() const {
-    if (turn_count_win_ == 0) {
+    if (*this == ancestor()) {
+      return "[ancestor]";
+    } else if (turn_count_win_ == 0) {
       return absl::StrFormat("[tie:%u]", turn_count_tie());
     } else {
       return absl::StrFormat("[tie:%u,%s:%u]", turn_count_tie(),
@@ -939,6 +979,8 @@ std::string Game<NPawns, Hash>::Print() const {
   };
 
   std::ostringstream ostr;
+  ostr << (blackTurn() ? "black:\n" : "white:\n");
+
   for (uint32_t y = getBoardWidth() - 1; y < getBoardWidth(); y--) {
     ostr << std::setw(getBoardWidth() - 1 - y) << "";
 
