@@ -3,11 +3,17 @@
 #include <unistd.h>
 #include <utils/fun/print_csi.h>
 
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
 #include "game.h"
 #include "game_eq.h"
 #include "game_hash.h"
 #include "game_view.h"
 #include "transposition_table.h"
+
+ABSL_FLAG(uint32_t, depth, 8, "Search depth to test to");
+ABSL_FLAG(bool, from_stdin, false,
+          "If set, reads a game state proto from stdin.");
 
 template <uint32_t NPawns, typename Hash>
 bool onoro::Game<NPawns, Hash>::operator==(
@@ -16,7 +22,7 @@ bool onoro::Game<NPawns, Hash>::operator==(
   return eq(*this, other);
 }
 
-static constexpr uint32_t n_pawns = 8;
+static constexpr uint32_t n_pawns = 12;
 static uint64_t g_n_moves = 0;
 static uint64_t g_n_misses = 0;
 static uint64_t g_n_hits = 0;
@@ -204,17 +210,16 @@ static std::pair<int32_t, MoveClass> findMoveAB(const onoro::Game<NPawns>& g,
   return { best_score, best_move };
 }
 
-/*
- * Returns a chosen move along with the expected outcome, in terms of the
- * player to go. I.e., +1 = current player wins, 0 = tie, -1 = current player
- * loses.
- */
 template <uint32_t NPawns, class MoveClass>
 static std::pair<absl::optional<onoro::Score>, MoveClass> findMove(
-    const onoro::Game<NPawns>& g, TranspositionTable<NPawns>& m,
+    const onoro::Game<NPawns>& g, onoro::TranspositionTable<NPawns>& m,
     uint32_t depth) {
   absl::optional<onoro::Score> best_score;
   MoveClass best_move;
+
+  if (depth == 0) {
+    return { onoro::Score::tie(0), MoveClass() };
+  }
 
   if (!MoveClass::forEachMoveFn(g,
                                 [&g, &best_move, &best_score](MoveClass move) {
@@ -239,79 +244,72 @@ static std::pair<absl::optional<onoro::Score>, MoveClass> findMove(
     if (g2.isFinished()) {
       score = onoro::Score::win(1);
     } else {
-      if (depth > 0) {
-        auto cached_score = m.find(g2);
+      auto cached_score = m.find(g2);
 
-        if (cached_score.has_value() && cached_score->determined(depth)) {
-          g_n_hits++;
-
-          score = *cached_score;
-        } else if (cached_score.has_value() &&
-                   *cached_score == onoro::Score::ancestor()) {
-          score = onoro::Score::tie(1);
-        } else {
-          /*if (cached_score.has_value()) {
-            printf("Missed on depth %u %s\n%s\n", depth,
-                   cached_score->Print().c_str(), g2.Print().c_str());
-          }*/
-          g_n_misses++;
-          onoro::Score old_score = g2.getScore();
-          g2.setScore(onoro::Score::ancestor());
-          m.insert(g2);
-
-          absl::optional<onoro::Score> _score;
-          if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
-            _score = findMove<NPawns, onoro::P2Move>(g2, m, depth - 1).first;
-          } else {
-            _score = findMove<NPawns, onoro::P1Move>(g2, m, depth - 1).first;
-          }
-          if (!_score.has_value()) {
-            score = onoro::Score::win(1);
-          } else {
-            score = _score->backstep();
-          }
-
-          g2.setScore(old_score.merge(score));
-          m.insert_or_assign(std::move(g2));
-        }
+      if (cached_score.has_value() && cached_score->determined(depth)) {
+        score = *cached_score;
+        g_n_hits++;
       } else {
-        score = onoro::Score::tie(1);
+        g_n_misses++;
+
+        absl::optional<onoro::Score> _score;
+        if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
+          _score = findMove<NPawns, onoro::P2Move>(g2, m, depth - 1).first;
+        } else {
+          _score = findMove<NPawns, onoro::P1Move>(g2, m, depth - 1).first;
+        }
+        if (!_score.has_value()) {
+          // Consider winning by no legal moves as not winning until after the
+          // other player's attempt at making a move, since all game states
+          // that don't have 4 in a row of a pawn are considered a tie.
+          score = onoro::Score::win(2);
+        } else {
+          score = _score->backstep();
+        }
+
+        // Update the cached score in case it changed.
+        cached_score = m.find(g2);
+
+        onoro::Score merged_score =
+            cached_score.has_value() ? cached_score->merge(score) : score;
+        g2.setScore(merged_score);
+        m.insert_or_assign(std::move(g2));
       }
     }
 
     if (!best_score.has_value()) {
       best_score = score;
       best_move = move;
-    } else {
-      int32_t _score = score.score(depth + 1);
-      int32_t _best_score = best_score->score(depth + 1);
-      if (_score > _best_score) {
-        best_move = move;
-        best_score = score;
+    } else if (score.better(*best_score)) {
+      best_move = move;
+      best_score = score;
 
-        if (_score == 1) {
-          // We can stop the search early if we already have a winning move.
-          return false;
-        }
-      } else if (_best_score == -1) {
-        // Find the largest turn count needed for the opponent to force a win.
-        if (score.turn_count_win() > best_score->turn_count_win()) {
-          best_move = move;
-          best_score = score;
-        }
-      } else if (_score == 0) {
-        // If both scores were ties, take the score with the longest guaranteed
-        // tie depth.
-        if (score.turn_count_tie() > best_score->turn_count_tie()) {
-          best_move = move;
-          best_score = score;
-        }
+      if (score.score(depth) == 1) {
+        // We can stop the search early if we already have a winning move.
+        return false;
       }
     }
+
     return true;
   });
 
   return { best_score, best_move };
+}
+
+static void allCompatible(const TranspositionTable<n_pawns>& t1,
+                          const TranspositionTable<n_pawns>& t2) {
+  for (auto it = t1.table().cbegin(); it != t1.table().cend(); it++) {
+    const auto s1 = it->getScore();
+
+    const auto s2 = t2.find(*it);
+    if (s2.has_value()) {
+      if (!s1.compatible(*s2)) {
+        printf("%s\n", it->Print().c_str());
+        printf("Incompatible scores: t1 has %s, t2 has %s\n", s1, *s2);
+        abort();
+      }
+    }
+  }
 }
 
 static int playout() {
@@ -326,7 +324,7 @@ static int playout() {
   prev = g;
 
   TranspositionTable<n_pawns> m;
-  uint32_t max_depth = 10;
+  uint32_t max_depth = absl::GetFlag(FLAGS_depth);
   std::vector<onoro::Game<n_pawns>> history;
 
   for (uint32_t i = 0; i < -1u; i++) {
@@ -396,18 +394,6 @@ static int playout() {
     prev = g;
   }
 
-  /*
-  printf("Printing table contents:\n");
-  uint32_t cnt = 0;
-  for (auto it = m.table().cbegin(); it != m.table().cend(); it++) {
-    printf("score: %d, n_pawns: %u\n%s\n", it->second,
-           it->first.game().nPawnsInPlay(), it->first.game().Print().c_str());
-
-    if (cnt++ == 32) {
-      break;
-    }
-  }
-  */
   printf("Table size: %zu\n", m.table().size());
 
   return 0;
@@ -415,6 +401,9 @@ static int playout() {
 
 int main(int argc, char* argv[]) {
   static constexpr const uint32_t N = 8;
+
+  absl::ParseCommandLine(argc, argv);
+
   printf("score size: %zu\n", sizeof(onoro::Score));
   printf("score align: %zu\n", alignof(onoro::Score));
 

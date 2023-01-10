@@ -269,9 +269,9 @@ class [[gnu::packed]] Score {
         // win.
         return score_ == 1;
       } else {
-        // If both scores were ties, the better is the score with the longest
+        // If both scores were ties, the better is the score with the shortest
         // discovered tie depth.
-        return turn_count_tie_ > other.turn_count_tie_;
+        return turn_count_tie_ < other.turn_count_tie_;
       }
     }
   }

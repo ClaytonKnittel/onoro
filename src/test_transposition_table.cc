@@ -51,91 +51,6 @@ bool eqUnderSymm(const onoro::Game<n_pawns>& game1,
   SymmetryClassOpApplyAndReturn(s.symm_class, eqUnderSymmT, game1, game2);
 }
 
-/*
- * Returns a chosen move along with the expected outcome, in terms of the
- * player to go. I.e., +1 = current player wins, 0 = tie, -1 = current player
- * loses.
- */
-/*
-template <uint32_t NPawns, class MoveClass>
-static std::pair<int32_t, MoveClass> findMove(
-    const onoro::Game<NPawns>& g, onoro::TranspositionTable<NPawns>& m,
-    int depth) {
-  int32_t best_score = -2;
-  MoveClass best_move;
-
-  if (!MoveClass::forEachMoveFn(g,
-                                [&g, &best_move, &best_score](MoveClass move) {
-                                  onoro::Game<NPawns> g2(g, move);
-                                  if (g2.isFinished()) {
-                                    best_score = 1;
-                                    best_move = move;
-                                    return false;
-                                  }
-                                  return true;
-                                })) {
-    return { best_score, best_move };
-  }
-
-  MoveClass::forEachMoveFn(g, [&g, &m, &best_move, &best_score,
-                               depth](MoveClass move) {
-    onoro::Game<NPawns> g2(g, move);
-    g_n_moves++;
-    int32_t score;
-
-    // If this move finished the game, it means playing it made us win.
-    if (g2.isFinished()) {
-      score = 1;
-    } else {
-      if (depth > 0) {
-        auto cached_score = m.find(g2);
-
-        if (!cached_score.has_value()) {
-          m.insert(g2);
-        }
-
-        int32_t _score;
-        if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
-          _score = findMove<NPawns, onoro::P2Move>(g2, m, depth - 1).first;
-        } else {
-          _score = findMove<NPawns, onoro::P1Move>(g2, m, depth - 1).first;
-        }
-        score = std::min(-_score, 1);
-
-        if (cached_score.has_value()) {
-          if (score != cached_score->score()) {
-            printf("Turn: %s\n%s\n", g2.blackTurn() ? "black" : "white",
-                   g2.Print().c_str());
-            printf("Expected score %d, but found %d in hash table\n", score,
-                   cached_score->score());
-            onoro::proto::GameState gs = g2.SerializeState();
-            gs.SerializeToOstream(&std::cerr);
-            abort();
-          }
-        } else {
-          g2.setScore(onoro::Score(score, 0));
-          m.insert_or_assign(std::move(g2));
-        }
-      } else {
-        score = 0;
-      }
-    }
-
-    if (score > best_score) {
-      best_move = move;
-      best_score = score;
-
-      if (best_score == 1) {
-        return false;
-      }
-    }
-    return true;
-  });
-
-  return { best_score, best_move };
-}
-*/
-
 onoro::Game<n_pawns> g_game;
 
 template <uint32_t NPawns, class MoveClass>
@@ -162,90 +77,83 @@ static std::pair<absl::optional<onoro::Score>, MoveClass> findMove(
     return { best_score, best_move };
   }
 
-  MoveClass::forEachMoveFn(g, [&g, &m, &best_move, &best_score,
-                               depth](MoveClass move) {
-    onoro::Game<NPawns> g2(g, move);
-    g_n_moves++;
-    onoro::Score score;
+  MoveClass::forEachMoveFn(
+      g, [&g, &m, &best_move, &best_score, depth](MoveClass move) {
+        onoro::Game<NPawns> g2(g, move);
+        g_n_moves++;
+        onoro::Score score;
 
-    // If this move finished the game, it means playing it made us win.
-    if (g2.isFinished()) {
-      score = onoro::Score::win(1);
-    } else {
-      auto cached_score = m.find(g2);
+        // If this move finished the game, it means playing it made us win.
+        if (g2.isFinished()) {
+          score = onoro::Score::win(1);
+        } else {
+          auto cached_score = m.find(g2);
 
-      // if (cached_score.has_value() && cached_score->determined(depth)) {
-      //   score = *cached_score;
-      // } else if (cached_score.has_value() &&
-      //            *cached_score == onoro::Score::ancestor()) {
-      //   score = onoro::Score::tie(1);
-      // }
+          // if (cached_score.has_value() && cached_score->determined(depth)) {
+          //   score = *cached_score;
+          // }
 
-      // g2.setScore(onoro::Score::ancestor());
-      // m.insert(g2);
+          absl::optional<onoro::Score> _score;
+          if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
+            _score = findMove<NPawns, onoro::P2Move>(g2, m, depth - 1).first;
+          } else {
+            _score = findMove<NPawns, onoro::P1Move>(g2, m, depth - 1).first;
+          }
+          if (!_score.has_value()) {
+            // Consider winning by no legal moves as not winning until after the
+            // other player's attempt at making a move, since all game states
+            // that don't have 4 in a row of a pawn are considered a tie.
+            score = onoro::Score::win(2);
+          } else {
+            score = _score->backstep();
+          }
 
-      absl::optional<onoro::Score> _score;
-      if (std::is_same<MoveClass, onoro::P2Move>::value || g2.inPhase2()) {
-        _score = findMove<NPawns, onoro::P2Move>(g2, m, depth - 1).first;
-      } else {
-        _score = findMove<NPawns, onoro::P1Move>(g2, m, depth - 1).first;
-      }
-      if (!_score.has_value()) {
-        // Consider winning by no legal moves as not winning until after the
-        // other player's attempt at making a move, since all game states that
-        // don't have 4 in a row of a pawn are considered a tie.
-        score = onoro::Score::win(2);
-      } else {
-        score = _score->backstep();
-      }
+          // Update the cached score in case it changed.
+          cached_score = m.find(g2);
 
-      if (cached_score.has_value()) {
-        if (!cached_score->compatible(score)) {
-          // if (cached_score->determined(depth)) {
-          //   if (cached_score->score(depth) != score.score(depth)) {
-          printf("depth: %u\n", depth);
-          printf(
-              "%s\nIncompatible scores found at depth %u: cache %s, vs. "
-              "calc %s\n",
-              g2.Print().c_str(), depth, cached_score->Print().c_str(),
-              score.Print().c_str());
-          onoro::proto::GameState gs = g2.SerializeState();
-          gs.SerializeToOstream(&std::cerr);
-          abort();
-          //   }
+          if (cached_score.has_value()) {
+            if (!cached_score->compatible(score)) {
+              printf("depth: %u\n", depth);
+              printf(
+                  "%s\nIncompatible scores found at depth %u: cache %s, vs. "
+                  "calc %s\n",
+                  g2.Print().c_str(), depth, cached_score->Print().c_str(),
+                  score.Print().c_str());
+              onoro::proto::GameState gs = g2.SerializeState();
+              gs.SerializeToOstream(&std::cerr);
+              abort();
+            }
+          }
+
+          onoro::Score merged_score =
+              cached_score.has_value() ? cached_score->merge(score) : score;
+          g2.setScore(merged_score);
+          m.insert_or_assign(std::move(g2));
+
+          // if (eqUnderSymm(g2, g_game)) {
+          //   printf("depth: %u\n", depth);
+          //   printf("%s\n", g2.Print().c_str());
+          //   printf("%s (%s + %s)\n", merged_score.Print().c_str(),
+          //          cached_score.has_value() ? cached_score->Print().c_str() :
+          //          "[]", score.Print().c_str());
           // }
         }
-      }
 
-      onoro::Score merged_score =
-          cached_score.has_value() ? cached_score->merge(score) : score;
-      g2.setScore(merged_score);
-      m.insert_or_assign(std::move(g2));
+        if (!best_score.has_value()) {
+          best_score = score;
+          best_move = move;
+        } else if (score.better(*best_score)) {
+          best_move = move;
+          best_score = score;
 
-      if (eqUnderSymm(g2, g_game)) {
-        printf("depth: %u\n", depth);
-        printf("%s\n", g2.Print().c_str());
-        printf("%s (%s + %s)\n", merged_score.Print().c_str(),
-               cached_score.has_value() ? cached_score->Print().c_str() : "[]",
-               score.Print().c_str());
-      }
-    }
+          if (score.score(depth) == 1) {
+            // We can stop the search early if we already have a winning move.
+            return false;
+          }
+        }
 
-    if (!best_score.has_value()) {
-      best_score = score;
-      best_move = move;
-    } else if (score.better(*best_score)) {
-      best_move = move;
-      best_score = score;
-
-      if (score.score(depth) == 1) {
-        // We can stop the search early if we already have a winning move.
-        return false;
-      }
-    }
-
-    return true;
-  });
+        return true;
+      });
 
   return { best_score, best_move };
 }
@@ -266,8 +174,8 @@ static int test_transposition_table() {
       printf("Failed to parse: %s\n", err.status().message());
       return -1;
     }
-    g_game = *err;
-    // g = g_game;
+    // g_game = *err;
+    g = *err;
   }
 
   printf("%s\n", g.Print().c_str());

@@ -18,7 +18,7 @@ class TranspositionTable {
  public:
   TranspositionTable() {}
 
-  absl::optional<onoro::Score> find(const onoro::Game<NPawns>& game) {
+  absl::optional<onoro::Score> find(const onoro::Game<NPawns>& game) const {
     SymmState s = game.calcSymmetryState();
     SymmetryClassOpApplyAndReturn(s.symm_class, tryFindSymmetries, game, s);
   }
@@ -45,7 +45,7 @@ class TranspositionTable {
  private:
   template <class SymmetryClassOp>
   absl::optional<onoro::Score> tryFindSymmetries(
-      const onoro::Game<NPawns>& game, SymmState symm_state) {
+      const onoro::Game<NPawns>& game, SymmState symm_state) const {
     typedef typename SymmetryClassOp::Group Group;
 
     // printf("%s\n", view.game().Print().c_str());
