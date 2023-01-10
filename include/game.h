@@ -233,12 +233,18 @@ class [[gnu::packed]] Score {
   }
 
   constexpr bool compatible(const Score& other) const {
-    return (turn_count_win_ == 0 ||
-            (turn_count_win_ > other.turn_count_tie_ &&
-             (other.turn_count_win_ == 0 || score_ == other.score_))) &&
-           (other.turn_count_win_ == 0 ||
-            (other.turn_count_win_ > turn_count_tie_ &&
-             (turn_count_win_ == 0 || score_ == other.score_)));
+    uint32_t tc_win_1 =
+        this->turn_count_win() == 0 ? UINT32_MAX : this->turn_count_win();
+    uint32_t tc_win_2 =
+        other.turn_count_win() == 0 ? UINT32_MAX : other.turn_count_win();
+    uint32_t score_1 =
+        this->turn_count_win() == 0 ? other.score_ : this->score_;
+    uint32_t score_2 =
+        other.turn_count_win() == 0 ? this->score_ : other.score_;
+    uint32_t tc_tie_1 = this->turn_count_tie();
+    uint32_t tc_tie_2 = other.turn_count_tie();
+
+    return tc_win_1 > tc_tie_2 && tc_win_2 > tc_tie_1 && score_1 == score_2;
   }
 
   /*
