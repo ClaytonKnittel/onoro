@@ -327,7 +327,7 @@ static int playout() {
   uint32_t max_depth = absl::GetFlag(FLAGS_depth);
   std::vector<onoro::Game<n_pawns>> history;
 
-  for (uint32_t i = 0; i < -1u; i++) {
+  for (uint32_t i = 0; i < 1; i++) {
     if (std::find(history.cbegin(), history.cend(), prev) != history.cend()) {
       printf("State has been repeated!\n");
       break;
