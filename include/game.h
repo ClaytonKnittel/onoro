@@ -642,9 +642,6 @@ class Game {
   static void printSymmStateTableSymms(uint32_t n_reps = 1);
 
  public:  // TODO revert to private
-  static constexpr std::array<BoardSymmStateData, getSymmStateTableSize()>
-  genSymmStateTable();
-
   void appendTile(idx_t pos);
 
   // Changes the value of a tile at location "i" in the pawn_poses_ array
@@ -657,6 +654,121 @@ class Game {
 
   // Shifts all pawns of game by the given offset
   constexpr void shiftTiles(idx_t offset);
+
+  /*
+   * The purpose of the symmetry table is to provide a quick way to canonicalize
+   * boards when computing and checking for symmetries. Since the center of mass
+   * transforms the same as tiles under symmetry operations, we can use the
+   * position of the center of mass to prune the list of possible layouts of
+   * boards symmetric to this one. For example, if the center of mass does not
+   * lie on any symmetry lines, then if we orient the center of mass in the same
+   * segment of the origin hexagon, all other game boards which are symmetric to
+   * this one will have oriented their center of masses to the same position,
+   * meaning the coordinates of all pawns in both boards will be the same.
+   *
+   * We choose to place the center of mass within the triangle extending from
+   * the center of the origin hex to the center of its right edge (+x), and up
+   * to its top-right vertex. This triangle has coordinates (0, 0), (1/2, 0),
+   * (2/3, 1/3) in HexPos space.
+   *
+   * A unit square centered at (1/2, 1/2) in HexPos space is a possible unit
+   * tile for the hexagonal grid (keep in mind that the hexagons are not regular
+   * hexagons in HexPos space). Pictured below is a mapping from regions on this
+   * unit square to D6 operations (about the origin) to transform the points
+   * within the corresponding region to a point within the designated triangle
+   * defined above.
+   *
+   * +-------------------------------+
+   * |`            /    r3     _ _ | |
+   * |  `    s0   /       _ _    |   |
+   * |    `      /   _ _       |     |
+   * |  r1  `   / _          |       |
+   * |     _ _`v     s4    |        /|
+   * |  _     / `        |         / |
+   * e       /    `    |     r2   /  |
+   * |  s2  /       `e           /   |
+   * |     /  r5   |  `         / s5 |
+   * |    /      |      `      /    -|
+   * |   /     |    s1    `   /- -   |
+   * |  /    |            - `v    r4 |
+   * | /   |         - -    / `      |
+   * |/  |      - -        /    `    |
+   * | |   - -      r0    /  s3   `  |
+   * +-------------------e-----------+
+   *
+   * This image is composed of lines:
+   *  y = 2x
+   *  y = 1/2(x + 1)
+   *  y = x
+   *  y = 1 - x
+   *  y = 1/2x
+   *  y = 2x - 1
+   *
+   * These lines divie the unit square into 12 equally-sized regions in
+   * cartesian space, and listed in each region is the D6 group operation to map
+   * that region to the designated triangle.
+   *
+   * Since the lines given above are the symmetry lines of the hexagonal grid,
+   * we can use them to determine which symmetry group the board state belongs
+   * in.
+   *
+   * Let (x, y) = (n_pawns * (com.x % 1), n_pawns * (com.y % 1)) be the folded
+   * center of mass within the unit square, scaled by n_pawns in play. Note that
+   * x and y are integers.
+   *
+   * Let (x2, y2) = (max(x, y), min(x, y)) be (x, y) folded across the symmetry
+   * line y = x. Note that the diagram above is also symmetryc about y = x, save
+   * for the group operations in the regions.
+   *
+   * - C is the symmetry group D6 about the origin, which is only possible when
+   *     the center of mass lies on the origin, so (x, y) = (0, 0).
+   * - V is the symmetry group D3 about a vertex, which are labeled as 'v' in
+   *     the diagram. These are the points (2/3 n_pawns, 1/3 n_pawns) and (1/3
+   *     n_pawns, 2/3 n_pawns), or (x2, y2) = (2/3 n_pawns, 1/3 n_pawns).
+   * - E is the symmetry group K4 about the center of an edge, which are labeled
+   *     as 'e' in the diagram. These are the points (1/2 n_pawns, 0), (1/2
+   *     n_pawns, 1/2 n_pawns), and (0, 1/2 n_pawns), or (x2, y2) =
+   *     (1/2 n_pawns, 0) or (1/2 n_pawns, 1/2 n_pawns).
+   * - CV is the symmetry group C2 about a line passing through the center of
+   *     the origin hex and one of its vertices.
+   * - CE is the symmetry group C2 about a line passing through the center of
+   *     the origin hex and the center of one of its edges.
+   * - EV is the symmetry group C2 about a line tangent to one of the edges of
+   *     the origin hex.
+   * - TRIVIAL is a group with no symmetries other than the identity, so all
+   *     board states with center of masses which don't lie on any symmetry
+   *     lines are part of this group.
+   *
+   * In the case that the center of mass lies on a symmetry line/point, it is
+   * classified into one of 6 symmetry groups above. These symmetry groups are
+   * subgroups of D6, and are uniquely defined by the remaining symmetries after
+   * canonicalizing the symmetry line/point by the operations given in the
+   * graphic. As an example, the e's on the graphic will all be mapped to the e
+   * in         the bottom center of the graphic, but there are 4 possible
+   * orientations         of         the board with this constraint applied. The
+   * group of these 4         orientations is         K4 (C2 + C2), which is
+   * precisely the symmetries of the         infinite hexagonal         grid
+   * centered at the midpoint of an edge (nix         translation). This also
+   * means         that it does not matter which of the 4 group operations we
+   * choose to apply to         the game state when canonicalizing if the center
+   * of mass lies on an e, since they are symmetries of each other in this K4
+   * group.
+   */
+  static constexpr std::array<BoardSymmStateData, getSymmStateTableSize()>
+  genSymmStateTable() {
+    constexpr uint32_t N = getSymmStateTableWidth();
+
+    std::array<BoardSymmStateData, getSymmStateTableSize()> table;
+
+    for (uint32_t x = 0; x < N; x++) {
+      for (uint32_t y = 0; y < N; y++) {
+        table[x + y * N] =
+            BoardSymmStateData(symmStateOp(x, y, N), symmStateClass(x, y, N));
+      }
+    }
+
+    return table;
+  }
 
   /*
    * The board symmetry state data table is a cache of the BoardSymmStateData
@@ -1353,121 +1465,6 @@ void Game<NPawns, Hash>::printSymmStateTableSymms(uint32_t n_reps) {
     }
     printf("\n");
   }
-}
-
-/*
- * The purpose of the symmetry table is to provide a quick way to canonicalize
- * boards when computing and checking for symmetries. Since the center of mass
- * transforms the same as tiles under symmetry operations, we can use the
- * position of the center of mass to prune the list of possible layouts of
- * boards symmetric to this one. For example, if the center of mass does not
- * lie on any symmetry lines, then if we orient the center of mass in the same
- * segment of the origin hexagon, all other game boards which are symmetric to
- * this one will have oriented their center of masses to the same position,
- * meaning the coordinates of all pawns in both boards will be the same.
- *
- * We choose to place the center of mass within the triangle extending from
- * the center of the origin hex to the center of its right edge (+x), and up
- * to its top-right vertex. This triangle has coordinates (0, 0), (1/2, 0),
- * (2/3, 1/3) in HexPos space.
- *
- * A unit square centered at (1/2, 1/2) in HexPos space is a possible unit
- * tile for the hexagonal grid (keep in mind that the hexagons are not regular
- * hexagons in HexPos space). Pictured below is a mapping from regions on this
- * unit square to D6 operations (about the origin) to transform the points
- * within the corresponding region to a point within the designated triangle
- * defined above.
- *
- * +-------------------------------+
- * |`            /    r3     _ _ | |
- * |  `    s0   /       _ _    |   |
- * |    `      /   _ _       |     |
- * |  r1  `   / _          |       |
- * |     _ _`v     s4    |        /|
- * |  _     / `        |         / |
- * e       /    `    |     r2   /  |
- * |  s2  /       `e           /   |
- * |     /  r5   |  `         / s5 |
- * |    /      |      `      /    -|
- * |   /     |    s1    `   /- -   |
- * |  /    |            - `v    r4 |
- * | /   |         - -    / `      |
- * |/  |      - -        /    `    |
- * | |   - -      r0    /  s3   `  |
- * +-------------------e-----------+
- *
- * This image is composed of lines:
- *  y = 2x
- *  y = 1/2(x + 1)
- *  y = x
- *  y = 1 - x
- *  y = 1/2x
- *  y = 2x - 1
- *
- * These lines divie the unit square into 12 equally-sized regions in
- * cartesian space, and listed in each region is the D6 group operation to map
- * that region to the designated triangle.
- *
- * Since the lines given above are the symmetry lines of the hexagonal grid,
- * we can use them to determine which symmetry group the board state belongs
- * in.
- *
- * Let (x, y) = (n_pawns * (com.x % 1), n_pawns * (com.y % 1)) be the folded
- * center of mass within the unit square, scaled by n_pawns in play. Note that
- * x and y are integers.
- *
- * Let (x2, y2) = (max(x, y), min(x, y)) be (x, y) folded across the symmetry
- * line y = x. Note that the diagram above is also symmetryc about y = x, save
- * for the group operations in the regions.
- *
- * - C is the symmetry group D6 about the origin, which is only possible when
- *     the center of mass lies on the origin, so (x, y) = (0, 0).
- * - V is the symmetry group D3 about a vertex, which are labeled as 'v' in
- *     the diagram. These are the points (2/3 n_pawns, 1/3 n_pawns) and (1/3
- *     n_pawns, 2/3 n_pawns), or (x2, y2) = (2/3 n_pawns, 1/3 n_pawns).
- * - E is the symmetry group K4 about the center of an edge, which are labeled
- *     as 'e' in the diagram. These are the points (1/2 n_pawns, 0), (1/2
- *     n_pawns, 1/2 n_pawns), and (0, 1/2 n_pawns), or (x2, y2) =
- *     (1/2 n_pawns, 0) or (1/2 n_pawns, 1/2 n_pawns).
- * - CV is the symmetry group C2 about a line passing through the center of
- *     the origin hex and one of its vertices.
- * - CE is the symmetry group C2 about a line passing through the center of
- *     the origin hex and the center of one of its edges.
- * - EV is the symmetry group C2 about a line tangent to one of the edges of
- *     the origin hex.
- * - TRIVIAL is a group with no symmetries other than the identity, so all
- *     board states with center of masses which don't lie on any symmetry
- *     lines are part of this group.
- *
- * In the case that the center of mass lies on a symmetry line/point, it is
- * classified into one of 6 symmetry groups above. These symmetry groups are
- * subgroups of D6, and are uniquely defined by the remaining symmetries after
- * canonicalizing the symmetry line/point by the operations given in the
- * graphic. As an example, the e's on the graphic will all be mapped to the e in
- * the bottom center of the graphic, but there are 4 possible orientations of
- * the board with this constraint applied. The group of these 4 orientations is
- * K4 (C2 + C2), which is precisely the symmetries of the infinite hexagonal
- * grid centered at the midpoint of an edge (nix translation). This also means
- * that it does not matter which of the 4 group operations we choose to apply to
- * the game state when canonicalizing if the center of mass lies on an e, since
- * they are symmetries of each other in this K4 group.
- */
-template <uint32_t NPawns, typename Hash>
-constexpr std::array<typename Game<NPawns, Hash>::BoardSymmStateData,
-                     Game<NPawns, Hash>::getSymmStateTableSize()>
-Game<NPawns, Hash>::genSymmStateTable() {
-  constexpr uint32_t N = getSymmStateTableWidth();
-
-  std::array<BoardSymmStateData, getSymmStateTableSize()> table;
-
-  for (uint32_t x = 0; x < N; x++) {
-    for (uint32_t y = 0; y < N; y++) {
-      table[x + y * N] =
-          BoardSymmStateData(symmStateOp(x, y, N), symmStateClass(x, y, N));
-    }
-  }
-
-  return table;
 }
 
 template <uint32_t NPawns, typename Hash>
